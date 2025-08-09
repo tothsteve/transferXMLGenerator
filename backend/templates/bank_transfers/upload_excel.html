@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+
+{% block title %}Excel Import - Bank Utalás Rendszer{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="fas fa-file-excel"></i> Excel Fájl Importálása</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-4">
+                    Töltse fel az Excel fájlt a banki utalások importálásához. 
+                    A fájl formátuma legyen: Megjegyzés | Név | Számlaszám | Összeg | Dátum | Közlemény
+                </p>
+                
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.excel_file.id_for_label }}" class="form-label">
+                            <i class="fas fa-file-upload"></i> Excel Fájl
+                        </label>
+                        {{ form.excel_file }}
+                        {% if form.excel_file.help_text %}
+                            <div class="form-text">{{ form.excel_file.help_text }}</div>
+                        {% endif %}
+                        {% if form.excel_file.errors %}
+                            <div class="text-danger">
+                                {% for error in form.excel_file.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.account_number.id_for_label }}" class="form-label">
+                            <i class="fas fa-credit-card"></i> Terhelendő Számlaszám
+                        </label>
+                        {{ form.account_number }}
+                        {% if form.account_number.help_text %}
+                            <div class="form-text">{{ form.account_number.help_text }}</div>
+                        {% endif %}
+                        {% if form.account_number.errors %}
+                            <div class="text-danger">
+                                {% for error in form.account_number.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'index' %}" class="btn btn-secondary me-md-2">
+                            <i class="fas fa-arrow-left"></i> Vissza
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-upload"></i> Import Indítása
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5><i class="fas fa-info-circle"></i> Excel Fájl Formátum</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Az Excel fájl elvárásai:</strong></p>
+                <ul>
+                    <li>A 3. sortól kezdődjenek az adatok</li>
+                    <li>Oszlopok sorrendje: Megjegyzés | Név | Számlaszám | Összeg | Dátum | Közlemény</li>
+                    <li>Támogatott formátumok: .xlsx, .xls</li>
+                </ul>
+                
+                <p><strong>Példa:</strong></p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Megjegyzés</th>
+                                <th>Név</th>
+                                <th>Számlaszám</th>
+                                <th>Összeg</th>
+                                <th>Dátum</th>
+                                <th>Közlemény</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>NAV fizetés</td>
+                                <td>NAV Személyi jövedelemadó</td>
+                                <td>10032000-06055950</td>
+                                <td>150000</td>
+                                <td>2025-08-15</td>
+                                <td>28778367-2-16</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+
+{% block title %}XML Generálás - Bank Utalás Rendszer{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="fas fa-file-code"></i> XML Generálás</h4>
+            </div>
+            <div class="card-body">
+                {% if transfers %}
+                    <p class="text-muted mb-3">Válassza ki a generálandó utalásokat:</p>
+                    
+                    <form id="xmlForm">
+                        {% csrf_token %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th width="30">
+                                            <input type="checkbox" id="selectAll" onclick="toggleAll()">
+                                        </th>
+                                        <th>Kedvezményezett</th>
+                                        <th>Összeg</th>
+                                        <th>Dátum</th>
+                                        <th>Közlemény</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for transfer in transfers %}
+                                    <tr>
+                                        <td>
+                                            <input type="checkbox" name="transfer_ids" value="{{ transfer.id }}" class="transfer-checkbox">
+                                        </td>
+                                        <td>{{ transfer.beneficiary.name }}</td>
+                                        <td>{{ transfer.amount }} {{ transfer.currency }}</td>
+                                        <td>{{ transfer.execution_date|date:"Y.m.d" }}</td>
+                                        <td>{{ transfer.remittance_info|truncatechars:30 }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <input type="text" class="form-control" id="batchName" placeholder="Köteg neve (opcionális)">
+                            </div>
+                            <div class="col-md-6">
+                                <button type="button" class="btn btn-success" onclick="generateXML()">
+                                    <i class="fas fa-code"></i> XML Generálás
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                        <h5>Nincs utalás</h5>
+                        <p class="text-muted">Hozzon létre utalásokat XML generáláshoz</p>
+                        <a href="{% url 'index' %}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Új Utalás
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-file-code"></i> Generált XML</h5>
+            </div>
+            <div class="card-body">
+                <textarea id="xmlOutput" class="form-control" rows="15" placeholder="Itt jelenik meg a generált XML..."></textarea>
+                <button class="btn btn-outline-primary mt-2 w-100" onclick="copyToClipboard()">
+                    <i class="fas fa-copy"></i> Másolás
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleAll() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.transfer-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+    });
+}
+
+function generateXML() {
+    const checkboxes = document.querySelectorAll('.transfer-checkbox:checked');
+    const transferIds = Array.from(checkboxes).map(cb => cb.value);
+    const batchName = document.getElementById('batchName').value;
+    
+    if (transferIds.length === 0) {
+        alert('Válasszon ki legalább egy utalást!');
+        return;
+    }
+    
+    fetch('{% url "generate_xml_view" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            transfer_ids: transferIds,
+            batch_name: batchName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.xml) {
+            document.getElementById('xmlOutput').value = data.xml;
+            alert(`XML generálva ${data.count} utalásból!`);
+        } else {
+            alert('Hiba az XML generálása során!');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Hiba történt!');
+    });
+}
+
+function copyToClipboard() {
+    const xmlOutput = document.getElementById('xmlOutput');
+    xmlOutput.select();
+    document.execCommand('copy');
+    
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-check"></i> Másolva!';
+    btn.classList.add('btn-success');
+    btn.classList.remove('btn-outline-primary');
+    
+    setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.classList.remove('btn-success');
+        btn.classList.add('btn-outline-primary');
+    }, 2000);
+}
+</script>
+{% endblock %}

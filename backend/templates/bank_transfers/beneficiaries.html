@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}Kedvezményezettek - Bank Utalás Rendszer{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="fas fa-users"></i> Kedvezményezettek</h4>
+            </div>
+            <div class="card-body">
+                {% if beneficiaries %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Név</th>
+                                    <th>Számlaszám</th>
+                                    <th>Bank</th>
+                                    <th>Gyakori</th>
+                                    <th>Létrehozva</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for beneficiary in beneficiaries %}
+                                <tr>
+                                    <td>{{ beneficiary.name }}</td>
+                                    <td>{{ beneficiary.account_number }}</td>
+                                    <td>{{ beneficiary.bank_name|default:"—" }}</td>
+                                    <td>
+                                        {% if beneficiary.is_frequent %}
+                                            <i class="fas fa-star text-warning"></i>
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ beneficiary.created_at|date:"Y.m.d" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">Még nincsenek kedvezményezettek hozzáadva.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-plus"></i> Új Kedvezményezett</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.name.id_for_label }}" class="form-label">Név</label>
+                        {{ form.name }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.account_number.id_for_label }}" class="form-label">Számlaszám</label>
+                        {{ form.account_number }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.bank_name.id_for_label }}" class="form-label">Bank neve</label>
+                        {{ form.bank_name }}
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        {{ form.is_frequent }}
+                        <label for="{{ form.is_frequent.id_for_label }}" class="form-check-label">
+                            Gyakori kedvezményezett
+                        </label>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-save"></i> Hozzáadás
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

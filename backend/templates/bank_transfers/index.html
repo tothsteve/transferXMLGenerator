@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+
+{% block title %}Főoldal - Bank Utalás Rendszer{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="fas fa-plus-circle"></i> Új Utalás Létrehozása</h4>
+            </div>
+            <div class="card-body">
+                <form id="transferForm">
+                    {% csrf_token %}
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Terhelendő számla</label>
+                            <select class="form-select" id="originatorAccount" required>
+                                {% if default_account %}
+                                    <option value="{{ default_account.id }}" selected>{{ default_account.name }} ({{ default_account.account_number }})</option>
+                                {% endif %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Teljesítési dátum</label>
+                            <input type="date" class="form-control" id="executionDate" value="{{ today|date:'Y-m-d' }}" required>
+                        </div>
+                    </div>
+                    
+                    <div id="transfersList">
+                        <!-- Dynamic transfers will be added here -->
+                    </div>
+                    
+                    <button type="button" class="btn btn-primary" onclick="addTransfer()">
+                        <i class="fas fa-plus"></i> Új Utalás Hozzáadása
+                    </button>
+                    
+                    <button type="button" class="btn btn-success ms-2" onclick="generateXML()">
+                        <i class="fas fa-code"></i> XML Generálás
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-users"></i> Gyakori Kedvezményezettek</h5>
+            </div>
+            <div class="card-body">
+                {% for beneficiary in frequent_beneficiaries %}
+                    <div class="d-grid gap-2 mb-2">
+                        <button class="btn btn-outline-primary btn-sm" onclick="addBeneficiary('{{ beneficiary.name }}', '{{ beneficiary.account_number }}')">
+                            {{ beneficiary.name }}
+                        </button>
+                    </div>
+                {% empty %}
+                    <p class="text-muted">Nincs gyakori kedvezményezett</p>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5><i class="fas fa-file-code"></i> Generált XML</h5>
+            </div>
+            <div class="card-body">
+                <textarea id="xmlOutput" class="form-control" rows="10" placeholder="Itt jelenik meg a generált XML..."></textarea>
+                <button class="btn btn-outline-primary mt-2 w-100" onclick="copyToClipboard()">
+                    <i class="fas fa-copy"></i> Másolás
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let transferCount = 0;
+
+function addTransfer() {
+    transferCount++;
+    const transfersDiv = document.getElementById('transfersList');
+    
+    const transferHtml = `
+        <div class="transfer-item border rounded p-3 mb-3" id="transfer-${transferCount}">
+            <div class="row">
+                <div class="col-md-3">
+                    <label class="form-label">Kedvezményezett</label>
+                    <input type="text" class="form-control beneficiary-name" placeholder="Név" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Számlaszám</label>
+                    <input type="text" class="form-control beneficiary-account" placeholder="XXXXXXXX-XXXXXXXX" required>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Összeg</label>
+                    <input type="number" class="form-control amount" placeholder="0.00" step="0.01" min="0.01" required>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Közlemény</label>
+                    <input type="text" class="form-control remittance" placeholder="Közlemény" required>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="button" class="btn btn-danger" onclick="removeTransfer(${transferCount})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    transfersDiv.insertAdjacentHTML('beforeend', transferHtml);
+}
+
+function removeTransfer(id) {
+    document.getElementById(`transfer-${id}`).remove();
+}
+
+function addBeneficiary(name, account) {
+    addTransfer();
+    const lastTransfer = document.querySelector('.transfer-item:last-child');
+    lastTransfer.querySelector('.beneficiary-name').value = name;
+    lastTransfer.querySelector('.beneficiary-account').value = account;
+}
+
+function generateXML() {
+    const transfers = document.querySelectorAll('.transfer-item');
+    const executionDate = document.getElementById('executionDate').value;
+    const originatorAccount = '{{ default_account.account_number|default:"1210001119014874" }}';
+    
+    if (transfers.length === 0) {
+        alert('Adjon hozzá legalább egy utalást!');
+        return;
+    }
+    
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\\n<HUFTransactions>\\n';
+    
+    transfers.forEach(transfer => {
+        const name = transfer.querySelector('.beneficiary-name').value.trim();
+        const account = transfer.querySelector('.beneficiary-account').value.trim().replace(/[-\\s]/g, '');
+        const amount = transfer.querySelector('.amount').value.trim();
+        const remittance = transfer.querySelector('.remittance').value.trim();
+        
+        if (name && account && amount && remittance) {
+            xml += `    <Transaction>
+        <Originator>
+            <Account>
+                <AccountNumber>${originatorAccount.replace(/[-\\s]/g, '')}</AccountNumber>
+            </Account>
+        </Originator>
+        <Beneficiary>
+            <Name>${name}</Name>
+            <Account>
+                <AccountNumber>${account}</AccountNumber>
+            </Account>
+        </Beneficiary>
+        <Amount Currency="HUF">${parseFloat(amount).toFixed(2)}</Amount>
+        <RequestedExecutionDate>${executionDate}</RequestedExecutionDate>
+        <RemittanceInfo>
+            <Text>${remittance}</Text>
+        </RemittanceInfo>
+    </Transaction>
+`;
+        }
+    });
+    
+    xml += '</HUFTransactions>';
+    
+    document.getElementById('xmlOutput').value = xml;
+}
+
+function copyToClipboard() {
+    const xmlOutput = document.getElementById('xmlOutput');
+    xmlOutput.select();
+    document.execCommand('copy');
+    
+    // Show success message
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-check"></i> Másolva!';
+    btn.classList.add('btn-success');
+    btn.classList.remove('btn-outline-primary');
+    
+    setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.classList.remove('btn-success');
+        btn.classList.add('btn-outline-primary');
+    }, 2000);
+}
+
+// Add initial transfer
+addTransfer();
+</script>
+{% endblock %}
