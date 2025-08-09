@@ -1,25 +1,48 @@
 import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { BrowserRouter as Router } from 'react-router-dom';
+import Layout from './components/Layout/Layout';
+import ErrorBoundary from './components/UI/ErrorBoundary';
+import { ToastProvider } from './context/ToastContext';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes
+      retry: (failureCount, error: any) => {
+        // Don't retry on 4xx errors
+        if (error?.response?.status >= 400 && error?.response?.status < 500) {
+          return false;
+        }
+        return failureCount < 2;
+      },
+    },
+    mutations: {
+      retry: (failureCount, error: any) => {
+        // Don't retry mutations on client errors
+        if (error?.response?.status >= 400 && error?.response?.status < 500) {
+          return false;
+        }
+        return failureCount < 1;
+      },
+    },
+  },
+});
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <Router>
+            <Layout />
+          </Router>
+        </ToastProvider>
+        <ReactQueryDevtools initialIsOpen={false} />
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
