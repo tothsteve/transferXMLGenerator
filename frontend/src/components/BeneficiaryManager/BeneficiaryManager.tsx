@@ -48,8 +48,8 @@ const BeneficiaryManager: React.FC = () => {
     is_active: showActive,
     is_frequent: showFrequent,
     page: currentPage,
-    // Don't send ordering for notes field since we handle it client-side
-    ordering: sortField !== 'notes' ? `${sortDirection === 'desc' ? '-' : ''}${sortField}` : undefined,
+    // Don't send ordering for remittance_information field since we handle it client-side
+    ordering: (sortField !== 'remittance_information' && sortField !== 'description') ? `${sortDirection === 'desc' ? '-' : ''}${sortField}` : undefined,
   };
 
   const { data: beneficiariesData, isLoading, refetch } = useBeneficiaries(queryParams);
@@ -60,11 +60,11 @@ const BeneficiaryManager: React.FC = () => {
   // Get raw beneficiaries and apply client-side sorting for notes if needed
   const rawBeneficiaries = beneficiariesData?.results || [];
   
-  // Apply client-side sorting for notes column to handle null values properly
-  const beneficiaries = sortField === 'notes' 
+  // Apply client-side sorting for remittance_information and description columns to handle null values properly
+  const beneficiaries = (sortField === 'remittance_information' || sortField === 'description')
     ? [...rawBeneficiaries].sort((a, b) => {
-        const aValue = a.notes || '';
-        const bValue = b.notes || '';
+        const aValue = (sortField === 'remittance_information' ? a.remittance_information : a.description) || '';
+        const bValue = (sortField === 'remittance_information' ? b.remittance_information : b.description) || '';
         
         // Handle null/empty values - put them at the end for ascending, beginning for descending
         if (!aValue && !bValue) return 0;

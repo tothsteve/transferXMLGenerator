@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import {
   Dialog,
   DialogTitle,
@@ -17,14 +17,35 @@ import {
   InputAdornment,
   List,
   ListItem,
-  ListItemText
+  ListItemText,
+  Tooltip
 } from '@mui/material';
 import {
   Close as CloseIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
-  Search as SearchIcon
+  Search as SearchIcon,
+  DragIndicator as DragIcon
 } from '@mui/icons-material';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import {
+  CSS,
+} from '@dnd-kit/utilities';
 import { TransferTemplate, Beneficiary } from '../../types/api';
 import { useBeneficiaries } from '../../hooks/api';
 
@@ -53,7 +74,110 @@ interface BeneficiarySelection {
   account_number: string;
   default_amount: string;
   default_remittance_info: string;
+  order: number;
 }
+
+// Sortable Beneficiary Component
+const SortableBeneficiary: React.FC<{
+  beneficiary: BeneficiarySelection;
+  onUpdate: (beneficiaryId: number, field: 'default_amount' | 'default_remittance_info', value: string) => void;
+  onRemove: (beneficiaryId: number) => void;
+}> = ({ beneficiary, onUpdate, onRemove }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ 
+    id: beneficiary.beneficiary_id
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <Paper 
+      ref={setNodeRef} 
+      style={style}
+      sx={{ 
+        p: 2,
+        cursor: isDragging ? 'grabbing' : 'default',
+        '&:hover .drag-handle': { opacity: 1 }
+      }}
+    >
+      <Stack direction="row" spacing={2}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', pt: 1 }}>
+          <Tooltip title="Húzd a sorrendezéshez">
+            <IconButton
+              {...attributes}
+              {...listeners}
+              size="small"
+              className="drag-handle"
+              sx={{ 
+                opacity: 0.3,
+                transition: 'opacity 0.2s',
+                cursor: 'grab',
+                '&:active': { cursor: 'grabbing' }
+              }}
+            >
+              <DragIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
+        
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="body1" fontWeight={500}>
+            {beneficiary.beneficiary_name}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" fontFamily="monospace">
+            {beneficiary.account_number}
+          </Typography>
+          
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mt: 1 }}>
+            <Box>
+              <TextField
+                label="Alapértelmezett összeg (HUF)"
+                type="number"
+                size="small"
+                fullWidth
+                value={beneficiary.default_amount}
+                onChange={(e) => onUpdate(beneficiary.beneficiary_id, 'default_amount', e.target.value)}
+                placeholder="0"
+              />
+            </Box>
+            <Box>
+              <TextField
+                label="Alapértelmezett közlemény"
+                size="small"
+                fullWidth
+                value={beneficiary.default_remittance_info}
+                onChange={(e) => onUpdate(beneficiary.beneficiary_id, 'default_remittance_info', e.target.value)}
+                placeholder="Közlemény..."
+              />
+            </Box>
+          </Box>
+        </Box>
+        
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', pt: 1 }}>
+          <Tooltip title="Eltávolítás">
+            <IconButton
+              onClick={() => onRemove(beneficiary.beneficiary_id)}
+              color="error"
+              size="small"
+            >
+              <DeleteIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      </Stack>
+    </Paper>
+  );
+};
 
 const TemplateForm: React.FC<TemplateFormProps> = ({
   isOpen,
@@ -66,10 +190,19 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [showBeneficiaryPicker, setShowBeneficiaryPicker] = useState(false);
 
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   const {
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm<Omit<TemplateFormData, 'beneficiaries'>>({
     defaultValues: {
@@ -89,10 +222,58 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
 
   useEffect(() => {
     if (template) {
-      // TODO: Load template beneficiaries when we have that endpoint
+      // Reset form with template values
+      reset({
+        name: template.name || '',
+        description: template.description || '',
+        is_active: template.is_active ?? true,
+      });
+
+      // Load template beneficiaries if they exist
+      if (template.template_beneficiaries) {
+        const templateBeneficiaries = template.template_beneficiaries
+          .sort((a, b) => a.order - b.order) // Sort by order field
+          .map(tb => ({
+            beneficiary_id: tb.beneficiary.id,
+            beneficiary_name: tb.beneficiary.name,
+            account_number: tb.beneficiary.account_number,
+            default_amount: tb.default_amount?.toString() || '',
+            default_remittance_info: tb.default_remittance || '',
+            order: tb.order,
+          }));
+        setSelectedBeneficiaries(templateBeneficiaries);
+      }
+    } else {
+      // Reset form for new template
+      reset({
+        name: '',
+        description: '',
+        is_active: true,
+      });
       setSelectedBeneficiaries([]);
     }
-  }, [template]);
+  }, [template, reset]);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = selectedBeneficiaries.findIndex(
+        (beneficiary) => beneficiary.beneficiary_id === active.id
+      );
+      const newIndex = selectedBeneficiaries.findIndex(
+        (beneficiary) => beneficiary.beneficiary_id === over.id
+      );
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const reorderedBeneficiaries = arrayMove(selectedBeneficiaries, oldIndex, newIndex).map((b, index) => ({
+          ...b,
+          order: index, // Update order based on new position
+        }));
+        setSelectedBeneficiaries(reorderedBeneficiaries);
+      }
+    }
+  };
 
   const handleFormSubmit = (data: Omit<TemplateFormData, 'beneficiaries'>) => {
     const formData: TemplateFormData = {
@@ -121,7 +302,8 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
         beneficiary_name: beneficiary.name,
         account_number: beneficiary.account_number,
         default_amount: '',
-        default_remittance_info: '',
+        default_remittance_info: beneficiary.remittance_information || '',
+        order: prev.length, // Add to the end
       }]);
     }
     setShowBeneficiaryPicker(false);
@@ -130,7 +312,9 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
 
   const removeBeneficiary = (beneficiaryId: number) => {
     setSelectedBeneficiaries(prev => 
-      prev.filter(b => b.beneficiary_id !== beneficiaryId)
+      prev
+        .filter(b => b.beneficiary_id !== beneficiaryId)
+        .map((b, index) => ({ ...b, order: index })) // Reorder after removal
     );
   };
 
@@ -173,9 +357,21 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
                 />
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <FormControlLabel
-                  control={<Checkbox {...register('is_active')} />}
-                  label="Aktív sablon"
+                <Controller
+                  name="is_active"
+                  control={control}
+                  render={({ field: { onChange, value, ...field } }) => (
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          {...field}
+                          checked={!!value}
+                          onChange={(e) => onChange(e.target.checked)}
+                        />
+                      }
+                      label="Aktív sablon"
+                    />
+                  )}
                 />
               </Box>
             </Box>
@@ -281,58 +477,34 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
                   }}
                 >
                   <Typography variant="body2" color="text.secondary">
-                    Nincs kiválasztott kedvezményezett. Kattintson a "Hozzáadás" gombra.
+                    Nincs kiválasztott kedvezményezett. Kedvezményezetteket később is hozzáadhat a sablonhoz.
                   </Typography>
                 </Paper>
               ) : (
                 <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
-                  <Stack spacing={2}>
-                    {selectedBeneficiaries.map(beneficiary => (
-                      <Paper key={beneficiary.beneficiary_id} sx={{ p: 2 }}>
-                        <Stack direction="row" spacing={2}>
-                          <Box sx={{ flex: 1 }}>
-                            <Typography variant="body1" fontWeight={500}>
-                              {beneficiary.beneficiary_name}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" fontFamily="monospace">
-                              {beneficiary.account_number}
-                            </Typography>
-                            
-                            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mt: 1 }}>
-                              <Box>
-                                <TextField
-                                  label="Alapértelmezett összeg (HUF)"
-                                  type="number"
-                                  size="small"
-                                  fullWidth
-                                  value={beneficiary.default_amount}
-                                  onChange={(e) => updateBeneficiary(beneficiary.beneficiary_id, 'default_amount', e.target.value)}
-                                  placeholder="0"
-                                />
-                              </Box>
-                              <Box>
-                                <TextField
-                                  label="Alapértelmezett közlemény"
-                                  size="small"
-                                  fullWidth
-                                  value={beneficiary.default_remittance_info}
-                                  onChange={(e) => updateBeneficiary(beneficiary.beneficiary_id, 'default_remittance_info', e.target.value)}
-                                  placeholder="Közlemény..."
-                                />
-                              </Box>
-                            </Box>
-                          </Box>
-                          
-                          <IconButton
-                            onClick={() => removeBeneficiary(beneficiary.beneficiary_id)}
-                            color="error"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </Stack>
-                      </Paper>
-                    ))}
-                  </Stack>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext 
+                      items={selectedBeneficiaries.map(b => b.beneficiary_id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <Stack spacing={2}>
+                        {selectedBeneficiaries
+                          .sort((a, b) => a.order - b.order) // Sort by order
+                          .map(beneficiary => (
+                            <SortableBeneficiary
+                              key={beneficiary.beneficiary_id}
+                              beneficiary={beneficiary}
+                              onUpdate={updateBeneficiary}
+                              onRemove={removeBeneficiary}
+                            />
+                          ))}
+                      </Stack>
+                    </SortableContext>
+                  </DndContext>
                 </Box>
               )}
             </Box>
@@ -346,7 +518,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
           <Button
             type="submit"
             variant="contained"
-            disabled={isLoading || selectedBeneficiaries.length === 0}
+            disabled={isLoading}
           >
             {isLoading ? 'Mentés...' : (template ? 'Frissítés' : 'Létrehozás')}
           </Button>

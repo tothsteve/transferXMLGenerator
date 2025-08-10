@@ -187,9 +187,9 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({
                               <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
                                 {beneficiary.account_number}
                               </Typography>
-                              {beneficiary.bank_name && (
+                              {beneficiary.description && (
                                 <Typography variant="caption" color="text.secondary">
-                                  {beneficiary.bank_name}
+                                  {beneficiary.description}
                                 </Typography>
                               )}
                             </Stack>
@@ -216,9 +216,9 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({
                     <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
                       {selectedBeneficiary?.account_number}
                     </Typography>
-                    {selectedBeneficiary?.bank_name && (
+                    {selectedBeneficiary?.description && (
                       <Typography variant="caption" color="text.secondary" display="block">
-                        {selectedBeneficiary.bank_name}
+                        {selectedBeneficiary.description}
                       </Typography>
                     )}
                   </Box>

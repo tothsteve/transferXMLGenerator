@@ -2,8 +2,8 @@ export interface Beneficiary {
   id: number;
   name: string;
   account_number: string;
-  bank_name: string;
-  notes: string;
+  description: string;
+  remittance_information: string;
   is_frequent: boolean;
   is_active: boolean;
 }
@@ -24,14 +24,17 @@ export interface TransferTemplate {
   beneficiary_count: number;
   created_at: string;
   updated_at: string;
+  template_beneficiaries?: TemplateBeneficiary[];
 }
 
 export interface TemplateBeneficiary {
   id: number;
   template: number;
-  beneficiary: number;
-  default_amount: string;
-  default_remittance_info: string;
+  beneficiary: Beneficiary;
+  default_amount?: number;
+  default_remittance: string;
+  order: number;
+  is_active: boolean;
 }
 
 export interface Transfer {
@@ -61,8 +64,18 @@ export interface ApiResponse<T> {
   results: T[];
 }
 
+export interface CreateTransferData {
+  originator_account_id: number;
+  beneficiary_id: number;
+  amount: string;
+  currency: 'HUF' | 'EUR' | 'USD';
+  execution_date: string;
+  remittance_info: string;
+  order: number;
+}
+
 export interface BulkCreateTransferRequest {
-  transfers: Omit<Transfer, 'id' | 'is_processed' | 'created_at'>[];
+  transfers: CreateTransferData[];
 }
 
 export interface GenerateXmlRequest {
@@ -70,9 +83,9 @@ export interface GenerateXmlRequest {
 }
 
 export interface GenerateXmlResponse {
-  xml_content: string;
-  filename: string;
-  batch_id: number;
+  xml: string;
+  transfer_count: number;
+  total_amount: string;
 }
 
 export interface LoadTemplateResponse {

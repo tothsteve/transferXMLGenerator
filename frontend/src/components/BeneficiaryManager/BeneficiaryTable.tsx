@@ -56,7 +56,8 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
     setEditData({
       name: beneficiary.name,
       account_number: beneficiary.account_number,
-      notes: beneficiary.notes,
+      description: beneficiary.description,
+      remittance_information: beneficiary.remittance_information,
       is_frequent: beneficiary.is_frequent,
       is_active: beneficiary.is_active,
     });
@@ -115,8 +116,9 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
           <TableHead>
             <TableRow>
               <TableCell>Név</TableCell>
-              <TableCell>Megjegyzés</TableCell>
+              <TableCell>Leírás</TableCell>
               <TableCell>Számlaszám</TableCell>
+              <TableCell>Közlemény</TableCell>
               <TableCell>Állapot</TableCell>
               <TableCell align="right">Műveletek</TableCell>
             </TableRow>
@@ -127,6 +129,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 <TableCell><Skeleton variant="text" width="80%" /></TableCell>
                 <TableCell><Skeleton variant="text" width="60%" /></TableCell>
                 <TableCell><Skeleton variant="text" width="90%" /></TableCell>
+                <TableCell><Skeleton variant="text" width="70%" /></TableCell>
                 <TableCell><Skeleton variant="text" width="60%" /></TableCell>
                 <TableCell><Skeleton variant="text" width="40%" /></TableCell>
               </TableRow>
@@ -153,8 +156,9 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
         <TableHead>
           <TableRow>
             <SortableHeader field="name">Név</SortableHeader>
-            <SortableHeader field="notes">Megjegyzés</SortableHeader>
+            <SortableHeader field="description">Leírás</SortableHeader>
             <SortableHeader field="account_number">Számlaszám</SortableHeader>
+            <SortableHeader field="remittance_information">Közlemény</SortableHeader>
             <TableCell sx={{ fontWeight: 600 }}>
               <Typography variant="body2" fontWeight="inherit">
                 Állapot
@@ -193,16 +197,14 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 {editingId === beneficiary.id ? (
                   <TextField
                     size="small"
-                    multiline
-                    rows={2}
-                    value={editData.notes || ''}
-                    onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
-                    placeholder="Megjegyzés..."
+                    value={editData.description || ''}
+                    onChange={(e) => setEditData({ ...editData, description: e.target.value })}
+                    placeholder="Leírás..."
                     fullWidth
                   />
                 ) : (
-                  <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 200 }}>
-                    {beneficiary.notes || '-'}
+                  <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 150 }}>
+                    {beneficiary.description || '-'}
                   </Typography>
                 )}
               </TableCell>
@@ -217,6 +219,23 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 ) : (
                   <Typography variant="body2" fontFamily="monospace">
                     {beneficiary.account_number}
+                  </Typography>
+                )}
+              </TableCell>
+              <TableCell>
+                {editingId === beneficiary.id ? (
+                  <TextField
+                    size="small"
+                    multiline
+                    rows={2}
+                    value={editData.remittance_information || ''}
+                    onChange={(e) => setEditData({ ...editData, remittance_information: e.target.value })}
+                    placeholder="Közlemény..."
+                    fullWidth
+                  />
+                ) : (
+                  <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 200 }}>
+                    {beneficiary.remittance_information || '-'}
                   </Typography>
                 )}
               </TableCell>

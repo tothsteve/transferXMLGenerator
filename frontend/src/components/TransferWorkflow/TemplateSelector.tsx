@@ -12,8 +12,7 @@ import {
   Chip
 } from '@mui/material';
 import {
-  Description as TemplateIcon,
-  PlayArrow as PlayIcon
+  Description as TemplateIcon
 } from '@mui/icons-material';
 import { TransferTemplate } from '../../types/api';
 
@@ -39,27 +38,22 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
     const template = activeTemplates.find(t => t.id === templateId);
     if (template) {
       onSelectTemplate(template);
+      // Automatically load the template when selected
+      onLoadTemplate(templateId);
     }
   };
 
   return (
     <Paper elevation={1} sx={{ p: 3 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <TemplateIcon color="primary" />
-          <Typography variant="h6">
-            Sablon kiválasztása
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
+        <TemplateIcon color="primary" />
+        <Typography variant="h6">
+          Sablon kiválasztása
+        </Typography>
+        {isLoading && (
+          <Typography variant="body2" color="primary" sx={{ ml: 2 }}>
+            Betöltés...
           </Typography>
-        </Stack>
-        {selectedTemplate && (
-          <Button
-            variant="contained"
-            startIcon={<PlayIcon />}
-            onClick={() => onLoadTemplate(selectedTemplate.id)}
-            disabled={isLoading}
-          >
-            {isLoading ? 'Betöltés...' : 'Sablon betöltése'}
-          </Button>
         )}
       </Stack>
 

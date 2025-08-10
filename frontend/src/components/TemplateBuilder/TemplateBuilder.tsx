@@ -7,7 +7,9 @@ import {
   Stack,
   Card,
   CardContent,
-  Avatar
+  Avatar,
+  Alert,
+  Snackbar
 } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 import { 
@@ -15,7 +17,9 @@ import {
   useCreateTemplate, 
   useUpdateTemplate, 
   useDeleteTemplate,
-  useLoadTemplate
+  useAddTemplateBeneficiary,
+  useRemoveTemplateBeneficiary,
+  useUpdateTemplateBeneficiary
 } from '../../hooks/api';
 import { TransferTemplate } from '../../types/api';
 import TemplateList from './TemplateList';
@@ -38,6 +42,15 @@ const TemplateBuilder: React.FC = () => {
   const [showView, setShowView] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TransferTemplate | null>(null);
   const [viewingTemplate, setViewingTemplate] = useState<TransferTemplate | null>(null);
+  const [notification, setNotification] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info' | 'warning';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
   
   const navigate = useNavigate();
 
@@ -45,26 +58,66 @@ const TemplateBuilder: React.FC = () => {
   const createMutation = useCreateTemplate();
   const updateMutation = useUpdateTemplate();
   const deleteMutation = useDeleteTemplate();
-  const loadTemplateMutation = useLoadTemplate();
+  const addBeneficiaryMutation = useAddTemplateBeneficiary();
+  const removeBeneficiaryMutation = useRemoveTemplateBeneficiary();
+  const updateBeneficiaryMutation = useUpdateTemplateBeneficiary();
 
   const templates = templatesData?.results || [];
 
+  const showNotification = (message: string, severity: 'success' | 'error' | 'info' | 'warning' = 'success') => {
+    setNotification({ open: true, message, severity });
+  };
+
+  const hideNotification = () => {
+    setNotification(prev => ({ ...prev, open: false }));
+  };
+
   const handleCreateTemplate = async (data: TemplateFormData) => {
     try {
+      console.log('Creating template with data:', data);
+      
       const templateData = {
         name: data.name,
         description: data.description,
         is_active: data.is_active,
       };
       
-      await createMutation.mutateAsync(templateData);
+      const result = await createMutation.mutateAsync(templateData);
+      console.log('Template created successfully:', result);
+      
+      const createdTemplate = result.data;
+      
+      // Add beneficiaries to the template if any were selected
+      if (data.beneficiaries && data.beneficiaries.length > 0) {
+        console.log('Adding beneficiaries to template:', data.beneficiaries);
+        
+        for (let i = 0; i < data.beneficiaries.length; i++) {
+          const beneficiary = data.beneficiaries[i];
+          try {
+            await addBeneficiaryMutation.mutateAsync({
+              templateId: createdTemplate.id,
+              data: {
+                beneficiary_id: beneficiary.beneficiary_id,
+                default_amount: beneficiary.default_amount ? parseFloat(beneficiary.default_amount) : undefined,
+                default_remittance: beneficiary.default_remittance_info || undefined,
+                order: i,
+                is_active: true,
+              }
+            });
+          } catch (beneficiaryError) {
+            console.error(`Failed to add beneficiary ${beneficiary.beneficiary_id}:`, beneficiaryError);
+            showNotification(`Figyelem: Nem sikerült hozzáadni minden kedvezményezettet a sablonhoz.`, 'warning');
+          }
+        }
+      }
+      
       setShowForm(false);
       refetch();
+      showNotification(`Sablon "${data.name}" sikeresen létrehozva!`, 'success');
       
-      // TODO: Handle beneficiary associations after template creation
-      // This would require additional API calls to associate beneficiaries with the template
     } catch (error) {
       console.error('Failed to create template:', error);
+      showNotification('Hiba történt a sablon létrehozása során.', 'error');
     }
   };
 
@@ -83,13 +136,74 @@ const TemplateBuilder: React.FC = () => {
         data: templateData,
       });
       
+      // Handle beneficiary associations update when editing templates
+      const currentBeneficiaryIds = new Set(
+        editingTemplate.template_beneficiaries?.map(tb => tb.beneficiary.id) || []
+      );
+      const newBeneficiaryIds = new Set(
+        data.beneficiaries.map(b => b.beneficiary_id)
+      );
+      
+      // Remove beneficiaries that are no longer selected
+      for (const currentBeneficiaryId of Array.from(currentBeneficiaryIds)) {
+        if (!newBeneficiaryIds.has(currentBeneficiaryId)) {
+          try {
+            await removeBeneficiaryMutation.mutateAsync({
+              templateId: editingTemplate.id,
+              beneficiaryId: currentBeneficiaryId
+            });
+          } catch (error) {
+            console.error(`Failed to remove beneficiary ${currentBeneficiaryId}:`, error);
+          }
+        }
+      }
+      
+      // Handle beneficiaries (add new ones and update existing ones)
+      for (let i = 0; i < data.beneficiaries.length; i++) {
+        const beneficiary = data.beneficiaries[i];
+        
+        if (!currentBeneficiaryIds.has(beneficiary.beneficiary_id)) {
+          // Add new beneficiaries
+          try {
+            await addBeneficiaryMutation.mutateAsync({
+              templateId: editingTemplate.id,
+              data: {
+                beneficiary_id: beneficiary.beneficiary_id,
+                default_amount: beneficiary.default_amount ? parseFloat(beneficiary.default_amount) : undefined,
+                default_remittance: beneficiary.default_remittance_info || undefined,
+                order: i,
+                is_active: true,
+              }
+            });
+          } catch (error) {
+            console.error(`Failed to add beneficiary ${beneficiary.beneficiary_id}:`, error);
+          }
+        } else {
+          // Update existing beneficiaries (order, amount, remittance info)
+          try {
+            await updateBeneficiaryMutation.mutateAsync({
+              templateId: editingTemplate.id,
+              data: {
+                beneficiary_id: beneficiary.beneficiary_id,
+                default_amount: beneficiary.default_amount ? parseFloat(beneficiary.default_amount) : undefined,
+                default_remittance: beneficiary.default_remittance_info || undefined,
+                order: i,
+                is_active: true,
+              }
+            });
+          } catch (error) {
+            console.error(`Failed to update beneficiary ${beneficiary.beneficiary_id}:`, error);
+          }
+        }
+      }
+      
       setShowForm(false);
       setEditingTemplate(null);
       refetch();
-      
-      // TODO: Handle beneficiary associations update
+      showNotification(`Sablon "${data.name}" sikeresen frissítve!`, 'success');
     } catch (error) {
       console.error('Failed to update template:', error);
+      showNotification('Hiba történt a sablon frissítése során.', 'error');
     }
   };
 
@@ -114,20 +228,14 @@ const TemplateBuilder: React.FC = () => {
     setShowView(true);
   };
 
-  const handleLoadTemplate = async (id: number) => {
-    try {
-      const result = await loadTemplateMutation.mutateAsync(id);
-      
-      // Navigate to transfers page with the loaded template data
-      navigate('/transfers', { 
-        state: { 
-          templateData: result.data,
-          loadedFromTemplate: true 
-        } 
-      });
-    } catch (error) {
-      console.error('Failed to load template:', error);
-    }
+  const handleLoadTemplate = (id: number) => {
+    // Navigate to transfers page with template ID - let TransferWorkflow handle the loading
+    navigate('/transfers', { 
+      state: { 
+        templateId: id,
+        loadFromTemplate: true 
+      } 
+    });
   };
 
   const handleFormClose = () => {
@@ -140,7 +248,7 @@ const TemplateBuilder: React.FC = () => {
     setViewingTemplate(null);
   };
 
-  const isFormLoading = createMutation.isPending || updateMutation.isPending;
+  const isFormLoading = createMutation.isPending || updateMutation.isPending || addBeneficiaryMutation.isPending || removeBeneficiaryMutation.isPending;
 
   return (
     <Box sx={{ p: 3 }}>
@@ -248,6 +356,18 @@ const TemplateBuilder: React.FC = () => {
         onClose={handleViewClose}
         template={viewingTemplate}
       />
+
+      {/* Notification Snackbar */}
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={6000}
+        onClose={hideNotification}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={hideNotification} severity={notification.severity} sx={{ width: '100%' }}>
+          {notification.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

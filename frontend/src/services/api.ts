@@ -60,8 +60,35 @@ export const templatesApi = {
   delete: (id: number) =>
     apiClient.delete(`/templates/${id}/`),
   
-  loadTransfers: (id: number) =>
-    apiClient.post<LoadTemplateResponse>(`/templates/${id}/load_transfers/`),
+  loadTransfers: (id: number, data: {
+    template_id: number;
+    originator_account_id: number;
+    execution_date: string;
+  }) =>
+    apiClient.post<LoadTemplateResponse>(`/templates/${id}/load_transfers/`, data),
+  
+  addBeneficiary: (templateId: number, data: {
+    beneficiary_id: number;
+    default_amount?: number;
+    default_remittance?: string;
+    order?: number;
+    is_active?: boolean;
+  }) =>
+    apiClient.post(`/templates/${templateId}/add_beneficiary/`, data),
+  
+  updateBeneficiary: (templateId: number, data: {
+    beneficiary_id: number;
+    default_amount?: number;
+    default_remittance?: string;
+    order?: number;
+    is_active?: boolean;
+  }) =>
+    apiClient.put(`/templates/${templateId}/update_beneficiary/`, data),
+  
+  removeBeneficiary: (templateId: number, beneficiaryId: number) =>
+    apiClient.delete(`/templates/${templateId}/remove_beneficiary/`, {
+      data: { beneficiary_id: beneficiaryId }
+    }),
 };
 
 // Transfers API

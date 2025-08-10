@@ -139,7 +139,69 @@ export function useDeleteTemplate() {
 
 export function useLoadTemplate() {
   return useMutation({
-    mutationFn: (id: number) => templatesApi.loadTransfers(id),
+    mutationFn: ({ templateId, data }: { 
+      templateId: number, 
+      data: { 
+        template_id: number;
+        originator_account_id: number;
+        execution_date: string;
+      }
+    }) => templatesApi.loadTransfers(templateId, data),
+  });
+}
+
+export function useAddTemplateBeneficiary() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ templateId, data }: { 
+      templateId: number; 
+      data: {
+        beneficiary_id: number;
+        default_amount?: number;
+        default_remittance?: string;
+        order?: number;
+        is_active?: boolean;
+      }
+    }) => templatesApi.addBeneficiary(templateId, data),
+    onSuccess: (_, { templateId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.templates });
+      queryClient.invalidateQueries({ queryKey: queryKeys.template(templateId) });
+    },
+  });
+}
+
+export function useRemoveTemplateBeneficiary() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ templateId, beneficiaryId }: { templateId: number; beneficiaryId: number }) =>
+      templatesApi.removeBeneficiary(templateId, beneficiaryId),
+    onSuccess: (_, { templateId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.templates });
+      queryClient.invalidateQueries({ queryKey: queryKeys.template(templateId) });
+    },
+  });
+}
+
+export function useUpdateTemplateBeneficiary() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ templateId, data }: { 
+      templateId: number; 
+      data: {
+        beneficiary_id: number;
+        default_amount?: number;
+        default_remittance?: string;
+        order?: number;
+        is_active?: boolean;
+      }
+    }) => templatesApi.updateBeneficiary(templateId, data),
+    onSuccess: (_, { templateId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.templates });
+      queryClient.invalidateQueries({ queryKey: queryKeys.template(templateId) });
+    },
   });
 }
 

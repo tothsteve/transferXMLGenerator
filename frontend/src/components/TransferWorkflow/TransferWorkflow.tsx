@@ -26,9 +26,10 @@ import {
   useLoadTemplate, 
   useBulkCreateTransfers, 
   useGenerateXml,
-  useDefaultBankAccount
+  useDefaultBankAccount,
+  useBeneficiaries
 } from '../../hooks/api';
-import { Transfer, TransferTemplate, LoadTemplateResponse } from '../../types/api';
+import { Transfer, TransferTemplate, LoadTemplateResponse, Beneficiary } from '../../types/api';
 import TemplateSelector from './TemplateSelector';
 import TransferTable from './TransferTable';
 import AddTransferModal from './AddTransferModal';
@@ -37,6 +38,7 @@ import XMLPreview from './XMLPreview';
 interface TransferData extends Omit<Transfer, 'id' | 'is_processed' | 'created_at'> {
   id?: number;
   tempId?: string;
+  beneficiary_data?: Beneficiary;
 }
 
 const TransferWorkflow: React.FC = () => {
@@ -52,11 +54,13 @@ const TransferWorkflow: React.FC = () => {
 
   const { data: templatesData } = useTemplates();
   const { data: defaultAccount } = useDefaultBankAccount();
+  const { data: beneficiariesData } = useBeneficiaries();
   const loadTemplateMutation = useLoadTemplate();
   const bulkCreateMutation = useBulkCreateTransfers();
   const generateXmlMutation = useGenerateXml();
 
   const templates = templatesData?.results || [];
+  const beneficiaries = beneficiariesData?.results || [];
 
   // Handle template data passed from TemplateBuilder
   useEffect(() => {
@@ -78,12 +82,41 @@ const TransferWorkflow: React.FC = () => {
   }, [location.state]);
 
   const handleLoadTemplate = async (templateId: number) => {
+    if (!defaultAccount) {
+      console.error('No default account available for template loading');
+      return;
+    }
+
     try {
-      const result = await loadTemplateMutation.mutateAsync(templateId);
-      setTransfers(result.data.transfers.map((transfer, index) => ({
-        ...transfer,
-        tempId: `temp-${index}`,
-      })));
+      // Use today's date as default execution date
+      const today = new Date().toISOString().split('T')[0];
+      
+      const result = await loadTemplateMutation.mutateAsync({
+        templateId,
+        data: {
+          template_id: templateId,
+          originator_account_id: defaultAccount.id,
+          execution_date: today,
+        }
+      });
+      
+      console.log('Template loading response:', result.data);
+      console.log('Loaded transfers:', result.data.transfers);
+      
+      // Enrich transfers with beneficiary data
+      const enrichedTransfers = result.data.transfers.map((transfer: any, index: number) => {
+        const beneficiaryData = beneficiaries.find(b => b.id === transfer.beneficiary);
+        console.log(`Transfer ${index}: beneficiary ID ${transfer.beneficiary}, found data:`, beneficiaryData);
+        
+        return {
+          ...transfer,
+          tempId: `temp-${index}`,
+          beneficiary_data: beneficiaryData,
+        };
+      });
+      
+      console.log('Enriched transfers:', enrichedTransfers);
+      setTransfers(enrichedTransfers);
     } catch (error) {
       console.error('Failed to load template:', error);
     }
@@ -106,6 +139,10 @@ const TransferWorkflow: React.FC = () => {
       tempId: `temp-${Date.now()}`,
     }]);
     setValidationErrors([]);
+  };
+
+  const handleReorderTransfers = (reorderedTransfers: TransferData[]) => {
+    setTransfers(reorderedTransfers);
   };
 
   const validateTransfers = (): string[] => {
@@ -132,47 +169,143 @@ const TransferWorkflow: React.FC = () => {
     return errors;
   };
 
-  const handleGenerateXML = async () => {
+  const handleSaveTransfers = async () => {
     const errors = validateTransfers();
     if (errors.length > 0) {
       setValidationErrors(errors);
-      return;
+      return false;
+    }
+
+    if (!defaultAccount) {
+      setValidationErrors(['Nem található alapértelmezett számla az átutalások mentéséhez.']);
+      return false;
     }
 
     try {
-      // First, bulk create the transfers if they don't have IDs yet
+      // Create all transfers that don't have IDs yet
       const transfersToCreate = transfers.filter(t => !t.id);
-      let transferIds: number[] = [];
-
+      
       if (transfersToCreate.length > 0) {
+        console.log('Creating transfers:', transfersToCreate);
+        
+        const transfersPayload = transfersToCreate.map((t, index) => ({
+          originator_account_id: defaultAccount!.id,
+          beneficiary_id: t.beneficiary,
+          amount: parseFloat(t.amount).toFixed(2),
+          currency: t.currency,
+          execution_date: t.execution_date,
+          remittance_info: t.remittance_info,
+          order: transfers.indexOf(t), // Preserve the order from the UI
+        }));
+        
+        console.log('Sending payload to backend:', { transfers: transfersPayload });
+        
         const bulkResult = await bulkCreateMutation.mutateAsync({
-          transfers: transfersToCreate.map(t => ({
-            beneficiary: t.beneficiary,
-            amount: t.amount,
-            currency: t.currency,
-            execution_date: t.execution_date,
-            remittance_info: t.remittance_info,
-          })),
+          transfers: transfersPayload,
         });
-        transferIds = bulkResult.data.map(t => t.id!);
+        
+        console.log('Bulk create response:', bulkResult);
+        console.log('Response data:', bulkResult.data);
+        
+        // Handle the response structure - check if it's wrapped or direct array
+        const responseData: any = bulkResult.data;
+        const createdTransfers = Array.isArray(responseData) 
+          ? responseData 
+          : responseData?.transfers || responseData?.results || [];
+        
+        console.log('Created transfers:', createdTransfers);
+        
+        // Update the transfers state with the created transfer IDs
+        const newTransfers = createdTransfers.map((createdTransfer: any, index: number) => ({
+          ...transfersToCreate[index],
+          id: createdTransfer.id,
+        }));
+        
+        // Replace the unsaved transfers with saved ones
+        setTransfers(prev => [
+          ...prev.filter(t => t.id), // Keep existing saved transfers
+          ...newTransfers // Add newly saved transfers
+        ]);
+      }
+      
+      return true;
+    } catch (error: any) {
+      console.error('Failed to save transfers:', error);
+      console.error('Error response:', error.response?.data);
+      
+      // Handle validation errors from backend
+      let errorMessages: string[] = [];
+      
+      if (error.response?.data?.transfers) {
+        // Backend returned field-specific errors for each transfer
+        const transferErrors = error.response.data.transfers;
+        transferErrors.forEach((transferError: any, index: number) => {
+          if (transferError) {
+            Object.keys(transferError).forEach(field => {
+              const fieldErrors = transferError[field];
+              if (Array.isArray(fieldErrors)) {
+                fieldErrors.forEach(err => {
+                  errorMessages.push(`${index + 1}. átutalás - ${field}: ${err}`);
+                });
+              }
+            });
+          }
+        });
+      }
+      
+      if (errorMessages.length === 0) {
+        const errorMessage = error.response?.data?.detail || 
+                            error.response?.data?.message || 
+                            'Hiba történt az átutalások mentése során.';
+        errorMessages = [errorMessage];
+      }
+      
+      setValidationErrors(errorMessages);
+      return false;
+    }
+  };
+
+  const handleGenerateXML = async () => {
+    // First, ensure all transfers are saved
+    const saveSuccess = await handleSaveTransfers();
+    if (!saveSuccess) return;
+
+    try {
+      // Get all transfer IDs (now all should have IDs)
+      const allTransferIds = transfers
+        .filter(t => t.id)
+        .map(t => t.id!);
+
+      console.log('Current transfers state:', transfers);
+      console.log('Transfer IDs for XML generation:', allTransferIds);
+
+      if (allTransferIds.length === 0) {
+        setValidationErrors(['Nincsenek mentett átutalások az XML generáláshoz.']);
+        return;
       }
 
-      // Add existing transfer IDs
-      const existingIds = transfers.filter(t => t.id).map(t => t.id!);
-      const allTransferIds = [...existingIds, ...transferIds];
-
-      // Generate XML
+      // Generate XML from saved transfers
+      console.log('Calling XML generation with IDs:', allTransferIds);
       const xmlResult = await generateXmlMutation.mutateAsync({
         transfer_ids: allTransferIds,
       });
 
+      console.log('XML generation response:', xmlResult);
+      console.log('XML content:', xmlResult.data);
+
       setXmlPreview({
-        content: xmlResult.data.xml_content,
-        filename: xmlResult.data.filename,
+        content: xmlResult.data.xml,
+        filename: `transfers_${new Date().toISOString().split('T')[0]}.xml`,
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to generate XML:', error);
+      console.error('Error response:', error.response?.data);
+      
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          'Hiba történt az XML generálása során.';
+      setValidationErrors([errorMessage]);
     }
   };
 
@@ -198,37 +331,14 @@ const TransferWorkflow: React.FC = () => {
     <Box sx={{ p: 3 }}>
       {/* Header */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', pb: 3, mb: 4 }}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={3}>
-          <Box>
-            <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
-              Átutalások
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Átutalások létrehozása, szerkesztése és XML generálás bank importáláshoz
-            </Typography>
-          </Box>
-          {transfers.length > 0 && (
-            <Stack direction="row" alignItems="center" spacing={2}>
-              <Box sx={{ textAlign: 'right' }}>
-                <Typography variant="body2" color="text.secondary">
-                  Összesen
-                </Typography>
-                <Typography variant="h6" fontWeight="bold">
-                  {totalAmount.toLocaleString('hu-HU')} HUF
-                </Typography>
-              </Box>
-              <Button
-                variant="contained"
-                color="success"
-                startIcon={<DownloadIcon />}
-                onClick={handleGenerateXML}
-                disabled={isGenerating || transfers.length === 0}
-              >
-                {isGenerating ? 'Generálás...' : 'XML Generálás'}
-              </Button>
-            </Stack>
-          )}
-        </Stack>
+        <Box>
+          <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
+            Átutalások
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Átutalások létrehozása, szerkesztése és XML generálás bank importáláshoz
+          </Typography>
+        </Box>
       </Box>
 
       {/* Bank Account Info */}
@@ -267,6 +377,68 @@ const TransferWorkflow: React.FC = () => {
         />
       </Box>
 
+      {/* Action Buttons and Total Amount */}
+      {transfers.length > 0 && (
+        <Box sx={{ mb: 4 }}>
+          <Stack 
+            direction={{ xs: 'column', sm: 'row' }} 
+            justifyContent="space-between" 
+            alignItems={{ xs: 'stretch', sm: 'center' }} 
+            spacing={3}
+            sx={{
+              p: 3,
+              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              borderRadius: 3,
+            }}
+          >
+            <Box sx={{ textAlign: { xs: 'center', sm: 'left' } }}>
+              <Typography variant="body2" color="text.secondary">
+                Összesen
+              </Typography>
+              <Typography variant="h5" fontWeight="bold" sx={{ color: 'success.dark' }}>
+                {totalAmount.toLocaleString('hu-HU')} HUF
+              </Typography>
+            </Box>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <Button
+                variant="outlined"
+                color="primary"
+                onClick={handleSaveTransfers}
+                disabled={isGenerating || transfers.length === 0}
+                sx={{ 
+                  minWidth: 160,
+                  borderWidth: 2,
+                  '&:hover': { borderWidth: 2 }
+                }}
+              >
+                {bulkCreateMutation.isPending ? 'Mentés...' : 'Átutalások mentése'}
+              </Button>
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<DownloadIcon />}
+                onClick={handleGenerateXML}
+                disabled={isGenerating || transfers.length === 0}
+                sx={{ 
+                  minWidth: 160,
+                  background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                  boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #047857 0%, #059669 100%)',
+                    transform: 'translateY(-1px)',
+                    boxShadow: '0 6px 16px rgba(5, 150, 105, 0.4)',
+                  }
+                }}
+              >
+                {isGenerating ? 'Generálás...' : 'XML Generálás'}
+              </Button>
+            </Stack>
+          </Stack>
+        </Box>
+      )}
+
       {/* Transfer Table */}
       <Box sx={{ mb: 4 }}>
         <TransferTable
@@ -274,6 +446,7 @@ const TransferWorkflow: React.FC = () => {
           onUpdateTransfer={handleUpdateTransfer}
           onDeleteTransfer={handleDeleteTransfer}
           onAddTransfer={() => setShowAddModal(true)}
+          onReorderTransfers={handleReorderTransfers}
         />
       </Box>
 

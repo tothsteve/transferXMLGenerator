@@ -7,7 +7,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Layout from './components/Layout/Layout';
 import ErrorBoundary from './components/UI/ErrorBoundary';
 import { ToastProvider } from './context/ToastContext';
-import theme from './theme';
+import customTheme from './theme/customTheme';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,7 +37,7 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider theme={theme}>
+      <ThemeProvider theme={customTheme}>
         <CssBaseline />
         <QueryClientProvider client={queryClient}>
           <ToastProvider>

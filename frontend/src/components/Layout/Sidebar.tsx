@@ -36,7 +36,7 @@ const navigation = [
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) => {
   const drawerContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
+      {/* Header with Logo */}
       <Box
         sx={{
           p: 2,
@@ -48,9 +48,21 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
           borderColor: 'divider',
         }}
       >
-        <Typography variant="h6" component="h1" fontWeight="bold">
-          Transfer XML Generator
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <img
+            src="/logo192.png"
+            alt="ITCardigan"
+            style={{ width: 32, height: 32, borderRadius: '50%' }}
+          />
+          <Box>
+            <Typography variant="h6" component="h1" fontWeight="bold" sx={{ lineHeight: 1.2 }}>
+              Transfer XML Generator
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+              by ITCardigan
+            </Typography>
+          </Box>
+        </Box>
         {isMobile && (
           <IconButton onClick={onClose} edge="end">
             <CloseIcon />
@@ -114,6 +126,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
             '& .MuiDrawer-paper': {
               width: width,
               boxSizing: 'border-box',
+              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%)',
+              backdropFilter: 'blur(20px)',
+              borderRight: '1px solid rgba(255, 255, 255, 0.2)',
             },
           }}
         >
@@ -129,6 +144,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
             '& .MuiDrawer-paper': {
               width: width,
               boxSizing: 'border-box',
+              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%)',
+              backdropFilter: 'blur(20px)',
+              borderRight: '1px solid rgba(255, 255, 255, 0.2)',
             },
           }}
         >

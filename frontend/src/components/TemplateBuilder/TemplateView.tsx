@@ -22,7 +22,7 @@ import {
   Close as CloseIcon,
   CalendarToday as CalendarIcon,
   Group as GroupIcon,
-  AttachMoney as MoneyIcon,
+  Payments as PaymentsIcon,
   Description as DocumentIcon
 } from '@mui/icons-material';
 import { TransferTemplate } from '../../types/api';
@@ -38,7 +38,7 @@ interface TemplateBeneficiaryDetail {
   id: number;
   beneficiary_name: string;
   account_number: string;
-  bank_name: string;
+  description: string;
   default_amount: string;
   default_remittance_info: string;
 }
@@ -50,25 +50,15 @@ const TemplateView: React.FC<TemplateViewProps> = ({
 }) => {
   if (!template) return null;
 
-  // Mock data - in real implementation, this would come from API
-  const templateBeneficiaries: TemplateBeneficiaryDetail[] = [
-    {
-      id: 1,
-      beneficiary_name: 'Teszt Alkalmazott',
-      account_number: '12345678-12345678',
-      bank_name: 'Test Bank',
-      default_amount: '350000',
-      default_remittance_info: 'Havi bér - január',
-    },
-    {
-      id: 2,
-      beneficiary_name: 'Másik Alkalmazott', 
-      account_number: '87654321-87654321',
-      bank_name: 'Másik Bank',
-      default_amount: '420000',
-      default_remittance_info: 'Havi bér - január',
-    },
-  ];
+  // Use real template data from the API
+  const templateBeneficiaries: TemplateBeneficiaryDetail[] = template.template_beneficiaries?.map(tb => ({
+    id: tb.id,
+    beneficiary_name: tb.beneficiary.name,
+    account_number: tb.beneficiary.account_number,
+    description: tb.beneficiary.description || '',
+    default_amount: tb.default_amount?.toString() || '0',
+    default_remittance_info: tb.default_remittance || '',
+  })) || [];
 
   const totalAmount = templateBeneficiaries.reduce((sum, b) => 
     sum + (parseFloat(b.default_amount) || 0), 0
@@ -121,7 +111,7 @@ const TemplateView: React.FC<TemplateViewProps> = ({
                   </Stack>
                   
                   <Stack direction="row" alignItems="center" spacing={1}>
-                    <MoneyIcon fontSize="small" color="action" />
+                    <PaymentsIcon fontSize="small" color="action" />
                     <Typography variant="body2" color="text.secondary">
                       {totalAmount.toLocaleString('hu-HU')} HUF összesen
                     </Typography>
@@ -192,9 +182,9 @@ const TemplateView: React.FC<TemplateViewProps> = ({
                               <Typography variant="body2" fontFamily="monospace">
                                 {beneficiary.account_number}
                               </Typography>
-                              {beneficiary.bank_name && (
+                              {beneficiary.description && (
                                 <Typography variant="body2" color="text.secondary">
-                                  {beneficiary.bank_name}
+                                  {beneficiary.description}
                                 </Typography>
                               )}
                             </Stack>

@@ -43,25 +43,47 @@ const XMLPreview: React.FC<XMLPreviewProps> = ({
   };
 
   const formatXML = (xml: string) => {
-    // Simple XML formatting for display
-    const formatted = xml
-      .replace(/></g, '>\n<')
-      .replace(/^\s*\n/gm, '')
-      .split('\n')
-      .map((line, index) => {
-        const indentLevel = (line.match(/<\//g) || []).length > 0 ? 
-          Math.max(0, (line.match(/</g) || []).length - 1) : 
-          (line.match(/</g) || []).length;
-        
-        return {
-          content: line.trim(),
-          indent: Math.max(0, indentLevel - 1) * 2,
-          lineNumber: index + 1
-        };
-      })
-      .filter(line => line.content.length > 0);
-
-    return formatted;
+    // Improved XML formatting with proper indentation
+    if (!xml) return [];
+    
+    let indentLevel = 0;
+    const indentSize = 4; // 4 spaces per indent level
+    
+    // Remove existing formatting and add proper line breaks
+    const cleaned = xml
+      .replace(/>\s*</g, '>\n<')   // Add line breaks between tags
+      .replace(/^\s+|\s+$/g, '');  // Remove leading/trailing whitespace
+    
+    const lines = cleaned.split('\n');
+    const result = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      
+      // Adjust indent level BEFORE creating the line
+      if (line.startsWith('</')) {
+        // Closing tag: decrease indent level first
+        indentLevel = Math.max(0, indentLevel - 1);
+      }
+      
+      // Create formatted line with current indentation
+      const spaces = ' '.repeat(indentLevel * indentSize);
+      result.push({
+        content: line,
+        indent: indentLevel * indentSize,
+        lineNumber: result.length + 1,
+        formattedContent: spaces + line
+      });
+      
+      // Adjust indent level AFTER creating the line
+      if (line.startsWith('<') && !line.startsWith('</') && !line.endsWith('/>') && !line.includes('</')) {
+        // Opening tag: increase indent level for next line
+        indentLevel++;
+      }
+    }
+    
+    return result;
   };
 
   const formattedLines = formatXML(xmlContent);
@@ -73,17 +95,23 @@ const XMLPreview: React.FC<XMLPreviewProps> = ({
       maxWidth="lg" 
       fullWidth
       PaperProps={{
-        sx: { height: '90vh', display: 'flex', flexDirection: 'column' }
+        sx: { 
+          height: '90vh', 
+          display: 'flex', 
+          flexDirection: 'column',
+          bgcolor: '#1f2937',
+          color: '#f9fafb'
+        }
       }}
     >
-      <DialogTitle>
+      <DialogTitle sx={{ bgcolor: '#1f2937', color: '#f9fafb', borderBottom: '1px solid #374151' }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
           <Box>
             <Stack direction="row" alignItems="center" spacing={1}>
-              <CodeIcon color="primary" />
-              <Typography variant="h6">XML Előnézet</Typography>
+              <CodeIcon sx={{ color: '#60a5fa' }} />
+              <Typography variant="h6" sx={{ color: '#f9fafb' }}>XML Előnézet</Typography>
             </Stack>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" sx={{ color: '#9ca3af' }}>
               {filename}
             </Typography>
           </Box>
@@ -93,6 +121,14 @@ const XMLPreview: React.FC<XMLPreviewProps> = ({
               startIcon={<CopyIcon />}
               onClick={handleCopyToClipboard}
               size="small"
+              sx={{
+                borderColor: '#4b5563',
+                color: '#f9fafb',
+                '&:hover': {
+                  borderColor: '#6b7280',
+                  bgcolor: '#374151'
+                }
+              }}
             >
               Másolás
             </Button>
@@ -101,26 +137,55 @@ const XMLPreview: React.FC<XMLPreviewProps> = ({
               startIcon={<DownloadIcon />}
               onClick={onDownload}
               size="small"
+              sx={{
+                bgcolor: '#059669',
+                '&:hover': {
+                  bgcolor: '#047857'
+                }
+              }}
             >
               Letöltés
             </Button>
-            <IconButton onClick={onClose} edge="end">
+            <IconButton 
+              onClick={onClose} 
+              edge="end"
+              sx={{
+                color: '#9ca3af',
+                '&:hover': {
+                  bgcolor: '#374151',
+                  color: '#f9fafb'
+                }
+              }}
+            >
               <CloseIcon />
             </IconButton>
           </Stack>
         </Stack>
       </DialogTitle>
 
-      <DialogContent sx={{ flex: 1, p: 0, overflow: 'hidden' }}>
-        <Paper
-          variant="outlined"
+      <DialogContent sx={{ flex: 1, p: 0, overflow: 'hidden', bgcolor: '#1a1a1a' }}>
+        <Box
           sx={{
             height: '100%',
-            bgcolor: 'grey.900',
-            color: '#00ff00',
-            fontFamily: 'monospace',
+            bgcolor: '#1a1a1a',
+            color: '#e5e7eb',
+            fontFamily: '"Fira Code", "JetBrains Mono", "Monaco", "Cascadia Code", "Roboto Mono", monospace',
             fontSize: '0.875rem',
-            overflow: 'auto'
+            overflow: 'auto',
+            '&::-webkit-scrollbar': {
+              width: 8,
+              height: 8,
+            },
+            '&::-webkit-scrollbar-track': {
+              backgroundColor: '#2d2d2d',
+            },
+            '&::-webkit-scrollbar-thumb': {
+              backgroundColor: '#555',
+              borderRadius: 4,
+              '&:hover': {
+                backgroundColor: '#777',
+              },
+            },
           }}
         >
           <Box sx={{ p: 2 }}>
@@ -128,12 +193,16 @@ const XMLPreview: React.FC<XMLPreviewProps> = ({
               <Box key={index} sx={{ display: 'flex', minHeight: '1.25em' }}>
                 <Box
                   sx={{
-                    color: 'grey.500',
+                    color: '#6b7280',
                     width: 48,
                     textAlign: 'right',
                     mr: 2,
                     userSelect: 'none',
-                    flexShrink: 0
+                    flexShrink: 0,
+                    bgcolor: '#262626',
+                    px: 1,
+                    borderRadius: 0.5,
+                    fontSize: '0.8rem'
                   }}
                 >
                   {line.lineNumber}
@@ -141,7 +210,6 @@ const XMLPreview: React.FC<XMLPreviewProps> = ({
                 <Box
                   sx={{
                     flex: 1,
-                    pl: line.indent,
                     whiteSpace: 'pre-wrap',
                     wordBreak: 'break-all'
                   }}
@@ -150,42 +218,63 @@ const XMLPreview: React.FC<XMLPreviewProps> = ({
                     component="span"
                     sx={{
                       color: line.content.includes('</')
-                        ? '#ff6b6b'
+                        ? '#f87171' // Red for closing tags
                         : line.content.includes('<?xml')
-                        ? '#ffd93d'
+                        ? '#fbbf24' // Yellow for XML declaration
                         : line.content.includes('<') && !line.content.includes('</')
-                        ? '#74c0fc'
-                        : '#ffffff'
+                        ? '#60a5fa' // Blue for opening tags
+                        : '#e5e7eb', // Light gray for text content
+                      lineHeight: 1.5,
                     }}
                   >
-                    {line.content}
+                    {line.formattedContent}
                   </Box>
                 </Box>
               </Box>
             ))}
           </Box>
-        </Paper>
+        </Box>
       </DialogContent>
 
-      <DialogActions sx={{ bgcolor: 'grey.50', px: 3, py: 2 }}>
+      <DialogActions sx={{ bgcolor: '#1f2937', px: 3, py: 2, borderTop: '1px solid #374151' }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ width: '100%' }}>
           <Stack direction="row" spacing={2}>
             <Chip 
               label={`${formattedLines.length} sor`} 
               size="small" 
-              variant="outlined" 
+              variant="outlined"
+              sx={{
+                borderColor: '#4b5563',
+                color: '#9ca3af',
+                '& .MuiChip-label': {
+                  color: '#9ca3af'
+                }
+              }}
             />
             <Chip 
               label={`${new Blob([xmlContent]).size} byte`} 
               size="small" 
-              variant="outlined" 
+              variant="outlined"
+              sx={{
+                borderColor: '#4b5563',
+                color: '#9ca3af',
+                '& .MuiChip-label': {
+                  color: '#9ca3af'
+                }
+              }}
             />
           </Stack>
           <Chip 
             label="UTF-8 kódolás" 
             size="small" 
-            color="primary" 
-            variant="outlined" 
+            variant="outlined"
+            sx={{
+              borderColor: '#60a5fa',
+              color: '#60a5fa',
+              '& .MuiChip-label': {
+                color: '#60a5fa'
+              }
+            }}
           />
         </Stack>
       </DialogActions>

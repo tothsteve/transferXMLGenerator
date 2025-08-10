@@ -8,7 +8,9 @@
       "Bash(git checkout:*)",
       "Bash(find:*)",
       "Bash(grep:*)",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "Bash(cp:*)",
+      "Bash(npm test:*)"
     ],
     "deny": []
   }
