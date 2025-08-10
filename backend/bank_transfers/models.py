@@ -23,10 +23,12 @@ class BankAccount(models.Model):
 class Beneficiary(models.Model):
     name = models.CharField(max_length=200, verbose_name="Kedvezményezett neve")
     account_number = models.CharField(max_length=50, verbose_name="Számlaszám")
-    bank_name = models.CharField(max_length=200, blank=True, verbose_name="Bank neve")
+    description = models.CharField(max_length=200, blank=True, verbose_name="Leírás", 
+                                 help_text="További információk a kedvezményezettről (bank neve, szervezet adatai, stb.)")
     is_frequent = models.BooleanField(default=False, verbose_name="Gyakori kedvezményezett")
     is_active = models.BooleanField(default=True, verbose_name="Aktív")
-    notes = models.TextField(blank=True, verbose_name="Megjegyzések")
+    remittance_information = models.TextField(blank=True, verbose_name="Utalási információ",
+                                            help_text="Alapértelmezett fizetési hivatkozások, számlaszámok vagy egyéb tranzakció-specifikus információk")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -89,6 +91,7 @@ class Transfer(models.Model):
     execution_date = models.DateField(verbose_name="Teljesítési dátum")
     remittance_info = models.CharField(max_length=500, verbose_name="Közlemény")
     template = models.ForeignKey(TransferTemplate, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Sablon")
+    order = models.IntegerField(default=0, verbose_name="Sorrend", help_text="Átutalások sorrendje XML generáláskor")
     is_processed = models.BooleanField(default=False, verbose_name="Feldolgozva")
     notes = models.TextField(blank=True, verbose_name="Megjegyzések")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -97,7 +100,7 @@ class Transfer(models.Model):
     class Meta:
         verbose_name = "Utalás"
         verbose_name_plural = "Utalások"
-        ordering = ['-execution_date', '-created_at']
+        ordering = ['order', '-execution_date', '-created_at']
         indexes = [
             models.Index(fields=['execution_date']),
             models.Index(fields=['is_processed']),

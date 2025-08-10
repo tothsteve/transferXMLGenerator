@@ -154,6 +154,33 @@ class TransferTemplateViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'Beneficiary not found in template'}, status=404)
     
     @swagger_auto_schema(
+        operation_description="Sablon kedvezményezett frissítése",
+        request_body=TemplateBeneficiarySerializer,
+        responses={
+            200: TemplateBeneficiarySerializer,
+            404: 'Template beneficiary not found'
+        }
+    )
+    @action(detail=True, methods=['put'])
+    def update_beneficiary(self, request, pk=None):
+        """Sablon kedvezményezett frissítése (összeg, közlemény, sorrend)"""
+        template = self.get_object()
+        beneficiary_id = request.data.get('beneficiary_id')
+        
+        try:
+            template_beneficiary = TemplateBeneficiary.objects.get(
+                template=template, 
+                beneficiary_id=beneficiary_id
+            )
+            serializer = TemplateBeneficiarySerializer(template_beneficiary, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except TemplateBeneficiary.DoesNotExist:
+            return Response({'detail': 'Beneficiary not found in template'}, status=404)
+    
+    @swagger_auto_schema(
         operation_description="Sablon betöltése utalások létrehozásához",
         request_body=TransferCreateFromTemplateSerializer,
         responses={
@@ -185,7 +212,7 @@ class TransferTemplateViewSet(viewsets.ModelViewSet):
                     'amount': template_beneficiary.default_amount or 0,
                     'currency': 'HUF',
                     'execution_date': execution_date,
-                    'remittance_info': template_beneficiary.default_remittance or '',
+                    'remittance_info': template_beneficiary.default_remittance or template_beneficiary.beneficiary.remittance_information or '',
                     'template': template.id
                 }
                 transfers.append(transfer_data)
@@ -297,7 +324,7 @@ class TransferViewSet(viewsets.ModelViewSet):
             
             transfers = Transfer.objects.filter(id__in=transfer_ids).select_related(
                 'beneficiary', 'originator_account'
-            )
+            ).order_by('order', 'execution_date')
             
             if not transfers:
                 return Response({'detail': 'No transfers found'}, status=404)

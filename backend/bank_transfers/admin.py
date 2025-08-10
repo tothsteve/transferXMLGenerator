@@ -17,9 +17,9 @@ class BankAccountAdmin(admin.ModelAdmin):
 
 @admin.register(Beneficiary)
 class BeneficiaryAdmin(admin.ModelAdmin):
-    list_display = ['name', 'account_number', 'bank_name', 'is_frequent', 'created_at']
+    list_display = ['name', 'account_number', 'description', 'is_frequent', 'created_at']
     list_filter = ['is_frequent', 'created_at']
-    search_fields = ['name', 'account_number', 'bank_name']
+    search_fields = ['name', 'account_number', 'description']
 
 @admin.register(Transfer)
 class TransferAdmin(admin.ModelAdmin):

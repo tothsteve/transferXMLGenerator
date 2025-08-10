@@ -11,8 +11,8 @@ class BeneficiarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Beneficiary
         fields = [
-            'id', 'name', 'account_number', 'bank_name', 
-            'is_frequent', 'is_active', 'notes', 
+            'id', 'name', 'account_number', 'description', 
+            'is_frequent', 'is_active', 'remittance_information', 
             'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
@@ -56,7 +56,7 @@ class TransferSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'originator_account', 'originator_account_id',
             'beneficiary', 'beneficiary_id', 'amount', 'currency',
-            'execution_date', 'remittance_info', 'template',
+            'execution_date', 'remittance_info', 'template', 'order',
             'is_processed', 'notes', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']

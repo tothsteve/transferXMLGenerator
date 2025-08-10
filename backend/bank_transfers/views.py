@@ -80,7 +80,7 @@ def generate_xml_view(request):
         if not transfer_ids:
             return JsonResponse({'error': 'Nincs kiválasztott utalás'}, status=400)
         
-        transfers = Transfer.objects.filter(id__in=transfer_ids)
+        transfers = Transfer.objects.filter(id__in=transfer_ids).order_by('order', 'execution_date')
         xml_content = generate_xml(transfers)
         
         # Opcionálisan mentés kötegbe
