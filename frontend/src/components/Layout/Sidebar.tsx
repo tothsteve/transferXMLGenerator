@@ -1,138 +1,140 @@
-import React, { Fragment } from 'react';
-import { Dialog, Transition } from '@headlessui/react';
+import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
-  XMarkIcon,
-  HomeIcon,
-  UserGroupIcon,
-  DocumentDuplicateIcon,
-  ArrowsRightLeftIcon,
-} from '@heroicons/react/24/outline';
+  Box,
+  Drawer,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Typography,
+  IconButton,
+} from '@mui/material';
+import {
+  Close as CloseIcon,
+  Home as HomeIcon,
+  People as PeopleIcon,
+  Description as DescriptionIcon,
+  SwapHoriz as SwapHorizIcon,
+} from '@mui/icons-material';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  width: number;
+  isMobile: boolean;
 }
 
 const navigation = [
   { name: 'Főoldal', href: '/', icon: HomeIcon },
-  { name: 'Kedvezményezettek', href: '/beneficiaries', icon: UserGroupIcon },
-  { name: 'Sablonok', href: '/templates', icon: DocumentDuplicateIcon },
-  { name: 'Átutalások', href: '/transfers', icon: ArrowsRightLeftIcon },
+  { name: 'Kedvezményezettek', href: '/beneficiaries', icon: PeopleIcon },
+  { name: 'Sablonok', href: '/templates', icon: DescriptionIcon },
+  { name: 'Átutalások', href: '/transfers', icon: SwapHorizIcon },
 ];
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) => {
+  const drawerContent = (
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <Box
+        sx={{
+          p: 2,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          minHeight: 64,
+          borderBottom: 1,
+          borderColor: 'divider',
+        }}
+      >
+        <Typography variant="h6" component="h1" fontWeight="bold">
+          Transfer XML Generator
+        </Typography>
+        {isMobile && (
+          <IconButton onClick={onClose} edge="end">
+            <CloseIcon />
+          </IconButton>
+        )}
+      </Box>
+
+      {/* Navigation */}
+      <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+        <List sx={{ p: 1 }}>
+          {navigation.map((item) => (
+            <ListItem key={item.name} disablePadding sx={{ mb: 0.5 }}>
+              <ListItemButton
+                component={NavLink}
+                to={item.href}
+                onClick={isMobile ? onClose : undefined}
+                sx={{
+                  borderRadius: 1,
+                  '&.active': {
+                    bgcolor: 'primary.50',
+                    color: 'primary.600',
+                    '& .MuiListItemIcon-root': {
+                      color: 'primary.600',
+                    },
+                  },
+                  '&:hover': {
+                    bgcolor: 'grey.50',
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 40 }}>
+                  <item.icon />
+                </ListItemIcon>
+                <ListItemText 
+                  primary={item.name}
+                  primaryTypographyProps={{
+                    fontWeight: 600,
+                    fontSize: '0.875rem',
+                  }}
+                />
+              </ListItemButton>
+            </ListItem>
+          ))}
+        </List>
+      </Box>
+    </Box>
+  );
+
   return (
     <>
-      {/* Mobile sidebar */}
-      <Transition.Root show={isOpen} as={Fragment}>
-        <Dialog as="div" className="relative z-50 lg:hidden" onClose={onClose}>
-          <Transition.Child
-            as={Fragment}
-            enter="transition-opacity ease-linear duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="transition-opacity ease-linear duration-300"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <div className="fixed inset-0 bg-gray-900/80" />
-          </Transition.Child>
-
-          <div className="fixed inset-0 flex">
-            <Transition.Child
-              as={Fragment}
-              enter="transition ease-in-out duration-300 transform"
-              enterFrom="-translate-x-full"
-              enterTo="translate-x-0"
-              leave="transition ease-in-out duration-300 transform"
-              leaveFrom="translate-x-0"
-              leaveTo="-translate-x-full"
-            >
-              <Dialog.Panel className="relative mr-16 flex w-full max-w-xs flex-1">
-                <div className="absolute left-full top-0 flex w-16 justify-center pt-5">
-                  <button type="button" className="-m-2.5 p-2.5" onClick={onClose}>
-                    <span className="sr-only">Oldalsáv bezárása</span>
-                    <XMarkIcon className="h-6 w-6 text-white" aria-hidden="true" />
-                  </button>
-                </div>
-
-                <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white px-6 pb-4">
-                  <div className="flex h-16 shrink-0 items-center">
-                    <h1 className="text-xl font-bold text-gray-900">Transfer XML</h1>
-                  </div>
-                  <nav className="flex flex-1 flex-col">
-                    <ul className="flex flex-1 flex-col gap-y-7">
-                      <li>
-                        <ul className="-mx-2 space-y-1">
-                          {navigation.map((item) => (
-                            <li key={item.name}>
-                              <NavLink
-                                to={item.href}
-                                onClick={onClose}
-                                className={({ isActive }) =>
-                                  `group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 ${
-                                    isActive
-                                      ? 'bg-primary-50 text-primary-600'
-                                      : 'text-gray-700 hover:text-primary-600 hover:bg-gray-50'
-                                  }`
-                                }
-                              >
-                                <item.icon
-                                  className="h-6 w-6 shrink-0"
-                                  aria-hidden="true"
-                                />
-                                {item.name}
-                              </NavLink>
-                            </li>
-                          ))}
-                        </ul>
-                      </li>
-                    </ul>
-                  </nav>
-                </div>
-              </Dialog.Panel>
-            </Transition.Child>
-          </div>
-        </Dialog>
-      </Transition.Root>
-
-      {/* Desktop sidebar */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
-        <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4">
-          <div className="flex h-16 shrink-0 items-center">
-            <h1 className="text-xl font-bold text-gray-900">Transfer XML Generator</h1>
-          </div>
-          <nav className="flex flex-1 flex-col">
-            <ul className="flex flex-1 flex-col gap-y-7">
-              <li>
-                <ul className="-mx-2 space-y-1">
-                  {navigation.map((item) => (
-                    <li key={item.name}>
-                      <NavLink
-                        to={item.href}
-                        className={({ isActive }) =>
-                          `group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 ${
-                            isActive
-                              ? 'bg-primary-50 text-primary-600'
-                              : 'text-gray-700 hover:text-primary-600 hover:bg-gray-50'
-                          }`
-                        }
-                      >
-                        <item.icon
-                          className="h-6 w-6 shrink-0"
-                          aria-hidden="true"
-                        />
-                        {item.name}
-                      </NavLink>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            </ul>
-          </nav>
-        </div>
-      </div>
+      {/* Mobile Drawer */}
+      {isMobile ? (
+        <Drawer
+          anchor="left"
+          open={isOpen}
+          onClose={onClose}
+          ModalProps={{
+            keepMounted: true, // Better open performance on mobile.
+          }}
+          sx={{
+            '& .MuiDrawer-paper': {
+              width: width,
+              boxSizing: 'border-box',
+            },
+          }}
+        >
+          {drawerContent}
+        </Drawer>
+      ) : (
+        /* Desktop Drawer */
+        <Drawer
+          variant="permanent"
+          sx={{
+            width: width,
+            flexShrink: 0,
+            '& .MuiDrawer-paper': {
+              width: width,
+              boxSizing: 'border-box',
+            },
+          }}
+        >
+          {drawerContent}
+        </Drawer>
+      )}
     </>
   );
 };

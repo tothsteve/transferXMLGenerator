@@ -1,13 +1,30 @@
 import React, { useState } from 'react';
-import { 
-  PencilIcon, 
-  TrashIcon, 
-  CheckIcon, 
-  XMarkIcon,
-  ChevronUpIcon,
-  ChevronDownIcon
-} from '@heroicons/react/24/outline';
-import { StarIcon as StarSolidIcon } from '@heroicons/react/24/solid';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  IconButton,
+  TextField,
+  Checkbox,
+  Chip,
+  Stack,
+  Typography,
+  Skeleton,
+  Box,
+  FormControlLabel
+} from '@mui/material';
+import {
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Check as CheckIcon,
+  Close as CloseIcon,
+  KeyboardArrowUp as ArrowUpIcon,
+  KeyboardArrowDown as ArrowDownIcon,
+  Star as StarIcon
+} from '@mui/icons-material';
 import { Beneficiary } from '../../types/api';
 
 interface BeneficiaryTableProps {
@@ -57,19 +74,25 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
   };
 
   const SortableHeader: React.FC<{ field: string; children: React.ReactNode }> = ({ field, children }) => (
-    <th 
-      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+    <TableCell 
+      sx={{ 
+        cursor: 'pointer',
+        '&:hover': { backgroundColor: 'action.hover' },
+        fontWeight: 600
+      }}
       onClick={() => handleSort(field)}
     >
-      <div className="flex items-center space-x-1">
-        <span>{children}</span>
+      <Stack direction="row" alignItems="center" spacing={0.5}>
+        <Typography variant="body2" fontWeight="inherit">
+          {children}
+        </Typography>
         {sortField === field && (
           sortDirection === 'asc' ? 
-            <ChevronUpIcon className="h-4 w-4" /> : 
-            <ChevronDownIcon className="h-4 w-4" />
+            <ArrowUpIcon fontSize="small" /> : 
+            <ArrowDownIcon fontSize="small" />
         )}
-      </div>
-    </th>
+      </Stack>
+    </TableCell>
   );
 
   const handleSaveEdit = () => {
@@ -87,180 +110,203 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
 
   if (isLoading) {
     return (
-      <div className="animate-pulse">
-        <div className="bg-white shadow rounded-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-          </div>
-          <div className="divide-y divide-gray-200">
+      <TableContainer>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Név</TableCell>
+              <TableCell>Megjegyzés</TableCell>
+              <TableCell>Számlaszám</TableCell>
+              <TableCell>Állapot</TableCell>
+              <TableCell align="right">Műveletek</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="px-6 py-4">
-                <div className="flex space-x-4">
-                  <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                  <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                  <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                  <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                </div>
-              </div>
+              <TableRow key={i}>
+                <TableCell><Skeleton variant="text" width="80%" /></TableCell>
+                <TableCell><Skeleton variant="text" width="60%" /></TableCell>
+                <TableCell><Skeleton variant="text" width="90%" /></TableCell>
+                <TableCell><Skeleton variant="text" width="60%" /></TableCell>
+                <TableCell><Skeleton variant="text" width="40%" /></TableCell>
+              </TableRow>
             ))}
-          </div>
-        </div>
-      </div>
+          </TableBody>
+        </Table>
+      </TableContainer>
     );
   }
 
   if (beneficiaries.length === 0) {
     return (
-      <div className="bg-white shadow rounded-lg p-6 text-center">
-        <p className="text-gray-500">Nincsenek kedvezményezettek</p>
-      </div>
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <Typography variant="body1" color="text.secondary">
+          Nincsenek kedvezményezettek
+        </Typography>
+      </Box>
     );
   }
 
   return (
-    <div className="bg-white shadow rounded-lg overflow-hidden">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
-          <tr>
+    <TableContainer>
+      <Table>
+        <TableHead>
+          <TableRow>
             <SortableHeader field="name">Név</SortableHeader>
             <SortableHeader field="notes">Megjegyzés</SortableHeader>
             <SortableHeader field="account_number">Számlaszám</SortableHeader>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Állapot
-            </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Műveletek
-            </th>
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+            <TableCell sx={{ fontWeight: 600 }}>
+              <Typography variant="body2" fontWeight="inherit">
+                Állapot
+              </Typography>
+            </TableCell>
+            <TableCell align="right" sx={{ fontWeight: 600 }}>
+              <Typography variant="body2" fontWeight="inherit">
+                Műveletek
+              </Typography>
+            </TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
           {beneficiaries.map((beneficiary) => (
-            <tr key={beneficiary.id} className="hover:bg-gray-50">
-              <td className="px-6 py-4 whitespace-nowrap">
+            <TableRow key={beneficiary.id} hover>
+              <TableCell>
                 {editingId === beneficiary.id ? (
-                  <input
-                    type="text"
+                  <TextField
+                    size="small"
                     value={editData.name || ''}
                     onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    fullWidth
                   />
                 ) : (
-                  <div className="flex items-center">
-                    <div className="text-sm font-medium text-gray-900">
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <Typography variant="body2" fontWeight={500}>
                       {beneficiary.name}
-                    </div>
+                    </Typography>
                     {beneficiary.is_frequent && (
-                      <StarSolidIcon className="h-4 w-4 text-yellow-400 ml-2" />
+                      <StarIcon fontSize="small" sx={{ color: 'warning.main' }} />
                     )}
-                  </div>
+                  </Stack>
                 )}
-              </td>
-              <td className="px-6 py-4">
+              </TableCell>
+              <TableCell>
                 {editingId === beneficiary.id ? (
-                  <textarea
+                  <TextField
+                    size="small"
+                    multiline
+                    rows={2}
                     value={editData.notes || ''}
                     onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm resize-none"
-                    rows={2}
                     placeholder="Megjegyzés..."
+                    fullWidth
                   />
                 ) : (
-                  <div className="text-sm text-gray-500 max-w-xs">
+                  <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 200 }}>
                     {beneficiary.notes || '-'}
-                  </div>
+                  </Typography>
                 )}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
+              </TableCell>
+              <TableCell>
                 {editingId === beneficiary.id ? (
-                  <input
-                    type="text"
+                  <TextField
+                    size="small"
                     value={editData.account_number || ''}
                     onChange={(e) => setEditData({ ...editData, account_number: e.target.value })}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    fullWidth
                   />
                 ) : (
-                  <div className="text-sm text-gray-900 font-mono">
+                  <Typography variant="body2" fontFamily="monospace">
                     {beneficiary.account_number}
-                  </div>
+                  </Typography>
                 )}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
+              </TableCell>
+              <TableCell>
                 {editingId === beneficiary.id ? (
-                  <div className="flex flex-col space-y-1">
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={editData.is_active || false}
-                        onChange={(e) => setEditData({ ...editData, is_active: e.target.checked })}
-                        className="mr-1"
-                      />
-                      <span className="text-xs">Aktív</span>
-                    </label>
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={editData.is_frequent || false}
-                        onChange={(e) => setEditData({ ...editData, is_frequent: e.target.checked })}
-                        className="mr-1"
-                      />
-                      <span className="text-xs">Gyakori</span>
-                    </label>
-                  </div>
+                  <Stack spacing={0.5}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={editData.is_active || false}
+                          onChange={(e) => setEditData({ ...editData, is_active: e.target.checked })}
+                        />
+                      }
+                      label={<Typography variant="caption">Aktív</Typography>}
+                      sx={{ m: 0 }}
+                    />
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={editData.is_frequent || false}
+                          onChange={(e) => setEditData({ ...editData, is_frequent: e.target.checked })}
+                        />
+                      }
+                      label={<Typography variant="caption">Gyakori</Typography>}
+                      sx={{ m: 0 }}
+                    />
+                  </Stack>
                 ) : (
-                  <div className="flex flex-col space-y-1">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      beneficiary.is_active 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {beneficiary.is_active ? 'Aktív' : 'Inaktív'}
-                    </span>
+                  <Stack spacing={0.5}>
+                    <Chip
+                      label={beneficiary.is_active ? 'Aktív' : 'Inaktív'}
+                      size="small"
+                      color={beneficiary.is_active ? 'success' : 'error'}
+                      variant="outlined"
+                    />
                     {beneficiary.is_frequent && (
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                        Gyakori
-                      </span>
+                      <Chip
+                        label="Gyakori"
+                        size="small"
+                        color="warning"
+                        variant="outlined"
+                      />
                     )}
-                  </div>
+                  </Stack>
                 )}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+              </TableCell>
+              <TableCell align="right">
                 {editingId === beneficiary.id ? (
-                  <div className="flex justify-end space-x-2">
-                    <button
+                  <Stack direction="row" justifyContent="flex-end" spacing={1}>
+                    <IconButton
+                      size="small"
                       onClick={handleSaveEdit}
-                      className="text-green-600 hover:text-green-900 p-1"
+                      color="success"
                     >
-                      <CheckIcon className="h-4 w-4" />
-                    </button>
-                    <button
+                      <CheckIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      size="small"
                       onClick={handleCancelEdit}
-                      className="text-red-600 hover:text-red-900 p-1"
+                      color="error"
                     >
-                      <XMarkIcon className="h-4 w-4" />
-                    </button>
-                  </div>
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </Stack>
                 ) : (
-                  <div className="flex justify-end space-x-2">
-                    <button
+                  <Stack direction="row" justifyContent="flex-end" spacing={1}>
+                    <IconButton
+                      size="small"
                       onClick={() => handleStartEdit(beneficiary)}
-                      className="text-primary-600 hover:text-primary-900 p-1"
+                      color="primary"
                     >
-                      <PencilIcon className="h-4 w-4" />
-                    </button>
-                    <button
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      size="small"
                       onClick={() => onDelete(beneficiary.id)}
-                      className="text-red-600 hover:text-red-900 p-1"
+                      color="error"
                     >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
-                  </div>
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Stack>
                 )}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </TableBody>
+      </Table>
+    </TableContainer>
   );
 };
 

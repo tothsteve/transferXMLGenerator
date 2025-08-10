@@ -1,11 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { 
-  DocumentArrowDownIcon,
-  ExclamationTriangleIcon,
-  CheckCircleIcon,
-  PlayIcon
-} from '@heroicons/react/24/outline';
+import {
+  Box,
+  Typography,
+  Button,
+  Alert,
+  AlertTitle,
+  Stack,
+  Paper,
+  Stepper,
+  Step,
+  StepLabel,
+  List,
+  ListItem,
+  ListItemText
+} from '@mui/material';
+import {
+  Download as DownloadIcon,
+  Warning as WarningIcon,
+  CheckCircle as CheckCircleIcon,
+  PlayArrow as PlayIcon
+} from '@mui/icons-material';
 import { 
   useTemplates, 
   useLoadTemplate, 
@@ -180,142 +195,131 @@ const TransferWorkflow: React.FC = () => {
   const isGenerating = bulkCreateMutation.isPending || generateXmlMutation.isPending;
 
   return (
-    <div className="lg:pl-72">
-      <div className="px-4 py-10 sm:px-6 lg:px-8 lg:py-6">
-        <div className="border-b border-gray-200 pb-5">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold leading-tight tracking-tight text-gray-900">
-                Átutalások
-              </h1>
-              <p className="mt-2 max-w-4xl text-sm text-gray-500">
-                Átutalások létrehozása, szerkesztése és XML generálás bank importáláshoz
-              </p>
-            </div>
-            {transfers.length > 0 && (
-              <div className="flex space-x-3">
-                <div className="text-right">
-                  <div className="text-sm text-gray-500">Összesen</div>
-                  <div className="text-lg font-semibold text-gray-900">
-                    {totalAmount.toLocaleString('hu-HU')} HUF
-                  </div>
-                </div>
-                <button
-                  onClick={handleGenerateXML}
-                  disabled={isGenerating || transfers.length === 0}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <DocumentArrowDownIcon className="h-4 w-4 mr-2" />
-                  {isGenerating ? 'Generálás...' : 'XML Generálás'}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+    <Box sx={{ p: 3 }}>
+      {/* Header */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', pb: 3, mb: 4 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={3}>
+          <Box>
+            <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
+              Átutalások
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              Átutalások létrehozása, szerkesztése és XML generálás bank importáláshoz
+            </Typography>
+          </Box>
+          {transfers.length > 0 && (
+            <Stack direction="row" alignItems="center" spacing={2}>
+              <Box sx={{ textAlign: 'right' }}>
+                <Typography variant="body2" color="text.secondary">
+                  Összesen
+                </Typography>
+                <Typography variant="h6" fontWeight="bold">
+                  {totalAmount.toLocaleString('hu-HU')} HUF
+                </Typography>
+              </Box>
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<DownloadIcon />}
+                onClick={handleGenerateXML}
+                disabled={isGenerating || transfers.length === 0}
+              >
+                {isGenerating ? 'Generálás...' : 'XML Generálás'}
+              </Button>
+            </Stack>
+          )}
+        </Stack>
+      </Box>
 
-        {/* Bank Account Info */}
-        {defaultAccount && (
-          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-md p-4">
-            <div className="flex">
-              <CheckCircleIcon className="h-5 w-5 text-blue-400 mt-0.5" />
-              <div className="ml-3">
-                <h4 className="text-sm font-medium text-blue-800">
-                  Alapértelmezett számla
-                </h4>
-                <p className="text-sm text-blue-700">
-                  {defaultAccount.name} - {defaultAccount.account_number}
-                  {defaultAccount.bank_name && ` (${defaultAccount.bank_name})`}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+      {/* Bank Account Info */}
+      {defaultAccount && (
+        <Alert severity="info" icon={<CheckCircleIcon />} sx={{ mb: 3 }}>
+          <AlertTitle>Alapértelmezett számla</AlertTitle>
+          <Typography variant="body2">
+            {defaultAccount.name} - {defaultAccount.account_number}
+            {defaultAccount.bank_name && ` (${defaultAccount.bank_name})`}
+          </Typography>
+        </Alert>
+      )}
 
-        {/* Validation Errors */}
-        {validationErrors.length > 0 && (
-          <div className="mt-6 bg-red-50 border border-red-200 rounded-md p-4">
-            <div className="flex">
-              <ExclamationTriangleIcon className="h-5 w-5 text-red-400 mt-0.5" />
-              <div className="ml-3">
-                <h4 className="text-sm font-medium text-red-800">
-                  Validációs hibák
-                </h4>
-                <ul className="mt-2 text-sm text-red-700 list-disc list-inside">
-                  {validationErrors.map((error, index) => (
-                    <li key={index}>{error}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
+      {/* Validation Errors */}
+      {validationErrors.length > 0 && (
+        <Alert severity="error" icon={<WarningIcon />} sx={{ mb: 3 }}>
+          <AlertTitle>Validációs hibák</AlertTitle>
+          <List dense sx={{ pt: 1 }}>
+            {validationErrors.map((error, index) => (
+              <ListItem key={index} sx={{ px: 0, py: 0.25 }}>
+                <ListItemText primary={`• ${error}`} />
+              </ListItem>
+            ))}
+          </List>
+        </Alert>
+      )}
 
-        {/* Template Selector */}
-        <div className="mt-8">
-          <TemplateSelector
-            templates={templates}
-            selectedTemplate={selectedTemplate}
-            onSelectTemplate={setSelectedTemplate}
-            onLoadTemplate={handleLoadTemplate}
-            isLoading={loadTemplateMutation.isPending}
-          />
-        </div>
-
-        {/* Transfer Table */}
-        <div className="mt-8">
-          <TransferTable
-            transfers={transfers}
-            onUpdateTransfer={handleUpdateTransfer}
-            onDeleteTransfer={handleDeleteTransfer}
-            onAddTransfer={() => setShowAddModal(true)}
-          />
-        </div>
-
-        {/* Workflow Steps */}
-        {transfers.length > 0 && (
-          <div className="mt-8 bg-gray-50 rounded-lg p-6">
-            <h4 className="text-sm font-medium text-gray-900 mb-4">Következő lépések:</h4>
-            <div className="flex items-center space-x-4 text-sm">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
-                  <CheckCircleIcon className="w-4 h-4 text-green-600" />
-                </div>
-                <span className="ml-2 text-gray-700">Átutalások összeállítva</span>
-              </div>
-              <div className="flex items-center">
-                <div className="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
-                  <PlayIcon className="w-4 h-4 text-blue-600" />
-                </div>
-                <span className="ml-2 text-gray-700">XML generálás</span>
-              </div>
-              <div className="flex items-center">
-                <div className="flex-shrink-0 w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">
-                  <DocumentArrowDownIcon className="w-4 h-4 text-gray-500" />
-                </div>
-                <span className="ml-2 text-gray-500">Letöltés és bank importálás</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Add Transfer Modal */}
-        <AddTransferModal
-          isOpen={showAddModal}
-          onClose={() => setShowAddModal(false)}
-          onAdd={handleAddTransfer}
+      {/* Template Selector */}
+      <Box sx={{ mb: 4 }}>
+        <TemplateSelector
+          templates={templates}
+          selectedTemplate={selectedTemplate}
+          onSelectTemplate={setSelectedTemplate}
+          onLoadTemplate={handleLoadTemplate}
+          isLoading={loadTemplateMutation.isPending}
         />
+      </Box>
 
-        {/* XML Preview */}
-        {xmlPreview && (
-          <XMLPreview
-            xmlContent={xmlPreview.content}
-            filename={xmlPreview.filename}
-            onClose={() => setXmlPreview(null)}
-            onDownload={handleDownloadXML}
-          />
-        )}
-      </div>
-    </div>
+      {/* Transfer Table */}
+      <Box sx={{ mb: 4 }}>
+        <TransferTable
+          transfers={transfers}
+          onUpdateTransfer={handleUpdateTransfer}
+          onDeleteTransfer={handleDeleteTransfer}
+          onAddTransfer={() => setShowAddModal(true)}
+        />
+      </Box>
+
+      {/* Workflow Steps */}
+      {transfers.length > 0 && (
+        <Paper sx={{ p: 3, bgcolor: 'grey.50', mb: 4 }}>
+          <Typography variant="h6" gutterBottom>
+            Következő lépések:
+          </Typography>
+          <Stepper orientation="horizontal" sx={{ pt: 2 }}>
+            <Step completed>
+              <StepLabel icon={<CheckCircleIcon sx={{ color: 'success.main' }} />}>
+                Átutalások összeállítva
+              </StepLabel>
+            </Step>
+            <Step active={!xmlPreview}>
+              <StepLabel icon={<PlayIcon sx={{ color: xmlPreview ? 'success.main' : 'primary.main' }} />}>
+                XML generálás
+              </StepLabel>
+            </Step>
+            <Step>
+              <StepLabel icon={<DownloadIcon sx={{ color: 'text.disabled' }} />}>
+                Letöltés és bank importálás
+              </StepLabel>
+            </Step>
+          </Stepper>
+        </Paper>
+      )}
+
+      {/* Add Transfer Modal */}
+      <AddTransferModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onAdd={handleAddTransfer}
+      />
+
+      {/* XML Preview */}
+      {xmlPreview && (
+        <XMLPreview
+          xmlContent={xmlPreview.content}
+          filename={xmlPreview.filename}
+          onClose={() => setXmlPreview(null)}
+          onDownload={handleDownloadXML}
+        />
+      )}
+    </Box>
   );
 };
 

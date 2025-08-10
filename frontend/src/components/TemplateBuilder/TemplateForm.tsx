@@ -1,14 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Dialog, Transition } from '@headlessui/react';
-import { Fragment } from 'react';
-import { 
-  XMarkIcon, 
-  PlusIcon, 
-  TrashIcon,
-  MagnifyingGlassIcon
-} from '@heroicons/react/24/outline';
-import { TransferTemplate, Beneficiary, TemplateBeneficiary } from '../../types/api';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Button,
+  Checkbox,
+  FormControlLabel,
+  Box,
+  Stack,
+  Typography,
+  IconButton,
+  Paper,
+  InputAdornment,
+  List,
+  ListItem,
+  ListItemText
+} from '@mui/material';
+import {
+  Close as CloseIcon,
+  Add as AddIcon,
+  Delete as DeleteIcon,
+  Search as SearchIcon
+} from '@mui/icons-material';
+import { TransferTemplate, Beneficiary } from '../../types/api';
 import { useBeneficiaries } from '../../hooks/api';
 
 interface TemplateFormProps {
@@ -128,228 +145,214 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
   };
 
   return (
-    <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={handleClose}>
-        <Transition.Child
-          as={Fragment}
-          enter="ease-out duration-300"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="ease-in duration-200"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
-        >
-          <div className="fixed inset-0 bg-black bg-opacity-25" />
-        </Transition.Child>
+    <Dialog open={isOpen} onClose={handleClose} maxWidth="lg" fullWidth>
+      <DialogTitle>
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Typography variant="h6">
+            {template ? 'Sablon szerkesztése' : 'Új sablon létrehozása'}
+          </Typography>
+          <IconButton onClick={handleClose} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Stack>
+      </DialogTitle>
 
-        <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4 text-center">
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95"
-              enterTo="opacity-100 scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
-            >
-              <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
-                <div className="flex justify-between items-center mb-6">
-                  <Dialog.Title
-                    as="h3"
-                    className="text-lg font-medium leading-6 text-gray-900"
-                  >
-                    {template ? 'Sablon szerkesztése' : 'Új sablon létrehozása'}
-                  </Dialog.Title>
-                  <button
-                    onClick={handleClose}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <XMarkIcon className="h-6 w-6" />
-                  </button>
-                </div>
+      <form onSubmit={handleSubmit(handleFormSubmit)}>
+        <DialogContent>
+          <Stack spacing={4}>
+            {/* Basic Template Info */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '2fr 1fr' }, gap: 3 }}>
+              <Box>
+                <TextField
+                  label="Sablon neve *"
+                  fullWidth
+                  placeholder="pl. Havi bérszámfejtés"
+                  {...register('name', { required: 'A sablon neve kötelező' })}
+                  error={!!errors.name}
+                  helperText={errors.name?.message}
+                />
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <FormControlLabel
+                  control={<Checkbox {...register('is_active')} />}
+                  label="Aktív sablon"
+                />
+              </Box>
+            </Box>
 
-                <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-                  {/* Basic Template Info */}
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    <div>
-                      <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                        Sablon neve *
-                      </label>
-                      <input
-                        type="text"
-                        {...register('name', { required: 'A sablon neve kötelező' })}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                        placeholder="pl. Havi bérszámfejtés"
-                      />
-                      {errors.name && (
-                        <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
-                      )}
-                    </div>
+            <TextField
+              label="Leírás"
+              fullWidth
+              multiline
+              rows={3}
+              placeholder="Sablon leírása..."
+              {...register('description')}
+            />
 
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        {...register('is_active')}
-                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                      />
-                      <label htmlFor="is_active" className="ml-2 block text-sm text-gray-900">
-                        Aktív sablon
-                      </label>
-                    </div>
-                  </div>
+            {/* Beneficiaries Section */}
+            <Box>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                <Typography variant="body1" fontWeight={500}>
+                  Kedvezményezettek ({selectedBeneficiaries.length})
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<AddIcon />}
+                  onClick={() => setShowBeneficiaryPicker(true)}
+                >
+                  Hozzáadás
+                </Button>
+              </Stack>
 
-                  <div>
-                    <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-                      Leírás
-                    </label>
-                    <textarea
-                      {...register('description')}
-                      rows={3}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                      placeholder="Sablon leírása..."
-                    />
-                  </div>
+              {/* Beneficiary Picker Dialog */}
+              <Dialog 
+                open={showBeneficiaryPicker} 
+                onClose={() => setShowBeneficiaryPicker(false)}
+                maxWidth="sm"
+                fullWidth
+              >
+                <DialogTitle>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="h6">
+                      Kedvezményezett kiválasztása
+                    </Typography>
+                    <IconButton onClick={() => setShowBeneficiaryPicker(false)} size="small">
+                      <CloseIcon />
+                    </IconButton>
+                  </Stack>
+                </DialogTitle>
+                <DialogContent>
+                  <TextField
+                    fullWidth
+                    placeholder="Keresés..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    sx={{ mb: 2 }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                  <List sx={{ maxHeight: 300, overflow: 'auto' }}>
+                    {availableBeneficiaries
+                      .filter(b => !selectedBeneficiaryIds.has(b.id))
+                      .map(beneficiary => (
+                        <ListItem
+                          key={beneficiary.id}
+                          onClick={() => addBeneficiary(beneficiary)}
+                          sx={{ 
+                            border: 1, 
+                            borderColor: 'divider', 
+                            borderRadius: 1, 
+                            mb: 1,
+                            cursor: 'pointer',
+                            '&:hover': {
+                              backgroundColor: 'action.hover'
+                            }
+                          }}
+                        >
+                          <ListItemText
+                            primary={beneficiary.name}
+                            secondary={
+                              <Typography variant="body2" fontFamily="monospace">
+                                {beneficiary.account_number}
+                              </Typography>
+                            }
+                          />
+                        </ListItem>
+                      ))}
+                  </List>
+                </DialogContent>
+              </Dialog>
 
-                  {/* Beneficiaries Section */}
-                  <div>
-                    <div className="flex justify-between items-center mb-4">
-                      <label className="block text-sm font-medium text-gray-700">
-                        Kedvezményezettek ({selectedBeneficiaries.length})
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => setShowBeneficiaryPicker(true)}
-                        className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-primary-700 bg-primary-100 hover:bg-primary-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                      >
-                        <PlusIcon className="h-4 w-4 mr-1" />
-                        Hozzáadás
-                      </button>
-                    </div>
-
-                    {/* Beneficiary Picker Modal */}
-                    {showBeneficiaryPicker && (
-                      <div className="fixed inset-0 bg-black bg-opacity-25 flex items-center justify-center z-50">
-                        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-                          <div className="flex justify-between items-center mb-4">
-                            <h4 className="text-lg font-medium">Kedvezményezett kiválasztása</h4>
-                            <button
-                              onClick={() => setShowBeneficiaryPicker(false)}
-                              className="text-gray-400 hover:text-gray-600"
-                            >
-                              <XMarkIcon className="h-5 w-5" />
-                            </button>
-                          </div>
-
-                          <div className="relative mb-4">
-                            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                            <input
-                              type="text"
-                              placeholder="Keresés..."
-                              value={searchTerm}
-                              onChange={(e) => setSearchTerm(e.target.value)}
-                              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                            />
-                          </div>
-
-                          <div className="max-h-64 overflow-y-auto space-y-2">
-                            {availableBeneficiaries
-                              .filter(b => !selectedBeneficiaryIds.has(b.id))
-                              .map(beneficiary => (
-                                <button
-                                  key={beneficiary.id}
-                                  type="button"
-                                  onClick={() => addBeneficiary(beneficiary)}
-                                  className="w-full text-left p-3 hover:bg-gray-50 border border-gray-200 rounded-md"
-                                >
-                                  <div className="font-medium text-gray-900">{beneficiary.name}</div>
-                                  <div className="text-sm text-gray-500 font-mono">{beneficiary.account_number}</div>
-                                </button>
-                              ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Selected Beneficiaries */}
-                    {selectedBeneficiaries.length === 0 ? (
-                      <div className="text-center py-6 border-2 border-dashed border-gray-300 rounded-lg">
-                        <p className="text-sm text-gray-500">
-                          Nincs kiválasztott kedvezményezett. Kattintson a "Hozzáadás" gombra.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4 max-h-64 overflow-y-auto">
-                        {selectedBeneficiaries.map(beneficiary => (
-                          <div key={beneficiary.beneficiary_id} className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-gray-900">{beneficiary.beneficiary_name}</div>
-                              <div className="text-sm text-gray-500 font-mono">{beneficiary.account_number}</div>
-                              
-                              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-700">
-                                    Alapértelmezett összeg (HUF)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    value={beneficiary.default_amount}
-                                    onChange={(e) => updateBeneficiary(beneficiary.beneficiary_id, 'default_amount', e.target.value)}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                                    placeholder="0"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-700">
-                                    Alapértelmezett közlemény
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={beneficiary.default_remittance_info}
-                                    onChange={(e) => updateBeneficiary(beneficiary.beneficiary_id, 'default_remittance_info', e.target.value)}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                                    placeholder="Közlemény..."
-                                  />
-                                </div>
-                              </div>
-                            </div>
+              {/* Selected Beneficiaries */}
+              {selectedBeneficiaries.length === 0 ? (
+                <Paper 
+                  sx={{ 
+                    p: 4, 
+                    textAlign: 'center', 
+                    border: 2, 
+                    borderStyle: 'dashed', 
+                    borderColor: 'divider' 
+                  }}
+                >
+                  <Typography variant="body2" color="text.secondary">
+                    Nincs kiválasztott kedvezményezett. Kattintson a "Hozzáadás" gombra.
+                  </Typography>
+                </Paper>
+              ) : (
+                <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
+                  <Stack spacing={2}>
+                    {selectedBeneficiaries.map(beneficiary => (
+                      <Paper key={beneficiary.beneficiary_id} sx={{ p: 2 }}>
+                        <Stack direction="row" spacing={2}>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography variant="body1" fontWeight={500}>
+                              {beneficiary.beneficiary_name}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" fontFamily="monospace">
+                              {beneficiary.account_number}
+                            </Typography>
                             
-                            <button
-                              type="button"
-                              onClick={() => removeBeneficiary(beneficiary.beneficiary_id)}
-                              className="text-red-400 hover:text-red-600"
-                            >
-                              <TrashIcon className="h-5 w-5" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mt: 1 }}>
+                              <Box>
+                                <TextField
+                                  label="Alapértelmezett összeg (HUF)"
+                                  type="number"
+                                  size="small"
+                                  fullWidth
+                                  value={beneficiary.default_amount}
+                                  onChange={(e) => updateBeneficiary(beneficiary.beneficiary_id, 'default_amount', e.target.value)}
+                                  placeholder="0"
+                                />
+                              </Box>
+                              <Box>
+                                <TextField
+                                  label="Alapértelmezett közlemény"
+                                  size="small"
+                                  fullWidth
+                                  value={beneficiary.default_remittance_info}
+                                  onChange={(e) => updateBeneficiary(beneficiary.beneficiary_id, 'default_remittance_info', e.target.value)}
+                                  placeholder="Közlemény..."
+                                />
+                              </Box>
+                            </Box>
+                          </Box>
+                          
+                          <IconButton
+                            onClick={() => removeBeneficiary(beneficiary.beneficiary_id)}
+                            color="error"
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Stack>
+                      </Paper>
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+            </Box>
 
-                  <div className="flex justify-end space-x-3 pt-6">
-                    <button
-                      type="button"
-                      onClick={handleClose}
-                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                    >
-                      Mégse
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isLoading || selectedBeneficiaries.length === 0}
-                      className="px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isLoading ? 'Mentés...' : (template ? 'Frissítés' : 'Létrehozás')}
-                    </button>
-                  </div>
-                </form>
-              </Dialog.Panel>
-            </Transition.Child>
-          </div>
-        </div>
-      </Dialog>
-    </Transition>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClose}>
+            Mégse
+          </Button>
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={isLoading || selectedBeneficiaries.length === 0}
+          >
+            {isLoading ? 'Mentés...' : (template ? 'Frissítés' : 'Létrehozás')}
+          </Button>
+        </DialogActions>
+      </form>
+    </Dialog>
   );
 };
 

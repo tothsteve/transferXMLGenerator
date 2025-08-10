@@ -1,13 +1,31 @@
 import React, { useState } from 'react';
-import { 
-  PencilIcon, 
-  TrashIcon, 
-  CheckIcon, 
-  XMarkIcon,
-  PlusIcon,
-  CalendarIcon,
-  CurrencyDollarIcon
-} from '@heroicons/react/24/outline';
+import {
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Typography,
+  Button,
+  IconButton,
+  TextField,
+  Box,
+  Stack,
+  Chip,
+  Avatar,
+  Tooltip
+} from '@mui/material';
+import {
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Check as CheckIcon,
+  Close as CloseIcon,
+  Add as AddIcon,
+  CalendarToday as CalendarIcon,
+  AccountBalance as CurrencyIcon
+} from '@mui/icons-material';
 import { Transfer, Beneficiary } from '../../types/api';
 
 interface TransferData extends Omit<Transfer, 'id' | 'is_processed' | 'created_at'> {
@@ -60,182 +78,180 @@ const TransferTable: React.FC<TransferTableProps> = ({
 
   if (transfers.length === 0) {
     return (
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-6 py-8 text-center">
-          <CurrencyDollarIcon className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">Nincsenek átutalások</h3>
-          <p className="mt-1 text-sm text-gray-500">
+      <Paper elevation={1}>
+        <Box sx={{ p: 6, textAlign: 'center' }}>
+          <CurrencyIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+          <Typography variant="h6" gutterBottom>
+            Nincsenek átutalások
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
             Válasszon ki egy sablont vagy adjon hozzá manuálisan átutalásokat.
-          </p>
-          <div className="mt-6">
-            <button
-              type="button"
-              onClick={onAddTransfer}
-              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-            >
-              <PlusIcon className="h-4 w-4 mr-2" />
-              Átutalás hozzáadása
-            </button>
-          </div>
-        </div>
-      </div>
+          </Typography>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={onAddTransfer}
+          >
+            Átutalás hozzáadása
+          </Button>
+        </Box>
+      </Paper>
     );
   }
 
   return (
-    <div className="bg-white shadow rounded-lg overflow-hidden">
+    <Paper elevation={1}>
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-        <h3 className="text-lg font-medium text-gray-900">
+      <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h6">
           Átutalások ({transfers.length})
-        </h3>
-        <button
+        </Typography>
+        <Button
+          variant="outlined"
+          startIcon={<AddIcon />}
           onClick={onAddTransfer}
-          className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+          size="small"
         >
-          <PlusIcon className="h-4 w-4 mr-2" />
           Hozzáadás
-        </button>
-      </div>
+        </Button>
+      </Box>
 
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Kedvezményezett
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Összeg (HUF)
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Teljesítés dátuma
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Közlemény
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Műveletek
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+      <TableContainer>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Kedvezményezett</TableCell>
+              <TableCell>Összeg (HUF)</TableCell>
+              <TableCell>Teljesítés dátuma</TableCell>
+              <TableCell>Közlemény</TableCell>
+              <TableCell align="right">Műveletek</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
             {transfers.map((transfer, index) => (
-              <tr key={transfer.id || transfer.tempId || index} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {transfer.beneficiary_data?.name || `Kedvezményezett #${transfer.beneficiary}`}
-                      </div>
-                      <div className="text-sm text-gray-500 font-mono">
-                        {transfer.beneficiary_data?.account_number}
-                      </div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+              <TableRow key={transfer.id || transfer.tempId || index} hover>
+                <TableCell>
+                  <Box>
+                    <Typography variant="body2" fontWeight={500}>
+                      {transfer.beneficiary_data?.name || `Kedvezményezett #${transfer.beneficiary}`}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
+                      {transfer.beneficiary_data?.account_number}
+                    </Typography>
+                  </Box>
+                </TableCell>
+                <TableCell>
                   {editingIndex === index ? (
-                    <input
+                    <TextField
                       type="number"
-                      step="1"
+                      size="small"
                       value={editData.amount || ''}
                       onChange={(e) => setEditData({ ...editData, amount: e.target.value })}
-                      className="w-32 px-2 py-1 border border-gray-300 rounded text-sm"
                       placeholder="0"
+                      sx={{ width: 120 }}
+                      InputProps={{ inputProps: { step: 1 } }}
                     />
                   ) : (
-                    <div className="text-sm text-gray-900">
+                    <Typography variant="body2">
                       {parseFloat(transfer.amount).toLocaleString('hu-HU')} HUF
-                    </div>
+                    </Typography>
                   )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                </TableCell>
+                <TableCell>
                   {editingIndex === index ? (
-                    <input
+                    <TextField
                       type="date"
+                      size="small"
                       value={editData.execution_date || ''}
                       onChange={(e) => setEditData({ ...editData, execution_date: e.target.value })}
-                      className="w-36 px-2 py-1 border border-gray-300 rounded text-sm"
+                      sx={{ width: 150 }}
                     />
                   ) : (
-                    <div className="flex items-center text-sm text-gray-900">
-                      <CalendarIcon className="h-4 w-4 mr-1 text-gray-400" />
-                      {new Date(transfer.execution_date).toLocaleDateString('hu-HU')}
-                    </div>
+                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                      <CalendarIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                      <Typography variant="body2">
+                        {new Date(transfer.execution_date).toLocaleDateString('hu-HU')}
+                      </Typography>
+                    </Stack>
                   )}
-                </td>
-                <td className="px-6 py-4">
+                </TableCell>
+                <TableCell>
                   {editingIndex === index ? (
-                    <input
-                      type="text"
+                    <TextField
+                      size="small"
                       value={editData.remittance_info || ''}
                       onChange={(e) => setEditData({ ...editData, remittance_info: e.target.value })}
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                       placeholder="Közlemény..."
+                      fullWidth
                     />
                   ) : (
-                    <div className="text-sm text-gray-900 max-w-xs truncate">
+                    <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
                       {transfer.remittance_info || '-'}
-                    </div>
+                    </Typography>
                   )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                </TableCell>
+                <TableCell align="right">
                   {editingIndex === index ? (
-                    <div className="flex justify-end space-x-2">
-                      <button
-                        onClick={handleSaveEdit}
-                        className="text-green-600 hover:text-green-900 p-1"
-                        title="Mentés"
-                      >
-                        <CheckIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={handleCancelEdit}
-                        className="text-red-600 hover:text-red-900 p-1"
-                        title="Mégse"
-                      >
-                        <XMarkIcon className="h-4 w-4" />
-                      </button>
-                    </div>
+                    <Stack direction="row" justifyContent="flex-end" spacing={0.5}>
+                      <Tooltip title="Mentés">
+                        <IconButton
+                          onClick={handleSaveEdit}
+                          size="small"
+                          color="success"
+                        >
+                          <CheckIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Mégse">
+                        <IconButton
+                          onClick={handleCancelEdit}
+                          size="small"
+                          color="error"
+                        >
+                          <CloseIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
                   ) : (
-                    <div className="flex justify-end space-x-2">
-                      <button
-                        onClick={() => handleStartEdit(index, transfer)}
-                        className="text-primary-600 hover:text-primary-900 p-1"
-                        title="Szerkesztés"
-                      >
-                        <PencilIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => onDeleteTransfer(index)}
-                        className="text-red-600 hover:text-red-900 p-1"
-                        title="Törlés"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
-                    </div>
+                    <Stack direction="row" justifyContent="flex-end" spacing={0.5}>
+                      <Tooltip title="Szerkesztés">
+                        <IconButton
+                          onClick={() => handleStartEdit(index, transfer)}
+                          size="small"
+                          color="primary"
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Törlés">
+                        <IconButton
+                          onClick={() => onDeleteTransfer(index)}
+                          size="small"
+                          color="error"
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
                   )}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </TableContainer>
 
       {/* Footer with totals */}
-      <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-        <div className="flex justify-between items-center">
-          <div className="text-sm text-gray-500">
-            {transfers.length} átutalás összesen
-          </div>
-          <div className="text-lg font-semibold text-gray-900">
-            Összeg: {totalAmount.toLocaleString('hu-HU')} HUF
-          </div>
-        </div>
-      </div>
-    </div>
+      <Box sx={{ px: 3, py: 2, bgcolor: 'grey.50', borderTop: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="body2" color="text.secondary">
+          {transfers.length} átutalás összesen
+        </Typography>
+        <Typography variant="h6" fontWeight="bold">
+          Összeg: {totalAmount.toLocaleString('hu-HU')} HUF
+        </Typography>
+      </Box>
+    </Paper>
   );
 };
 

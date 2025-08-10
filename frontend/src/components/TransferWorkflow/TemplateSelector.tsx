@@ -1,11 +1,20 @@
 import React from 'react';
-import { Menu, Transition } from '@headlessui/react';
-import { Fragment } from 'react';
-import { 
-  ChevronDownIcon, 
-  DocumentDuplicateIcon,
-  PlayIcon
-} from '@heroicons/react/24/outline';
+import {
+  Paper,
+  Typography,
+  Button,
+  Box,
+  Stack,
+  FormControl,
+  Select,
+  MenuItem,
+  SelectChangeEvent,
+  Chip
+} from '@mui/material';
+import {
+  Description as TemplateIcon,
+  PlayArrow as PlayIcon
+} from '@mui/icons-material';
 import { TransferTemplate } from '../../types/api';
 
 interface TemplateSelectorProps {
@@ -24,120 +33,136 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
   isLoading = false,
 }) => {
   const activeTemplates = templates.filter(t => t.is_active);
+  
+  const handleSelectChange = (event: SelectChangeEvent<number>) => {
+    const templateId = event.target.value as number;
+    const template = activeTemplates.find(t => t.id === templateId);
+    if (template) {
+      onSelectTemplate(template);
+    }
+  };
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center">
-          <DocumentDuplicateIcon className="h-6 w-6 text-primary-600 mr-2" />
-          <h3 className="text-lg font-medium text-gray-900">Sablon kiválasztása</h3>
-        </div>
+    <Paper elevation={1} sx={{ p: 3 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <TemplateIcon color="primary" />
+          <Typography variant="h6">
+            Sablon kiválasztása
+          </Typography>
+        </Stack>
         {selectedTemplate && (
-          <button
+          <Button
+            variant="contained"
+            startIcon={<PlayIcon />}
             onClick={() => onLoadTemplate(selectedTemplate.id)}
             disabled={isLoading}
-            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
           >
-            <PlayIcon className="h-4 w-4 mr-1" />
             {isLoading ? 'Betöltés...' : 'Sablon betöltése'}
-          </button>
+          </Button>
         )}
-      </div>
+      </Stack>
 
       {activeTemplates.length === 0 ? (
-        <div className="text-center py-6 border-2 border-dashed border-gray-300 rounded-lg">
-          <DocumentDuplicateIcon className="mx-auto h-12 w-12 text-gray-400" />
-          <h4 className="mt-2 text-sm font-medium text-gray-900">Nincsenek aktív sablonok</h4>
-          <p className="mt-1 text-sm text-gray-500">
+        <Box 
+          sx={{ 
+            textAlign: 'center', 
+            py: 4, 
+            border: 2, 
+            borderStyle: 'dashed', 
+            borderColor: 'divider',
+            borderRadius: 1
+          }}
+        >
+          <TemplateIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
+          <Typography variant="h6" gutterBottom>
+            Nincsenek aktív sablonok
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
             Hozzon létre egy új sablont a Sablonok menüpontban.
-          </p>
-        </div>
+          </Typography>
+        </Box>
       ) : (
-        <Menu as="div" className="relative inline-block text-left w-full">
-          <div>
-            <Menu.Button className="inline-flex w-full justify-between items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2">
-              <div className="flex items-center">
-                {selectedTemplate ? (
-                  <div>
-                    <div className="font-medium text-gray-900">{selectedTemplate.name}</div>
-                    {selectedTemplate.description && (
-                      <div className="text-xs text-gray-500 truncate">{selectedTemplate.description}</div>
-                    )}
-                  </div>
-                ) : (
-                  <span>Válasszon sablont...</span>
-                )}
-              </div>
-              <ChevronDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
-            </Menu.Button>
-          </div>
-          
-          <Transition
-            as={Fragment}
-            enter="transition ease-out duration-100"
-            enterFrom="transform opacity-0 scale-95"
-            enterTo="transform opacity-100 scale-100"
-            leave="transition ease-in duration-75"
-            leaveFrom="transform opacity-100 scale-100"
-            leaveTo="transform opacity-0 scale-95"
+        <FormControl fullWidth>
+          <Select
+            value={selectedTemplate?.id || ''}
+            onChange={handleSelectChange}
+            displayEmpty
+            renderValue={(selected) => {
+              if (!selected) {
+                return <Typography color="text.secondary">Válasszon sablont...</Typography>;
+              }
+              const template = activeTemplates.find(t => t.id === selected);
+              return (
+                <Box>
+                  <Typography variant="body1" fontWeight={500}>
+                    {template?.name}
+                  </Typography>
+                  {template?.description && (
+                    <Typography variant="caption" color="text.secondary" noWrap>
+                      {template.description}
+                    </Typography>
+                  )}
+                </Box>
+              );
+            }}
           >
-            <Menu.Items className="absolute left-0 z-10 mt-2 w-full origin-top-left rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-              <div className="py-1">
-                {activeTemplates.map((template) => (
-                  <Menu.Item key={template.id}>
-                    {({ active }) => (
-                      <button
-                        onClick={() => onSelectTemplate(template)}
-                        className={`${
-                          active ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
-                        } group flex w-full items-center px-4 py-2 text-sm`}
-                      >
-                        <div className="flex-1 text-left">
-                          <div className="font-medium">{template.name}</div>
-                          <div className="text-xs text-gray-500">
-                            {template.beneficiary_count} kedvezményezett
-                          </div>
-                          {template.description && (
-                            <div className="text-xs text-gray-400 mt-1 line-clamp-1">
-                              {template.description}
-                            </div>
-                          )}
-                        </div>
-                        {selectedTemplate?.id === template.id && (
-                          <div className="ml-2 h-2 w-2 rounded-full bg-primary-600" />
-                        )}
-                      </button>
+            {activeTemplates.map((template) => (
+              <MenuItem key={template.id} value={template.id}>
+                <Box sx={{ width: '100%' }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="body2" fontWeight={500}>
+                        {template.name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {template.beneficiary_count} kedvezményezett
+                      </Typography>
+                      {template.description && (
+                        <Typography variant="caption" color="text.secondary" display="block" noWrap>
+                          {template.description}
+                        </Typography>
+                      )}
+                    </Box>
+                    {selectedTemplate?.id === template.id && (
+                      <Chip size="small" color="primary" label="Kiválasztva" />
                     )}
-                  </Menu.Item>
-                ))}
-              </div>
-            </Menu.Items>
-          </Transition>
-        </Menu>
+                  </Stack>
+                </Box>
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       )}
 
       {selectedTemplate && (
-        <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="font-medium text-gray-700">Kedvezményezettek:</span>
-              <span className="ml-2 text-gray-900">{selectedTemplate.beneficiary_count}</span>
-            </div>
-            <div>
-              <span className="font-medium text-gray-700">Létrehozva:</span>
-              <span className="ml-2 text-gray-900">
-                {new Date(selectedTemplate.created_at).toLocaleDateString('hu-HU')}
-              </span>
-            </div>
-          </div>
+        <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+            <Box>
+              <Typography variant="body2" color="text.secondary">
+                <Typography component="span" fontWeight={500}>
+                  Kedvezményezettek:
+                </Typography>
+                {' '}{selectedTemplate.beneficiary_count}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="body2" color="text.secondary">
+                <Typography component="span" fontWeight={500}>
+                  Létrehozva:
+                </Typography>
+                {' '}{new Date(selectedTemplate.created_at).toLocaleDateString('hu-HU')}
+              </Typography>
+            </Box>
+          </Box>
           {selectedTemplate.description && (
-            <div className="mt-2 text-sm text-gray-600">
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
               {selectedTemplate.description}
-            </div>
+            </Typography>
           )}
-        </div>
+        </Box>
       )}
-    </div>
+    </Paper>
   );
 };
 

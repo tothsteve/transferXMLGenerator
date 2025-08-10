@@ -1,13 +1,26 @@
 import React, { useState } from 'react';
-import { 
-  PlusIcon, 
-  MagnifyingGlassIcon, 
-  FunnelIcon, 
-  DocumentArrowUpIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon
-} from '@heroicons/react/24/outline';
-import { Menu } from '@headlessui/react';
+import {
+  Box,
+  Typography,
+  Button,
+  TextField,
+  InputAdornment,
+  Chip,
+  Stack,
+  Pagination,
+  Paper,
+  Menu,
+  MenuItem,
+  FormControlLabel,
+  Checkbox,
+  Divider
+} from '@mui/material';
+import {
+  Add as AddIcon,
+  Search as SearchIcon,
+  FilterList as FilterIcon,
+  Upload as UploadIcon
+} from '@mui/icons-material';
 import { 
   useBeneficiaries, 
   useCreateBeneficiary, 
@@ -113,192 +126,204 @@ const BeneficiaryManager: React.FC = () => {
     setSortDirection('asc');
   };
 
+  const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(null);
+  const filterMenuOpen = Boolean(filterAnchorEl);
+
+  const handleFilterClick = (event: React.MouseEvent<HTMLElement>) => {
+    setFilterAnchorEl(event.currentTarget);
+  };
+
+  const handleFilterClose = () => {
+    setFilterAnchorEl(null);
+  };
+
   return (
-    <div className="lg:pl-72">
-      <div className="px-4 py-10 sm:px-6 lg:px-8 lg:py-6">
-        <div className="border-b border-gray-200 pb-5">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold leading-tight tracking-tight text-gray-900">
-                Kedvezményezettek
-              </h1>
-              <p className="mt-2 max-w-4xl text-sm text-gray-500">
-                Kedvezményezettek kezelése, hozzáadás, szerkesztés és törlés
-              </p>
-            </div>
-            <div className="flex space-x-3">
-              <button
-                onClick={() => setShowImport(true)}
-                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-              >
-                <DocumentArrowUpIcon className="h-4 w-4 mr-2" />
-                Excel importálás
-              </button>
-              <button
-                onClick={() => setShowForm(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-              >
-                <PlusIcon className="h-4 w-4 mr-2" />
-                Új kedvezményezett
-              </button>
-            </div>
-          </div>
-        </div>
+    <Box sx={{ p: 3 }}>
+      {/* Header */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', pb: 3, mb: 4 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={3}>
+          <Box>
+            <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
+              Kedvezményezettek
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              Kedvezményezettek kezelése, hozzáadás, szerkesztés és törlés
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={2}>
+            <Button
+              variant="outlined"
+              startIcon={<UploadIcon />}
+              onClick={() => setShowImport(true)}
+            >
+              Excel importálás
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setShowForm(true)}
+            >
+              Új kedvezményezett
+            </Button>
+          </Stack>
+        </Stack>
+      </Box>
 
-        {/* Search and Filters */}
-        <div className="mt-8 space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            {/* Search */}
-            <div className="flex-1">
-              <div className="relative">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Keresés név vagy számlaszám alapján..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                />
-              </div>
-            </div>
-
-            {/* Filters */}
-            <div className="flex space-x-2">
-              <Menu as="div" className="relative inline-block text-left">
-                <Menu.Button className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                  <FunnelIcon className="h-4 w-4 mr-2" />
-                  Szűrők
-                </Menu.Button>
-                <Menu.Items className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
-                  <div className="py-1">
-                    <Menu.Item>
-                      <div className="px-4 py-2 text-sm text-gray-700">
-                        <label className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={showActive === true}
-                            onChange={(e) => setShowActive(e.target.checked ? true : undefined)}
-                            className="mr-2"
-                          />
-                          Csak aktív kedvezményezettek
-                        </label>
-                      </div>
-                    </Menu.Item>
-                    <Menu.Item>
-                      <div className="px-4 py-2 text-sm text-gray-700">
-                        <label className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={showFrequent === true}
-                            onChange={(e) => setShowFrequent(e.target.checked ? true : undefined)}
-                            className="mr-2"
-                          />
-                          Csak gyakori kedvezményezettek
-                        </label>
-                      </div>
-                    </Menu.Item>
-                    <div className="border-t border-gray-100">
-                      <Menu.Item>
-                        <button
-                          onClick={clearFilters}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                        >
-                          Szűrők törlése
-                        </button>
-                      </Menu.Item>
-                    </div>
-                  </div>
-                </Menu.Items>
-              </Menu>
-            </div>
-          </div>
-
-          {/* Active filters display */}
-          {(searchTerm || showActive !== undefined || showFrequent !== undefined) && (
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-500">Aktív szűrők:</span>
-              {searchTerm && (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
-                  Keresés: {searchTerm}
-                </span>
-              )}
-              {showActive === true && (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  Aktív
-                </span>
-              )}
-              {showFrequent === true && (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                  Gyakori
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Results count */}
-        <div className="mt-6 text-sm text-gray-700">
-          {beneficiariesData?.count} kedvezményezett találat
-        </div>
-
-        {/* Table */}
-        <div className="mt-4">
-          <BeneficiaryTable
-            beneficiaries={beneficiaries}
-            isLoading={isLoading}
-            onEdit={handleEditBeneficiary}
-            onDelete={handleDeleteBeneficiary}
-            onUpdate={handleUpdateBeneficiary}
-            onSort={handleSort}
-            sortField={sortField}
-            sortDirection={sortDirection}
+      {/* Search and Filters */}
+      <Box sx={{ mb: 4 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>
+          {/* Search */}
+          <TextField
+            fullWidth
+            placeholder="Keresés név vagy számlaszám alapján..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+            size="small"
           />
-        </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="mt-6 flex items-center justify-between">
-            <div className="text-sm text-gray-700">
-              Oldal {currentPage} / {totalPages}
-            </div>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronLeftIcon className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
-                className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronRightIcon className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
+          {/* Filters */}
+          <Button
+            variant="outlined"
+            startIcon={<FilterIcon />}
+            onClick={handleFilterClick}
+            sx={{ minWidth: 140 }}
+          >
+            Szűrők
+          </Button>
+          <Menu
+            anchorEl={filterAnchorEl}
+            open={filterMenuOpen}
+            onClose={handleFilterClose}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          >
+            <MenuItem disableRipple sx={{ '&:hover': { backgroundColor: 'transparent' } }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={showActive === true}
+                    onChange={(e) => setShowActive(e.target.checked ? true : undefined)}
+                    size="small"
+                  />
+                }
+                label="Csak aktív kedvezményezettek"
+                sx={{ m: 0 }}
+              />
+            </MenuItem>
+            <MenuItem disableRipple sx={{ '&:hover': { backgroundColor: 'transparent' } }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={showFrequent === true}
+                    onChange={(e) => setShowFrequent(e.target.checked ? true : undefined)}
+                    size="small"
+                  />
+                }
+                label="Csak gyakori kedvezményezettek"
+                sx={{ m: 0 }}
+              />
+            </MenuItem>
+            <Divider />
+            <MenuItem onClick={() => { clearFilters(); handleFilterClose(); }}>
+              Szűrők törlése
+            </MenuItem>
+          </Menu>
+        </Stack>
+
+        {/* Active filters display */}
+        {(searchTerm || showActive !== undefined || showFrequent !== undefined) && (
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+            <Typography variant="body2" color="text.secondary">
+              Aktív szűrők:
+            </Typography>
+            {searchTerm && (
+              <Chip
+                label={`Keresés: ${searchTerm}`}
+                size="small"
+                color="primary"
+                variant="outlined"
+              />
+            )}
+            {showActive === true && (
+              <Chip
+                label="Aktív"
+                size="small"
+                color="success"
+                variant="outlined"
+              />
+            )}
+            {showFrequent === true && (
+              <Chip
+                label="Gyakori"
+                size="small"
+                color="warning"
+                variant="outlined"
+              />
+            )}
+          </Stack>
         )}
+      </Box>
 
-        {/* Forms */}
-        <BeneficiaryForm
-          isOpen={showForm}
-          onClose={handleFormClose}
-          onSubmit={editingBeneficiary ? 
-            (data) => handleUpdateBeneficiary(editingBeneficiary.id, data) :
-            handleCreateBeneficiary
-          }
-          beneficiary={editingBeneficiary}
-          isLoading={createMutation.isPending || updateMutation.isPending}
-        />
+      {/* Results count */}
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        {beneficiariesData?.count} kedvezményezett találat
+      </Typography>
 
-        <ExcelImport
-          isOpen={showImport}
-          onClose={() => setShowImport(false)}
-          onSuccess={handleImportSuccess}
+      {/* Table */}
+      <Paper elevation={1}>
+        <BeneficiaryTable
+          beneficiaries={beneficiaries}
+          isLoading={isLoading}
+          onEdit={handleEditBeneficiary}
+          onDelete={handleDeleteBeneficiary}
+          onUpdate={handleUpdateBeneficiary}
+          onSort={handleSort}
+          sortField={sortField}
+          sortDirection={sortDirection}
         />
-      </div>
-    </div>
+      </Paper>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="body2" color="text.secondary">
+            Oldal {currentPage} / {totalPages}
+          </Typography>
+          <Pagination
+            count={totalPages}
+            page={currentPage}
+            onChange={(event, page) => setCurrentPage(page)}
+            color="primary"
+            size="small"
+          />
+        </Box>
+      )}
+
+      {/* Forms */}
+      <BeneficiaryForm
+        isOpen={showForm}
+        onClose={handleFormClose}
+        onSubmit={editingBeneficiary ? 
+          (data) => handleUpdateBeneficiary(editingBeneficiary.id, data) :
+          handleCreateBeneficiary
+        }
+        beneficiary={editingBeneficiary}
+        isLoading={createMutation.isPending || updateMutation.isPending}
+      />
+
+      <ExcelImport
+        isOpen={showImport}
+        onClose={() => setShowImport(false)}
+        onSuccess={handleImportSuccess}
+      />
+    </Box>
   );
 };
 
