@@ -1,12 +1,25 @@
 import React from 'react';
-import { 
-  PencilIcon, 
-  TrashIcon, 
-  PlayIcon,
-  EyeIcon,
-  CalendarIcon,
-  UserGroupIcon
-} from '@heroicons/react/24/outline';
+import {
+  Box,
+  Card,
+  CardContent,
+  CardActions,
+  Typography,
+  Button,
+  IconButton,
+  Chip,
+  Stack,
+  Skeleton
+} from '@mui/material';
+import {
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  PlayArrow as PlayIcon,
+  Visibility as ViewIcon,
+  CalendarToday as CalendarIcon,
+  Group as GroupIcon,
+  Description as TemplateIcon
+} from '@mui/icons-material';
 import { TransferTemplate } from '../../types/api';
 
 interface TemplateListProps {
@@ -28,127 +41,164 @@ const TemplateList: React.FC<TemplateListProps> = ({
 }) => {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <Box 
+        sx={{ 
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: '1fr',
+            sm: 'repeat(2, 1fr)',
+            lg: 'repeat(3, 1fr)'
+          },
+          gap: 3
+        }}
+      >
         {[...Array(6)].map((_, i) => (
-          <div key={i} className="animate-pulse">
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-              <div className="h-3 bg-gray-200 rounded w-1/2 mb-4"></div>
-              <div className="space-y-2">
-                <div className="h-3 bg-gray-200 rounded w-full"></div>
-                <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-              </div>
-              <div className="mt-4 flex space-x-2">
-                <div className="h-8 bg-gray-200 rounded w-20"></div>
-                <div className="h-8 bg-gray-200 rounded w-16"></div>
-              </div>
-            </div>
-          </div>
+          <Card key={i} elevation={1}>
+            <CardContent>
+              <Skeleton variant="text" width="75%" height={24} />
+              <Skeleton variant="text" width="50%" height={20} sx={{ mb: 2 }} />
+              <Stack spacing={1}>
+                <Skeleton variant="text" width="100%" height={16} />
+                <Skeleton variant="text" width="67%" height={16} />
+              </Stack>
+            </CardContent>
+            <CardActions>
+              <Skeleton variant="rectangular" width={80} height={32} />
+              <Skeleton variant="rectangular" width={64} height={32} />
+            </CardActions>
+          </Card>
         ))}
-      </div>
+      </Box>
     );
   }
 
   if (templates.length === 0) {
     return (
-      <div className="text-center py-12">
-        <div className="mx-auto h-12 w-12 text-gray-400">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        </div>
-        <h3 className="mt-2 text-sm font-medium text-gray-900">Nincsenek sablonok</h3>
-        <p className="mt-1 text-sm text-gray-500">
+      <Box sx={{ textAlign: 'center', py: 8 }}>
+        <TemplateIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+        <Typography variant="h6" color="text.primary" gutterBottom>
+          Nincsenek sablonok
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
           Kezdjen el egy új sablon létrehozásával.
-        </p>
-      </div>
+        </Typography>
+      </Box>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    <Box 
+      sx={{ 
+        display: 'grid',
+        gridTemplateColumns: {
+          xs: '1fr',
+          sm: 'repeat(2, 1fr)',
+          lg: 'repeat(3, 1fr)'
+        },
+        gap: 3
+      }}
+    >
       {templates.map((template) => (
-        <div key={template.id} className="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
-          <div className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="flex-1 min-w-0">
-                <h3 className="text-lg font-medium text-gray-900 truncate">
+        <Card 
+          key={template.id} 
+          elevation={1}
+          sx={{ 
+            transition: 'box-shadow 0.2s',
+            '&:hover': { boxShadow: 4 }
+          }}
+        >
+          <CardContent>
+            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Typography variant="h6" component="h3" noWrap gutterBottom>
                   {template.name}
-                </h3>
+                </Typography>
                 {template.description && (
-                  <p className="mt-1 text-sm text-gray-500 line-clamp-2">
+                  <Typography 
+                    variant="body2" 
+                    color="text.secondary" 
+                    sx={{ 
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical'
+                    }}
+                  >
                     {template.description}
-                  </p>
+                  </Typography>
                 )}
-              </div>
-              <div className="ml-2 flex-shrink-0">
-                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                  template.is_active 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-gray-100 text-gray-800'
-                }`}>
-                  {template.is_active ? 'Aktív' : 'Inaktív'}
-                </span>
-              </div>
-            </div>
+              </Box>
+              <Chip
+                label={template.is_active ? 'Aktív' : 'Inaktív'}
+                size="small"
+                color={template.is_active ? 'success' : 'default'}
+                variant="outlined"
+              />
+            </Stack>
 
-            <div className="mt-4 space-y-2">
-              <div className="flex items-center text-sm text-gray-500">
-                <UserGroupIcon className="h-4 w-4 mr-2" />
-                <span>{template.beneficiary_count} kedvezményezett</span>
-              </div>
-              <div className="flex items-center text-sm text-gray-500">
-                <CalendarIcon className="h-4 w-4 mr-2" />
-                <span>
+            <Stack spacing={1} sx={{ mt: 2 }}>
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <GroupIcon fontSize="small" color="action" />
+                <Typography variant="body2" color="text.secondary">
+                  {template.beneficiary_count} kedvezményezett
+                </Typography>
+              </Stack>
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <CalendarIcon fontSize="small" color="action" />
+                <Typography variant="body2" color="text.secondary">
                   Létrehozva: {new Date(template.created_at).toLocaleDateString('hu-HU')}
-                </span>
-              </div>
+                </Typography>
+              </Stack>
               {template.updated_at !== template.created_at && (
-                <div className="flex items-center text-sm text-gray-500">
-                  <CalendarIcon className="h-4 w-4 mr-2" />
-                  <span>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <CalendarIcon fontSize="small" color="action" />
+                  <Typography variant="body2" color="text.secondary">
                     Módosítva: {new Date(template.updated_at).toLocaleDateString('hu-HU')}
-                  </span>
-                </div>
+                  </Typography>
+                </Stack>
               )}
-            </div>
+            </Stack>
 
-            <div className="mt-6 flex space-x-2">
-              <button
-                onClick={() => onLoadTemplate(template.id)}
-                className="flex-1 inline-flex justify-center items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+          </CardContent>
+          <CardActions>
+            <Button
+              variant="contained"
+              startIcon={<PlayIcon />}
+              onClick={() => onLoadTemplate(template.id)}
+              sx={{ flex: 1 }}
+            >
+              Betöltés
+            </Button>
+            <Stack direction="row" spacing={0.5}>
+              <IconButton
+                onClick={() => onView(template)}
+                size="small"
+                title="Megtekintés"
               >
-                <PlayIcon className="h-4 w-4 mr-1" />
-                Betöltés
-              </button>
-              <div className="flex space-x-1">
-                <button
-                  onClick={() => onView(template)}
-                  className="inline-flex items-center px-2 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                  title="Megtekintés"
-                >
-                  <EyeIcon className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => onEdit(template)}
-                  className="inline-flex items-center px-2 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                  title="Szerkesztés"
-                >
-                  <PencilIcon className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => onDelete(template.id)}
-                  className="inline-flex items-center px-2 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                  title="Törlés"
-                >
-                  <TrashIcon className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+                <ViewIcon fontSize="small" />
+              </IconButton>
+              <IconButton
+                onClick={() => onEdit(template)}
+                size="small"
+                title="Szerkesztés"
+                color="primary"
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+              <IconButton
+                onClick={() => onDelete(template.id)}
+                size="small"
+                title="Törlés"
+                color="error"
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Stack>
+          </CardActions>
+        </Card>
       ))}
-    </div>
+    </Box>
   );
 };
 

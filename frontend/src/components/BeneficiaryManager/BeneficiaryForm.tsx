@@ -1,8 +1,19 @@
 import React from 'react';
 import { useForm } from 'react-hook-form';
-import { Dialog, Transition } from '@headlessui/react';
-import { Fragment } from 'react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Button,
+  FormControlLabel,
+  Checkbox,
+  Stack,
+  IconButton,
+  Typography
+} from '@mui/material';
+import { Close as CloseIcon } from '@mui/icons-material';
 import { Beneficiary } from '../../types/api';
 
 interface BeneficiaryFormProps {
@@ -16,8 +27,8 @@ interface BeneficiaryFormProps {
 interface FormData {
   name: string;
   account_number: string;
-  bank_name: string;
-  notes: string;
+  bank_name?: string;
+  notes?: string;
   is_frequent: boolean;
   is_active: boolean;
 }
@@ -46,7 +57,12 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
   });
 
   const handleFormSubmit = (data: FormData) => {
-    onSubmit(data);
+    const submitData: Omit<Beneficiary, 'id'> = {
+      ...data,
+      bank_name: data.bank_name || '',
+      notes: data.notes || ''
+    };
+    onSubmit(submitData);
     reset();
   };
 
@@ -56,153 +72,89 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
   };
 
   return (
-    <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={handleClose}>
-        <Transition.Child
-          as={Fragment}
-          enter="ease-out duration-300"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="ease-in duration-200"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
-        >
-          <div className="fixed inset-0 bg-black bg-opacity-25" />
-        </Transition.Child>
+    <Dialog open={isOpen} onClose={handleClose} maxWidth="sm" fullWidth>
+      <DialogTitle>
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Typography variant="h6">
+            {beneficiary ? 'Kedvezményezett szerkesztése' : 'Új kedvezményezett'}
+          </Typography>
+          <IconButton onClick={handleClose} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Stack>
+      </DialogTitle>
 
-        <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4 text-center">
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95"
-              enterTo="opacity-100 scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
-            >
-              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
-                <div className="flex justify-between items-center mb-4">
-                  <Dialog.Title
-                    as="h3"
-                    className="text-lg font-medium leading-6 text-gray-900"
-                  >
-                    {beneficiary ? 'Kedvezményezett szerkesztése' : 'Új kedvezményezett'}
-                  </Dialog.Title>
-                  <button
-                    onClick={handleClose}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <XMarkIcon className="h-6 w-6" />
-                  </button>
-                </div>
+      <form onSubmit={handleSubmit(handleFormSubmit)}>
+        <DialogContent>
+          <Stack spacing={3}>
+            <TextField
+              label="Név *"
+              fullWidth
+              {...register('name', { required: 'A név megadása kötelező' })}
+              error={!!errors.name}
+              helperText={errors.name?.message}
+            />
 
-                <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
-                  <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                      Név *
-                    </label>
-                    <input
-                      type="text"
-                      {...register('name', { required: 'A név megadása kötelező' })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                    />
-                    {errors.name && (
-                      <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
-                    )}
-                  </div>
+            <TextField
+              label="Számlaszám *"
+              fullWidth
+              placeholder="12345678-12345678"
+              {...register('account_number', { 
+                required: 'A számlaszám megadása kötelező',
+                pattern: {
+                  value: /^[\d-]+$/,
+                  message: 'Érvénytelen számlaszám formátum'
+                }
+              })}
+              error={!!errors.account_number}
+              helperText={errors.account_number?.message}
+              InputProps={{
+                sx: { fontFamily: 'monospace' }
+              }}
+            />
 
-                  <div>
-                    <label htmlFor="account_number" className="block text-sm font-medium text-gray-700">
-                      Számlaszám *
-                    </label>
-                    <input
-                      type="text"
-                      {...register('account_number', { 
-                        required: 'A számlaszám megadása kötelező',
-                        pattern: {
-                          value: /^[\d-]+$/,
-                          message: 'Érvénytelen számlaszám formátum'
-                        }
-                      })}
-                      placeholder="12345678-12345678"
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm font-mono"
-                    />
-                    {errors.account_number && (
-                      <p className="mt-1 text-sm text-red-600">{errors.account_number.message}</p>
-                    )}
-                  </div>
+            <TextField
+              label="Bank neve"
+              fullWidth
+              {...register('bank_name')}
+            />
 
-                  <div>
-                    <label htmlFor="bank_name" className="block text-sm font-medium text-gray-700">
-                      Bank neve
-                    </label>
-                    <input
-                      type="text"
-                      {...register('bank_name')}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                    />
-                  </div>
+            <TextField
+              label="Megjegyzés"
+              fullWidth
+              multiline
+              rows={3}
+              placeholder="Megjegyzés a kedvezményezettel kapcsolatban..."
+              {...register('notes')}
+            />
 
-                  <div>
-                    <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
-                      Megjegyzés
-                    </label>
-                    <textarea
-                      {...register('notes')}
-                      rows={3}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                      placeholder="Megjegyzés a kedvezményezettel kapcsolatban..."
-                    />
-                  </div>
+            <Stack spacing={1}>
+              <FormControlLabel
+                control={<Checkbox {...register('is_active')} />}
+                label="Aktív kedvezményezett"
+              />
+              <FormControlLabel
+                control={<Checkbox {...register('is_frequent')} />}
+                label="Gyakori kedvezményezett"
+              />
+            </Stack>
+          </Stack>
+        </DialogContent>
 
-                  <div className="space-y-2">
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        {...register('is_active')}
-                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                      />
-                      <label htmlFor="is_active" className="ml-2 block text-sm text-gray-900">
-                        Aktív kedvezményezett
-                      </label>
-                    </div>
-
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        {...register('is_frequent')}
-                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                      />
-                      <label htmlFor="is_frequent" className="ml-2 block text-sm text-gray-900">
-                        Gyakori kedvezményezett
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end space-x-3 pt-4">
-                    <button
-                      type="button"
-                      onClick={handleClose}
-                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                    >
-                      Mégse
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isLoading}
-                      className="px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isLoading ? 'Mentés...' : (beneficiary ? 'Frissítés' : 'Létrehozás')}
-                    </button>
-                  </div>
-                </form>
-              </Dialog.Panel>
-            </Transition.Child>
-          </div>
-        </div>
-      </Dialog>
-    </Transition>
+        <DialogActions>
+          <Button onClick={handleClose}>
+            Mégse
+          </Button>
+          <Button 
+            type="submit" 
+            variant="contained" 
+            disabled={isLoading}
+          >
+            {isLoading ? 'Mentés...' : (beneficiary ? 'Frissítés' : 'Létrehozás')}
+          </Button>
+        </DialogActions>
+      </form>
+    </Dialog>
   );
 };
 

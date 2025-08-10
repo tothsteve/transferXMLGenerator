@@ -1,13 +1,30 @@
 import React from 'react';
-import { Dialog, Transition } from '@headlessui/react';
-import { Fragment } from 'react';
-import { 
-  XMarkIcon,
-  CalendarIcon,
-  UserGroupIcon,
-  CurrencyDollarIcon,
-  DocumentTextIcon
-} from '@heroicons/react/24/outline';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Typography,
+  Button,
+  Box,
+  Paper,
+  Stack,
+  Chip,
+  Avatar,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
+  Divider,
+  IconButton
+} from '@mui/material';
+import {
+  Close as CloseIcon,
+  CalendarToday as CalendarIcon,
+  Group as GroupIcon,
+  AttachMoney as MoneyIcon,
+  Description as DocumentIcon
+} from '@mui/icons-material';
 import { TransferTemplate } from '../../types/api';
 
 interface TemplateViewProps {
@@ -58,182 +75,174 @@ const TemplateView: React.FC<TemplateViewProps> = ({
   );
 
   return (
-    <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
-        <Transition.Child
-          as={Fragment}
-          enter="ease-out duration-300"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="ease-in duration-200"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
-        >
-          <div className="fixed inset-0 bg-black bg-opacity-25" />
-        </Transition.Child>
+    <Dialog open={isOpen} onClose={onClose} maxWidth="lg" fullWidth>
+      <DialogTitle>
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Typography variant="h6">
+            Sablon részletei
+          </Typography>
+          <IconButton onClick={onClose} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Stack>
+      </DialogTitle>
 
-        <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4 text-center">
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95"
-              enterTo="opacity-100 scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
-            >
-              <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
-                <div className="flex justify-between items-center mb-6">
-                  <Dialog.Title
-                    as="h3"
-                    className="text-lg font-medium leading-6 text-gray-900"
-                  >
-                    Sablon részletei
-                  </Dialog.Title>
-                  <button
-                    onClick={onClose}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <XMarkIcon className="h-6 w-6" />
-                  </button>
-                </div>
+      <DialogContent>
+        <Stack spacing={3}>
+          {/* Template Info */}
+          <Paper sx={{ p: 3, bgcolor: 'grey.50' }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+              <Box>
+                <Typography variant="h5" gutterBottom>
+                  {template.name}
+                </Typography>
+                {template.description && (
+                  <Typography variant="body2" color="text.secondary">
+                    {template.description}
+                  </Typography>
+                )}
+              </Box>
+              
+              <Box>
+                <Stack spacing={2}>
+                  <Chip
+                    label={template.is_active ? 'Aktív' : 'Inaktív'}
+                    color={template.is_active ? 'success' : 'default'}
+                    variant="outlined"
+                    size="small"
+                    sx={{ width: 'fit-content' }}
+                  />
+                  
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <GroupIcon fontSize="small" color="action" />
+                    <Typography variant="body2" color="text.secondary">
+                      {template.beneficiary_count} kedvezményezett
+                    </Typography>
+                  </Stack>
+                  
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <MoneyIcon fontSize="small" color="action" />
+                    <Typography variant="body2" color="text.secondary">
+                      {totalAmount.toLocaleString('hu-HU')} HUF összesen
+                    </Typography>
+                  </Stack>
+                  
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <CalendarIcon fontSize="small" color="action" />
+                    <Typography variant="body2" color="text.secondary">
+                      Létrehozva: {new Date(template.created_at).toLocaleDateString('hu-HU')}
+                    </Typography>
+                  </Stack>
+                  
+                  {template.updated_at !== template.created_at && (
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <CalendarIcon fontSize="small" color="action" />
+                      <Typography variant="body2" color="text.secondary">
+                        Módosítva: {new Date(template.updated_at).toLocaleDateString('hu-HU')}
+                      </Typography>
+                    </Stack>
+                  )}
+                </Stack>
+              </Box>
+            </Box>
+          </Paper>
 
-                <div className="space-y-6">
-                  {/* Template Info */}
-                  <div className="bg-gray-50 rounded-lg p-6">
-                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                      <div>
-                        <h4 className="text-lg font-medium text-gray-900 mb-4">{template.name}</h4>
-                        {template.description && (
-                          <p className="text-sm text-gray-600">{template.description}</p>
-                        )}
-                      </div>
-                      
-                      <div className="space-y-3">
-                        <div className="flex items-center text-sm">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            template.is_active 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {template.is_active ? 'Aktív' : 'Inaktív'}
-                          </span>
-                        </div>
+          {/* Beneficiaries */}
+          <Box>
+            <Typography variant="h6" gutterBottom>
+              Kedvezményezettek
+            </Typography>
+            
+            {templateBeneficiaries.length === 0 ? (
+              <Paper 
+                sx={{ 
+                  p: 4, 
+                  textAlign: 'center', 
+                  border: 2, 
+                  borderStyle: 'dashed', 
+                  borderColor: 'divider' 
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  Nincsenek kedvezményezettek hozzárendelve ehhez a sablonhoz.
+                </Typography>
+              </Paper>
+            ) : (
+              <Paper elevation={1}>
+                <List>
+                  {templateBeneficiaries.map((beneficiary, index) => (
+                    <React.Fragment key={beneficiary.id}>
+                      <ListItem>
+                        <ListItemAvatar>
+                          <Avatar sx={{ bgcolor: 'primary.100', color: 'primary.800' }}>
+                            <Typography variant="body2" fontWeight={500}>
+                              {index + 1}
+                            </Typography>
+                          </Avatar>
+                        </ListItemAvatar>
                         
-                        <div className="flex items-center text-sm text-gray-500">
-                          <UserGroupIcon className="h-4 w-4 mr-2" />
-                          <span>{template.beneficiary_count} kedvezményezett</span>
-                        </div>
+                        <ListItemText
+                          primary={
+                            <Typography variant="body1" fontWeight={500}>
+                              {beneficiary.beneficiary_name}
+                            </Typography>
+                          }
+                          secondary={
+                            <Stack spacing={0.5}>
+                              <Typography variant="body2" fontFamily="monospace">
+                                {beneficiary.account_number}
+                              </Typography>
+                              {beneficiary.bank_name && (
+                                <Typography variant="body2" color="text.secondary">
+                                  {beneficiary.bank_name}
+                                </Typography>
+                              )}
+                            </Stack>
+                          }
+                        />
                         
-                        <div className="flex items-center text-sm text-gray-500">
-                          <CurrencyDollarIcon className="h-4 w-4 mr-2" />
-                          <span>{totalAmount.toLocaleString('hu-HU')} HUF összesen</span>
-                        </div>
-                        
-                        <div className="flex items-center text-sm text-gray-500">
-                          <CalendarIcon className="h-4 w-4 mr-2" />
-                          <span>
-                            Létrehozva: {new Date(template.created_at).toLocaleDateString('hu-HU')}
-                          </span>
-                        </div>
-                        
-                        {template.updated_at !== template.created_at && (
-                          <div className="flex items-center text-sm text-gray-500">
-                            <CalendarIcon className="h-4 w-4 mr-2" />
-                            <span>
-                              Módosítva: {new Date(template.updated_at).toLocaleDateString('hu-HU')}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                        <Box sx={{ textAlign: 'right' }}>
+                          <Typography variant="body1" fontWeight={500}>
+                            {parseFloat(beneficiary.default_amount).toLocaleString('hu-HU')} HUF
+                          </Typography>
+                          {beneficiary.default_remittance_info && (
+                            <Stack direction="row" alignItems="center" spacing={0.5} justifyContent="flex-end">
+                              <DocumentIcon fontSize="small" color="action" />
+                              <Typography variant="body2" color="text.secondary">
+                                {beneficiary.default_remittance_info}
+                              </Typography>
+                            </Stack>
+                          )}
+                        </Box>
+                      </ListItem>
+                      {index < templateBeneficiaries.length - 1 && <Divider />}
+                    </React.Fragment>
+                  ))}
+                </List>
+                
+                {/* Summary */}
+                <Box sx={{ bgcolor: 'grey.50', p: 2 }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="body1" fontWeight={500}>
+                      Összesen:
+                    </Typography>
+                    <Typography variant="body1" fontWeight="bold">
+                      {totalAmount.toLocaleString('hu-HU')} HUF
+                    </Typography>
+                  </Stack>
+                </Box>
+              </Paper>
+            )}
+          </Box>
+        </Stack>
+      </DialogContent>
 
-                  {/* Beneficiaries */}
-                  <div>
-                    <h5 className="text-sm font-medium text-gray-900 mb-4">Kedvezményezettek</h5>
-                    
-                    {templateBeneficiaries.length === 0 ? (
-                      <div className="text-center py-6 border-2 border-dashed border-gray-300 rounded-lg">
-                        <p className="text-sm text-gray-500">
-                          Nincsenek kedvezményezettek hozzárendelve ehhez a sablonhoz.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="bg-white shadow overflow-hidden sm:rounded-md">
-                        <ul className="divide-y divide-gray-200">
-                          {templateBeneficiaries.map((beneficiary, index) => (
-                            <li key={beneficiary.id} className="px-6 py-4">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center">
-                                  <div className="flex-shrink-0">
-                                    <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
-                                      <span className="text-sm font-medium text-primary-800">
-                                        {index + 1}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <div className="ml-4">
-                                    <div className="text-sm font-medium text-gray-900">
-                                      {beneficiary.beneficiary_name}
-                                    </div>
-                                    <div className="text-sm text-gray-500 font-mono">
-                                      {beneficiary.account_number}
-                                    </div>
-                                    {beneficiary.bank_name && (
-                                      <div className="text-sm text-gray-500">
-                                        {beneficiary.bank_name}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                                
-                                <div className="text-right">
-                                  <div className="text-sm font-medium text-gray-900">
-                                    {parseFloat(beneficiary.default_amount).toLocaleString('hu-HU')} HUF
-                                  </div>
-                                  {beneficiary.default_remittance_info && (
-                                    <div className="text-sm text-gray-500 flex items-center">
-                                      <DocumentTextIcon className="h-3 w-3 mr-1" />
-                                      {beneficiary.default_remittance_info}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                        
-                        {/* Summary */}
-                        <div className="bg-gray-50 px-6 py-3">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm font-medium text-gray-900">Összesen:</span>
-                            <span className="text-sm font-bold text-gray-900">
-                              {totalAmount.toLocaleString('hu-HU')} HUF
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex justify-end pt-6">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                  >
-                    Bezárás
-                  </button>
-                </div>
-              </Dialog.Panel>
-            </Transition.Child>
-          </div>
-        </div>
-      </Dialog>
-    </Transition>
+      <DialogActions>
+        <Button onClick={onClose}>
+          Bezárás
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 };
 

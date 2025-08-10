@@ -1,6 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PlusIcon } from '@heroicons/react/24/outline';
+import {
+  Box,
+  Typography,
+  Button,
+  Stack,
+  Card,
+  CardContent,
+  Avatar
+} from '@mui/material';
+import { Add as AddIcon } from '@mui/icons-material';
 import { 
   useTemplates, 
   useCreateTemplate, 
@@ -134,123 +143,112 @@ const TemplateBuilder: React.FC = () => {
   const isFormLoading = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div className="lg:pl-72">
-      <div className="px-4 py-10 sm:px-6 lg:px-8 lg:py-6">
-        <div className="border-b border-gray-200 pb-5">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold leading-tight tracking-tight text-gray-900">
-                Sablonok
-              </h1>
-              <p className="mt-2 max-w-4xl text-sm text-gray-500">
-                Átutalási sablonok létrehozása és kezelése ismétlődő fizetésekhez
-              </p>
-            </div>
-            <div>
-              <button
-                onClick={() => setShowForm(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-              >
-                <PlusIcon className="h-4 w-4 mr-2" />
-                Új sablon
-              </button>
-            </div>
-          </div>
-        </div>
+    <Box sx={{ p: 3 }}>
+      {/* Header */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', pb: 3, mb: 4 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={3}>
+          <Box>
+            <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
+              Sablonok
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              Átutalási sablonok létrehozása és kezelése ismétlődő fizetésekhez
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setShowForm(true)}
+          >
+            Új sablon
+          </Button>
+        </Stack>
+      </Box>
 
-        {/* Stats */}
-        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-3">
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="h-8 w-8 bg-primary-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-sm font-medium">{templates.length}</span>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
-                      Összes sablon
-                    </dt>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
+      {/* Stats */}
+      <Box 
+        sx={{ 
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: '1fr',
+            sm: 'repeat(3, 1fr)'
+          },
+          gap: 3,
+          mb: 4
+        }}
+      >
+        <Card elevation={1}>
+          <CardContent>
+            <Stack direction="row" alignItems="center" spacing={2}>
+              <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}>
+                <Typography variant="body2" fontWeight="bold" color="white">
+                  {templates.length}
+                </Typography>
+              </Avatar>
+              <Typography variant="body2" color="text.secondary">
+                Összes sablon
+              </Typography>
+            </Stack>
+          </CardContent>
+        </Card>
 
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="h-8 w-8 bg-green-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-sm font-medium">
-                      {templates.filter(t => t.is_active).length}
-                    </span>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
-                      Aktív sablonok
-                    </dt>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
+        <Card elevation={1}>
+          <CardContent>
+            <Stack direction="row" alignItems="center" spacing={2}>
+              <Avatar sx={{ bgcolor: 'success.main', width: 40, height: 40 }}>
+                <Typography variant="body2" fontWeight="bold" color="white">
+                  {templates.filter(t => t.is_active).length}
+                </Typography>
+              </Avatar>
+              <Typography variant="body2" color="text.secondary">
+                Aktív sablonok
+              </Typography>
+            </Stack>
+          </CardContent>
+        </Card>
 
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="h-8 w-8 bg-blue-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-sm font-medium">
-                      {templates.reduce((sum, t) => sum + t.beneficiary_count, 0)}
-                    </span>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
-                      Összes kedvezményezett
-                    </dt>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <Card elevation={1}>
+          <CardContent>
+            <Stack direction="row" alignItems="center" spacing={2}>
+              <Avatar sx={{ bgcolor: 'info.main', width: 40, height: 40 }}>
+                <Typography variant="body2" fontWeight="bold" color="white">
+                  {templates.reduce((sum, t) => sum + t.beneficiary_count, 0)}
+                </Typography>
+              </Avatar>
+              <Typography variant="body2" color="text.secondary">
+                Összes kedvezményezett
+              </Typography>
+            </Stack>
+          </CardContent>
+        </Card>
+      </Box>
 
-        {/* Template List */}
-        <div className="mt-8">
-          <TemplateList
-            templates={templates}
-            isLoading={isLoading}
-            onEdit={handleEditTemplate}
-            onDelete={handleDeleteTemplate}
-            onView={handleViewTemplate}
-            onLoadTemplate={handleLoadTemplate}
-          />
-        </div>
+      {/* Template List */}
+      <TemplateList
+        templates={templates}
+        isLoading={isLoading}
+        onEdit={handleEditTemplate}
+        onDelete={handleDeleteTemplate}
+        onView={handleViewTemplate}
+        onLoadTemplate={handleLoadTemplate}
+      />
 
-        {/* Template Form Modal */}
-        <TemplateForm
-          isOpen={showForm}
-          onClose={handleFormClose}
-          onSubmit={editingTemplate ? handleUpdateTemplate : handleCreateTemplate}
-          template={editingTemplate}
-          isLoading={isFormLoading}
-        />
+      {/* Template Form Modal */}
+      <TemplateForm
+        isOpen={showForm}
+        onClose={handleFormClose}
+        onSubmit={editingTemplate ? handleUpdateTemplate : handleCreateTemplate}
+        template={editingTemplate}
+        isLoading={isFormLoading}
+      />
 
-        {/* Template View Modal */}
-        <TemplateView
-          isOpen={showView}
-          onClose={handleViewClose}
-          template={viewingTemplate}
-        />
-      </div>
-    </div>
+      {/* Template View Modal */}
+      <TemplateView
+        isOpen={showView}
+        onClose={handleViewClose}
+        template={viewingTemplate}
+      />
+    </Box>
   );
 };
 

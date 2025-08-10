@@ -1,9 +1,24 @@
 import React from 'react';
-import { 
-  DocumentArrowDownIcon,
-  ClipboardDocumentIcon,
-  XMarkIcon
-} from '@heroicons/react/24/outline';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Typography,
+  Button,
+  IconButton,
+  Box,
+  Stack,
+  Paper,
+  Divider,
+  Chip
+} from '@mui/material';
+import {
+  Download as DownloadIcon,
+  ContentCopy as CopyIcon,
+  Close as CloseIcon,
+  Code as CodeIcon
+} from '@mui/icons-material';
 
 interface XMLPreviewProps {
   xmlContent: string;
@@ -21,15 +36,9 @@ const XMLPreview: React.FC<XMLPreviewProps> = ({
   const handleCopyToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(xmlContent);
-      // Success feedback would be handled by parent component
-      window.dispatchEvent(new CustomEvent('toast', {
-        detail: { type: 'success', title: 'XML tartalma vágólapra másolva' }
-      }));
+      // Success feedback could be handled by a snackbar or toast system
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
-      window.dispatchEvent(new CustomEvent('toast', {
-        detail: { type: 'error', title: 'Másolás sikertelen', message: 'Próbálja meg manuálisan kijelölni és másolni a tartalmat' }
-      }));
     }
   };
 
@@ -58,83 +67,129 @@ const XMLPreview: React.FC<XMLPreviewProps> = ({
   const formattedLines = formatXML(xmlContent);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-full flex flex-col">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-          <div>
-            <h3 className="text-lg font-medium text-gray-900">XML Előnézet</h3>
-            <p className="text-sm text-gray-500">{filename}</p>
-          </div>
-          <div className="flex space-x-2">
-            <button
+    <Dialog 
+      open={true} 
+      onClose={onClose} 
+      maxWidth="lg" 
+      fullWidth
+      PaperProps={{
+        sx: { height: '90vh', display: 'flex', flexDirection: 'column' }
+      }}
+    >
+      <DialogTitle>
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Box>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <CodeIcon color="primary" />
+              <Typography variant="h6">XML Előnézet</Typography>
+            </Stack>
+            <Typography variant="body2" color="text.secondary">
+              {filename}
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="outlined"
+              startIcon={<CopyIcon />}
               onClick={handleCopyToClipboard}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-              title="Másolás vágólapra"
+              size="small"
             >
-              <ClipboardDocumentIcon className="h-4 w-4 mr-2" />
               Másolás
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<DownloadIcon />}
               onClick={onDownload}
-              className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              size="small"
             >
-              <DocumentArrowDownIcon className="h-4 w-4 mr-2" />
               Letöltés
-            </button>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <XMarkIcon className="h-6 w-6" />
-            </button>
-          </div>
-        </div>
+            </Button>
+            <IconButton onClick={onClose} edge="end">
+              <CloseIcon />
+            </IconButton>
+          </Stack>
+        </Stack>
+      </DialogTitle>
 
-        {/* XML Content */}
-        <div className="flex-1 overflow-hidden">
-          <div className="h-full overflow-auto bg-gray-900 text-green-400 font-mono text-sm">
-            <div className="p-4">
-              {formattedLines.map((line, index) => (
-                <div key={index} className="flex">
-                  <div className="text-gray-500 w-12 text-right mr-4 select-none">
-                    {line.lineNumber}
-                  </div>
-                  <div 
-                    className="flex-1"
-                    style={{ paddingLeft: `${line.indent * 8}px` }}
+      <DialogContent sx={{ flex: 1, p: 0, overflow: 'hidden' }}>
+        <Paper
+          variant="outlined"
+          sx={{
+            height: '100%',
+            bgcolor: 'grey.900',
+            color: '#00ff00',
+            fontFamily: 'monospace',
+            fontSize: '0.875rem',
+            overflow: 'auto'
+          }}
+        >
+          <Box sx={{ p: 2 }}>
+            {formattedLines.map((line, index) => (
+              <Box key={index} sx={{ display: 'flex', minHeight: '1.25em' }}>
+                <Box
+                  sx={{
+                    color: 'grey.500',
+                    width: 48,
+                    textAlign: 'right',
+                    mr: 2,
+                    userSelect: 'none',
+                    flexShrink: 0
+                  }}
+                >
+                  {line.lineNumber}
+                </Box>
+                <Box
+                  sx={{
+                    flex: 1,
+                    pl: line.indent,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-all'
+                  }}
+                >
+                  <Box
+                    component="span"
+                    sx={{
+                      color: line.content.includes('</')
+                        ? '#ff6b6b'
+                        : line.content.includes('<?xml')
+                        ? '#ffd93d'
+                        : line.content.includes('<') && !line.content.includes('</')
+                        ? '#74c0fc'
+                        : '#ffffff'
+                    }}
                   >
-                    <span className="whitespace-pre-wrap">
-                      {line.content.includes('</') ? (
-                        <span className="text-red-400">{line.content}</span>
-                      ) : line.content.includes('<?xml') ? (
-                        <span className="text-yellow-400">{line.content}</span>
-                      ) : line.content.includes('<') && !line.content.includes('</') ? (
-                        <span className="text-blue-400">{line.content}</span>
-                      ) : (
-                        <span className="text-white">{line.content}</span>
-                      )}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+                    {line.content}
+                  </Box>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        </Paper>
+      </DialogContent>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-          <div className="flex justify-between items-center text-sm text-gray-600">
-            <div>
-              {formattedLines.length} sor • {new Blob([xmlContent]).size} byte
-            </div>
-            <div>
-              UTF-8 kódolás
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+      <DialogActions sx={{ bgcolor: 'grey.50', px: 3, py: 2 }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ width: '100%' }}>
+          <Stack direction="row" spacing={2}>
+            <Chip 
+              label={`${formattedLines.length} sor`} 
+              size="small" 
+              variant="outlined" 
+            />
+            <Chip 
+              label={`${new Blob([xmlContent]).size} byte`} 
+              size="small" 
+              variant="outlined" 
+            />
+          </Stack>
+          <Chip 
+            label="UTF-8 kódolás" 
+            size="small" 
+            color="primary" 
+            variant="outlined" 
+          />
+        </Stack>
+      </DialogActions>
+    </Dialog>
   );
 };
 
