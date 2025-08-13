@@ -10,6 +10,7 @@ import {
   ListItemText,
   Typography,
   IconButton,
+  Chip,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -18,6 +19,7 @@ import {
   Description as DescriptionIcon,
   SwapHoriz as SwapHorizIcon,
   Folder as FolderIcon,
+  CloudUpload as CloudUploadIcon,
 } from '@mui/icons-material';
 
 interface SidebarProps {
@@ -27,10 +29,18 @@ interface SidebarProps {
   isMobile: boolean;
 }
 
+interface NavigationItem {
+  name: string;
+  href: string;
+  icon: React.ElementType;
+  badge?: string;
+}
+
 const navigation = [
   { name: 'Főoldal', href: '/', icon: HomeIcon },
   { name: 'Kedvezményezettek', href: '/beneficiaries', icon: PeopleIcon },
   { name: 'Sablonok', href: '/templates', icon: DescriptionIcon },
+  { name: 'PDF Importálás', href: '/pdf-import', icon: CloudUploadIcon, badge: 'ÚJ' },
   { name: 'Átutalások', href: '/transfers', icon: SwapHorizIcon },
   { name: 'XML Kötegek', href: '/batches', icon: FolderIcon },
 ];
@@ -105,6 +115,19 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
                     fontSize: '0.875rem',
                   }}
                 />
+                {item.badge && (
+                  <Chip 
+                    label={item.badge} 
+                    size="small" 
+                    color="primary" 
+                    variant="filled"
+                    sx={{ 
+                      height: 20, 
+                      fontSize: '0.7rem',
+                      fontWeight: 'bold'
+                    }} 
+                  />
+                )}
               </ListItemButton>
             </ListItem>
           ))}

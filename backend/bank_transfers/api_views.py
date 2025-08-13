@@ -20,6 +20,7 @@ from .serializers import (
     ExcelImportSerializer, XMLGenerateSerializer
 )
 from .utils import generate_xml
+from .pdf_processor import PDFTransactionProcessor
 
 class BankAccountViewSet(viewsets.ModelViewSet):
     """
@@ -223,6 +224,84 @@ class TransferTemplateViewSet(viewsets.ModelViewSet):
             })
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @swagger_auto_schema(
+        operation_description="PDF fájlokból sablon létrehozása/frissítése",
+        manual_parameters=[
+            openapi.Parameter('pdf_files', openapi.IN_FORM, type=openapi.TYPE_FILE, required=True, description='PDF fájlok (több is)'),
+            openapi.Parameter('template_name', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description='Sablon neve (opcionális)'),
+            openapi.Parameter('template_id', openapi.IN_FORM, type=openapi.TYPE_INTEGER, required=False, description='Meglévő sablon ID frissítéshez (opcionális)')
+        ],
+        responses={
+            200: openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'template': openapi.Schema(type=openapi.TYPE_OBJECT),
+                    'transactions_processed': openapi.Schema(type=openapi.TYPE_INTEGER),
+                    'beneficiaries_matched': openapi.Schema(type=openapi.TYPE_INTEGER),
+                    'beneficiaries_created': openapi.Schema(type=openapi.TYPE_INTEGER),
+                    'consolidations': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_STRING)),
+                    'preview': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_OBJECT)),
+                    'total_amount': openapi.Schema(type=openapi.TYPE_NUMBER)
+                }
+            ),
+            400: 'Hibás PDF vagy feldolgozási hiba'
+        }
+    )
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser])
+    def process_pdf(self, request):
+        """
+        PDF fájlokból tranzakciók kinyerése és sablon létrehozása
+        
+        Támogatott formátumok:
+        - NAV adó és járulék befizetési PDF-ek
+        - Banki utalások / fizetési lista PDF-ek
+        
+        A rendszer automatikusan:
+        - Felismeri a meglévő kedvezményezetteket (nem hoz létre duplikátumokat)
+        - Összevonja az azonos számlára érkező átutalásokat
+        - Létrehoz új sablont vagy frissíti a meglévőt
+        """
+        try:
+            pdf_files = request.FILES.getlist('pdf_files')
+            template_name = request.data.get('template_name')
+            template_id = request.data.get('template_id')
+            
+            if not pdf_files:
+                return Response({
+                    'error': 'Nem található PDF fájl',
+                    'details': 'Legalább egy PDF fájlt fel kell tölteni'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate PDF files
+            for pdf_file in pdf_files:
+                if not pdf_file.name.lower().endswith('.pdf'):
+                    return Response({
+                        'error': f'Hibás fájl formátum: {pdf_file.name}',
+                        'details': 'Csak PDF fájlok engedélyezettek'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Process PDFs
+            processor = PDFTransactionProcessor()
+            result = processor.process_pdf_files(
+                pdf_files=pdf_files,
+                template_name=template_name,
+                template_id=int(template_id) if template_id else None
+            )
+            
+            return Response(result, status=status.HTTP_200_OK)
+            
+        except ValueError as e:
+            return Response({
+                'error': 'PDF feldolgozási hiba',
+                'details': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Exception as e:
+            return Response({
+                'error': 'Váratlan hiba történt',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class TransferViewSet(viewsets.ModelViewSet):
     """
