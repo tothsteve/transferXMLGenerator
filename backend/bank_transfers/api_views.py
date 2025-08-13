@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponse
 from django.utils import timezone
-from django.db import transaction
+from django.db import transaction, models
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 import json
@@ -334,10 +334,14 @@ class TransferViewSet(viewsets.ModelViewSet):
             
             # Create batch if name provided
             if batch_name:
+                # Get next order number
+                max_order = TransferBatch.objects.aggregate(max_order=models.Max('order'))['max_order'] or 0
+                
                 batch = TransferBatch.objects.create(
                     name=batch_name,
                     xml_generated_at=timezone.now(),
-                    total_amount=sum(t.amount for t in transfers)
+                    total_amount=sum(t.amount for t in transfers),
+                    order=max_order + 1  # Set incrementing order
                 )
                 batch.transfers.set(transfers)
             
@@ -368,18 +372,55 @@ class TransferBatchViewSet(viewsets.ReadOnlyModelViewSet):
     )
     @action(detail=True, methods=['get'])
     def download_xml(self, request, pk=None):
-        """XML fájl letöltése"""
+        """XML fájl letöltése - regenerálja az XML-t a mentett adatokból"""
         batch = self.get_object()
-        transfers = batch.transfers.select_related('beneficiary', 'originator_account').all()
+        transfers = batch.transfers.select_related('beneficiary', 'originator_account').order_by('order', 'execution_date')
         
         if not transfers:
             return Response({'detail': 'No transfers in batch'}, status=404)
         
+        # Regenerate XML from saved transfer data
         xml_content = generate_xml(transfers)
         
         response = HttpResponse(xml_content, content_type='application/xml')
-        response['Content-Disposition'] = f'attachment; filename="{batch.name}.xml"'
+        response['Content-Disposition'] = f'attachment; filename="{batch.xml_filename}"'
         return response
+    
+    @swagger_auto_schema(
+        operation_description="XML köteg megjelölése bankban felhasználtként",
+        responses={200: 'Batch marked as used', 404: 'Batch not found'}
+    )
+    @action(detail=True, methods=['post'])
+    def mark_used_in_bank(self, request, pk=None):
+        """XML köteg megjelölése bankban felhasználtként"""
+        batch = self.get_object()
+        batch.used_in_bank = True
+        batch.bank_usage_date = timezone.now()
+        batch.save()
+        
+        return Response({
+            'detail': 'Batch marked as used in bank',
+            'used_in_bank': batch.used_in_bank,
+            'bank_usage_date': batch.bank_usage_date
+        })
+    
+    @swagger_auto_schema(
+        operation_description="XML köteg megjelölése nem felhasználtként",
+        responses={200: 'Batch marked as unused', 404: 'Batch not found'}
+    )
+    @action(detail=True, methods=['post'])
+    def mark_unused_in_bank(self, request, pk=None):
+        """XML köteg megjelölése nem felhasználtként"""
+        batch = self.get_object()
+        batch.used_in_bank = False
+        batch.bank_usage_date = None
+        batch.save()
+        
+        return Response({
+            'detail': 'Batch marked as unused in bank',
+            'used_in_bank': batch.used_in_bank,
+            'bank_usage_date': batch.bank_usage_date
+        })
 
 class ExcelImportView(APIView):
     """
@@ -451,9 +492,9 @@ class ExcelImportView(APIView):
                     name=str(name).strip(),
                     account_number=str(account_number).strip(),
                     defaults={
-                        'bank_name': '',
+                        'description': '',
                         'is_active': True,
-                        'notes': str(comment or '').strip()
+                        'remittance_information': str(comment or '').strip()
                     }
                 )
                 

@@ -14,11 +14,11 @@ class TransferForm(forms.ModelForm):
 class BeneficiaryForm(forms.ModelForm):
     class Meta:
         model = Beneficiary
-        fields = ['name', 'account_number', 'bank_name', 'is_frequent']
+        fields = ['name', 'account_number', 'description', 'is_frequent']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Kedvezményezett neve'}),
             'account_number': forms.TextInput(attrs={'placeholder': 'XXXXXXXX-XXXXXXXX-XXXXXXXX'}),
-            'bank_name': forms.TextInput(attrs={'placeholder': 'Bank neve (opcionális)'}),
+            'description': forms.TextInput(attrs={'placeholder': 'Leírás (opcionális)'}),
         }
 
 class BankAccountForm(forms.ModelForm):

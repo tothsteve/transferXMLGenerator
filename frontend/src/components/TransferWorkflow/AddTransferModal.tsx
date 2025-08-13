@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   Dialog,
@@ -67,6 +67,7 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<FormData>({
     defaultValues: {
@@ -83,6 +84,13 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({
   });
 
   const availableBeneficiaries = beneficiariesData?.results || [];
+
+  // Auto-fill remittance info when beneficiary is selected
+  useEffect(() => {
+    if (selectedBeneficiary && selectedBeneficiary.remittance_information) {
+      setValue('remittance_info', selectedBeneficiary.remittance_information);
+    }
+  }, [selectedBeneficiary, setValue]);
 
   const handleFormSubmit = (data: FormData) => {
     if (!selectedBeneficiary) return;
@@ -183,16 +191,16 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({
                             </Typography>
                           }
                           secondary={
-                            <Stack spacing={0.5}>
-                              <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                            <Box component="span">
+                              <Typography variant="caption" component="span" sx={{ fontFamily: 'monospace', display: 'block' }}>
                                 {beneficiary.account_number}
                               </Typography>
                               {beneficiary.description && (
-                                <Typography variant="caption" color="text.secondary">
+                                <Typography variant="caption" component="span" color="text.secondary" sx={{ display: 'block' }}>
                                   {beneficiary.description}
                                 </Typography>
                               )}
-                            </Stack>
+                            </Box>
                           }
                         />
                       </ListItemButton>

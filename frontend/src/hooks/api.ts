@@ -4,6 +4,7 @@ import {
   templatesApi,
   transfersApi,
   bankAccountsApi,
+  batchesApi,
   uploadApi,
 } from '../services/api';
 import {
@@ -21,6 +22,7 @@ export const queryKeys = {
   templates: ['templates'] as const,
   template: (id: number) => ['templates', id] as const,
   bankAccountDefault: ['bankAccount', 'default'] as const,
+  batches: ['batches'] as const,
 };
 
 // Beneficiaries Hooks
@@ -213,8 +215,14 @@ export function useBulkCreateTransfers() {
 }
 
 export function useGenerateXml() {
+  const queryClient = useQueryClient();
+  
   return useMutation({
     mutationFn: (data: GenerateXmlRequest) => transfersApi.generateXml(data),
+    onSuccess: () => {
+      // Invalidate batches query to update the dashboard counter
+      queryClient.invalidateQueries({ queryKey: queryKeys.batches });
+    },
   });
 }
 
@@ -224,6 +232,46 @@ export function useDefaultBankAccount() {
     queryKey: queryKeys.bankAccountDefault,
     queryFn: () => bankAccountsApi.getDefault(),
     select: (data) => data.data,
+  });
+}
+
+// Batches Hooks
+export function useBatches() {
+  return useQuery({
+    queryKey: queryKeys.batches,
+    queryFn: () => batchesApi.getAll(),
+    select: (data) => data.data,
+  });
+}
+
+export function useMarkBatchUsedInBank() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (batchId: number) => batchesApi.markUsedInBank(batchId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.batches });
+    },
+  });
+}
+
+export function useMarkBatchUnusedInBank() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (batchId: number) => batchesApi.markUnusedInBank(batchId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.batches });
+    },
+  });
+}
+
+export function useDownloadBatchXml() {
+  return useMutation({
+    mutationFn: async (batchId: number) => {
+      const response = await batchesApi.downloadXml(batchId);
+      return response;
+    },
   });
 }
 

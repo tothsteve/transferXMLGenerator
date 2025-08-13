@@ -7,6 +7,7 @@ import Dashboard from '../Dashboard/Dashboard';
 import BeneficiaryManager from '../BeneficiaryManager/BeneficiaryManager';
 import TemplateBuilder from '../TemplateBuilder/TemplateBuilder';
 import TransferWorkflow from '../TransferWorkflow/TransferWorkflow';
+import BatchManager from '../BatchManager/BatchManager';
 
 const SIDEBAR_WIDTH = 280;
 
@@ -58,6 +59,7 @@ const Layout: React.FC = () => {
             <Route path="/beneficiaries" element={<BeneficiaryManager />} />
             <Route path="/templates" element={<TemplateBuilder />} />
             <Route path="/transfers" element={<TransferWorkflow />} />
+            <Route path="/batches" element={<BatchManager />} />
           </Routes>
         </Box>
       </Box>

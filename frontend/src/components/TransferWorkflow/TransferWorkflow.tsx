@@ -286,8 +286,14 @@ const TransferWorkflow: React.FC = () => {
 
       // Generate XML from saved transfers
       console.log('Calling XML generation with IDs:', allTransferIds);
+      
+      // Generate batch name with current date and time
+      const now = new Date();
+      const batchName = `Átutalás ${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      
       const xmlResult = await generateXmlMutation.mutateAsync({
         transfer_ids: allTransferIds,
+        batch_name: batchName,
       });
 
       console.log('XML generation response:', xmlResult);

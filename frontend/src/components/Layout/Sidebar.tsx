@@ -17,6 +17,7 @@ import {
   People as PeopleIcon,
   Description as DescriptionIcon,
   SwapHoriz as SwapHorizIcon,
+  Folder as FolderIcon,
 } from '@mui/icons-material';
 
 interface SidebarProps {
@@ -31,6 +32,7 @@ const navigation = [
   { name: 'Kedvezményezettek', href: '/beneficiaries', icon: PeopleIcon },
   { name: 'Sablonok', href: '/templates', icon: DescriptionIcon },
   { name: 'Átutalások', href: '/transfers', icon: SwapHorizIcon },
+  { name: 'XML Kötegek', href: '/batches', icon: FolderIcon },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) => {

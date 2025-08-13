@@ -51,10 +51,17 @@ export interface Transfer {
 
 export interface TransferBatch {
   id: number;
+  name: string;
+  description?: string;
   transfers: Transfer[];
-  xml_filename: string;
-  created_at: string;
+  total_amount: string;
+  used_in_bank: boolean;
+  bank_usage_date?: string;
+  order: number;
   transfer_count: number;
+  xml_filename: string;
+  xml_generated_at?: string;
+  created_at: string;
 }
 
 export interface ApiResponse<T> {
@@ -80,6 +87,7 @@ export interface BulkCreateTransferRequest {
 
 export interface GenerateXmlRequest {
   transfer_ids: number[];
+  batch_name?: string;
 }
 
 export interface GenerateXmlResponse {

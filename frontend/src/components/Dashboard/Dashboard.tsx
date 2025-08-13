@@ -18,7 +18,7 @@ import {
   TrendingUp as TrendingUpIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { useBeneficiaries, useTemplates } from '../../hooks/api';
+import { useBeneficiaries, useTemplates, useBatches } from '../../hooks/api';
 
 // Animated counter hook
 const useAnimatedCounter = (end: number, duration: number = 1000, start: number = 0) => {
@@ -142,13 +142,15 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { data: beneficiariesData, isLoading: beneficiariesLoading } = useBeneficiaries();
   const { data: templatesData, isLoading: templatesLoading } = useTemplates();
+  const { data: batchesData, isLoading: batchesLoading } = useBatches();
 
   const totalBeneficiaries = beneficiariesData?.count || 0;
   const totalTemplates = templatesData?.count || 0;
   const activeBeneficiaries = beneficiariesData?.results?.filter(b => b.is_active)?.length || 0;
   const frequentBeneficiaries = beneficiariesData?.results?.filter(b => b.is_frequent)?.length || 0;
+  const totalBatches = batchesData?.count || 0;
 
-  const isLoading = beneficiariesLoading || templatesLoading;
+  const isLoading = beneficiariesLoading || templatesLoading || batchesLoading;
 
   const quickActions = [
     {
@@ -222,11 +224,11 @@ const Dashboard: React.FC = () => {
           isLoading={isLoading}
         />
         <StatCard
-          title="Feldolgozott XML-ek"
-          value="0"
+          title="Generált XML-ek"
+          value={totalBatches}
           icon={SwapHorizIcon}
           color="warning"
-          isLoading={false}
+          isLoading={isLoading}
         />
       </Box>
 

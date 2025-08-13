@@ -106,6 +106,24 @@ export const bankAccountsApi = {
     apiClient.get<BankAccount>('/bank-accounts/default/'),
 };
 
+// Batches API
+export const batchesApi = {
+  getAll: () =>
+    apiClient.get<ApiResponse<TransferBatch>>('/batches/'),
+  
+  getById: (id: number) =>
+    apiClient.get<TransferBatch>(`/batches/${id}/`),
+  
+  downloadXml: (id: number) =>
+    apiClient.get(`/batches/${id}/download_xml/`, { responseType: 'blob' }),
+  
+  markUsedInBank: (id: number) =>
+    apiClient.post(`/batches/${id}/mark_used_in_bank/`),
+  
+  markUnusedInBank: (id: number) =>
+    apiClient.post(`/batches/${id}/mark_unused_in_bank/`),
+};
+
 // Upload API
 export const uploadApi = {
   uploadExcel: (file: File) => {
