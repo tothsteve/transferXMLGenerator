@@ -1,6 +1,12 @@
 # Database Schema Documentation
 ## Transfer XML Generator - Hungarian Banking System
 
+**Last Updated:** 2025-08-11  
+**Database:** SQL Server - `administration` on localhost:1435  
+**Schema Version:** After migration 0003_rename_beneficiary_fields
+
+> **Note:** This documentation reflects the current database schema after all Django migrations have been applied, including field renames that occurred in migration 0003.
+
 ### Database Tables and Column Descriptions
 
 ---
@@ -31,10 +37,10 @@
 | `id` | INTEGER | PRIMARY KEY, AUTO_INCREMENT | Unique identifier for beneficiary record |
 | `name` | VARCHAR(200) | NOT NULL | Full legal name of the beneficiary (person or organization) |
 | `account_number` | VARCHAR(50) | NOT NULL | Beneficiary's bank account number in Hungarian format |
-| `bank_name` | VARCHAR(200) | NULLABLE | Name of the beneficiary's bank (optional, for reference) |
+| `description` | VARCHAR(200) | NULLABLE | Additional information about the beneficiary (bank name, organization details, etc.) |
 | `is_frequent` | BOOLEAN | DEFAULT FALSE | Marks frequently used beneficiaries for quick access |
 | `is_active` | BOOLEAN | DEFAULT TRUE | Soft delete flag - inactive beneficiaries are hidden from selection |
-| `notes` | TEXT | NULLABLE | Additional notes about the beneficiary (payment terms, contact info, etc.) |
+| `remittance_information` | TEXT | NULLABLE | Default payment references, account numbers, or other transaction-specific information |
 | `created_at` | DATETIME | NOT NULL, AUTO_NOW_ADD | Timestamp when the beneficiary was added to the system |
 | `updated_at` | DATETIME | NOT NULL, AUTO_NOW | Timestamp when the beneficiary record was last modified |
 
@@ -102,7 +108,8 @@
 | `remittance_info` | VARCHAR(500) | NOT NULL | Payment reference/memo that appears on bank statements |
 | `template_id` | INTEGER | NULLABLE, FK | Reference to template if this transfer was created from a template |
 | `is_processed` | BOOLEAN | DEFAULT FALSE | Marks transfers that have been included in generated XML files |
-| `notes` | TEXT | NULLABLE | Internal notes about this specific transfer |
+| `order` | INTEGER | DEFAULT 0 | Display order for sorting transfers within a batch or template |
+| `notes` | TEXT | NULLABLE | Internal notes or comments about this transfer (not included in XML output) |
 | `created_at` | DATETIME | NOT NULL, AUTO_NOW_ADD | Timestamp when the transfer was created |
 | `updated_at` | DATETIME | NOT NULL, AUTO_NOW | Timestamp when the transfer was last modified |
 
@@ -129,6 +136,9 @@
 | `name` | VARCHAR(200) | NOT NULL | User-defined name for the batch (e.g., "Payroll 2025-01", "Supplier Payments Week 3") |
 | `description` | TEXT | NULLABLE | Detailed description of the batch contents and purpose |
 | `total_amount` | DECIMAL(15,2) | DEFAULT 0 | Sum of all transfer amounts in this batch |
+| `used_in_bank` | BOOLEAN | DEFAULT FALSE | Flag indicating whether this XML batch has been uploaded to internet banking |
+| `bank_usage_date` | DATETIME | NULLABLE | Timestamp when the batch was marked as used in internet banking |
+| `order` | INTEGER | DEFAULT 0 | Sequential order number for batch organization and listing |
 | `created_at` | DATETIME | NOT NULL, AUTO_NOW_ADD | Timestamp when the batch was created |
 | `xml_generated_at` | DATETIME | NULLABLE | Timestamp when the XML file was generated for this batch |
 
@@ -183,6 +193,9 @@
 - Batches group transfers for XML file generation
 - `total_amount` is calculated sum of all transfers in the batch
 - `xml_generated_at` timestamp marks when the batch was exported
+- `order` field auto-increments to maintain batch creation sequence
+- `used_in_bank` flag tracks whether XML has been uploaded to internet banking
+- `bank_usage_date` records when the batch was marked as used
 
 ### 6. **XML Output**
 - Generated XML follows Hungarian SEPA format
@@ -192,22 +205,51 @@
 
 ---
 
+## Schema Change History
+
+### Migration 0003_rename_beneficiary_fields
+**Applied:** During development  
+**Changes:**
+- `bank_transfers_beneficiary.bank_name` → `bank_transfers_beneficiary.description`
+- `bank_transfers_beneficiary.notes` → `bank_transfers_beneficiary.remittance_information`
+
+**Reason:** Field names were renamed to better reflect their purpose and align with the Django model design.
+
+### Migration 0005_alter_transferbatch_options_and_more
+**Applied:** 2025-08-11  
+**Changes:**
+- Added `used_in_bank` BOOLEAN field to `bank_transfers_transferbatch`
+- Added `bank_usage_date` DATETIME field to `bank_transfers_transferbatch`
+- Added `order` INTEGER field to `bank_transfers_transferbatch`
+- Updated table ordering to `['order', '-created_at']`
+
+**Reason:** Enhanced batch management to track XML usage status in internet banking systems and maintain proper ordering.
+
+### Migration 0006_remove_xml_content
+**Applied:** 2025-08-11  
+**Changes:**
+- Removed `xml_content` TEXT field from `bank_transfers_transferbatch`
+
+**Reason:** Eliminated redundant XML storage in favor of regenerating XML from transfer data, reducing database size and complexity.
+
+---
+
 ## Common Queries
 
 ```sql
 -- Get default bank account
-SELECT * FROM bank_transfers_bankaccount WHERE is_default = TRUE;
+SELECT * FROM bank_transfers_bankaccount WHERE is_default = 1;
 
 -- Get frequent beneficiaries
 SELECT * FROM bank_transfers_beneficiary 
-WHERE is_frequent = TRUE AND is_active = TRUE 
+WHERE is_frequent = 1 AND is_active = 1 
 ORDER BY name;
 
 -- Get unprocessed transfers for a specific date range
 SELECT t.*, b.name as beneficiary_name 
 FROM bank_transfers_transfer t
 JOIN bank_transfers_beneficiary b ON t.beneficiary_id = b.id
-WHERE t.is_processed = FALSE 
+WHERE t.is_processed = 0 
   AND t.execution_date BETWEEN '2025-01-01' AND '2025-01-31'
 ORDER BY t.execution_date, b.name;
 
@@ -217,6 +259,28 @@ SELECT t.name as template_name, b.name as beneficiary_name,
 FROM bank_transfers_transfertemplate t
 JOIN bank_transfers_templatebeneficiary tb ON t.id = tb.template_id
 JOIN bank_transfers_beneficiary b ON tb.beneficiary_id = b.id
-WHERE t.id = 1 AND t.is_active = TRUE AND tb.is_active = TRUE
+WHERE t.id = 1 AND t.is_active = 1 AND tb.is_active = 1
 ORDER BY tb.order, b.name;
+
+-- Get all transfer batches with usage status
+SELECT id, name, total_amount, used_in_bank, bank_usage_date, 
+       xml_generated_at, created_at
+FROM bank_transfers_transferbatch
+ORDER BY [order], created_at DESC;
+
+-- Get batches that haven't been used in internet banking
+SELECT id, name, total_amount, xml_generated_at
+FROM bank_transfers_transferbatch
+WHERE used_in_bank = 0 AND xml_generated_at IS NOT NULL
+ORDER BY xml_generated_at DESC;
+
+-- Get batch details with transfer count and total amount
+SELECT b.id, b.name, b.used_in_bank, b.bank_usage_date,
+       COUNT(bt.transfer_id) as transfer_count,
+       SUM(t.amount) as calculated_total
+FROM bank_transfers_transferbatch b
+LEFT JOIN bank_transfers_transferbatch_transfers bt ON b.id = bt.transferbatch_id
+LEFT JOIN bank_transfers_transfer t ON bt.transfer_id = t.id
+GROUP BY b.id, b.name, b.used_in_bank, b.bank_usage_date
+ORDER BY b.[order], b.created_at DESC;
 ```
