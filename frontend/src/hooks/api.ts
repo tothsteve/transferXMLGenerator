@@ -214,11 +214,48 @@ export function useBulkCreateTransfers() {
   });
 }
 
+export function useUpdateTransfer() {
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<Transfer> }) => 
+      transfersApi.update(id, data),
+  });
+}
+
+export function useBulkUpdateTransfers() {
+  return useMutation({
+    mutationFn: async (transfers: { id: number; data: Partial<Transfer> }[]) => {
+      // Execute all updates in parallel
+      const updatePromises = transfers.map(({ id, data }) => 
+        transfersApi.partialUpdate(id, data)
+      );
+      return Promise.all(updatePromises);
+    },
+  });
+}
+
+export function useDeleteTransfer() {
+  return useMutation({
+    mutationFn: (id: number) => transfersApi.delete(id),
+  });
+}
+
 export function useGenerateXml() {
   const queryClient = useQueryClient();
   
   return useMutation({
     mutationFn: (data: GenerateXmlRequest) => transfersApi.generateXml(data),
+    onSuccess: () => {
+      // Invalidate batches query to update the dashboard counter
+      queryClient.invalidateQueries({ queryKey: queryKeys.batches });
+    },
+  });
+}
+
+export function useGenerateKHExport() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (data: GenerateXmlRequest) => transfersApi.generateKHExport(data),
     onSuccess: () => {
       // Invalidate batches query to update the dashboard counter
       queryClient.invalidateQueries({ queryKey: queryKeys.batches });

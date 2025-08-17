@@ -105,3 +105,10 @@ export interface ExcelImportResponse {
   imported_count: number;
   errors: string[];
 }
+
+export interface GenerateKHExportResponse {
+  content: string;
+  filename: string;
+  transfer_count: number;
+  total_amount: string;
+}

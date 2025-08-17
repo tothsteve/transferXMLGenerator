@@ -21,6 +21,7 @@ from .serializers import (
 )
 from .utils import generate_xml
 from .pdf_processor import PDFTransactionProcessor
+from .kh_export import KHBankExporter
 
 class BankAccountViewSet(viewsets.ModelViewSet):
     """
@@ -109,7 +110,7 @@ class TransferTemplateViewSet(viewsets.ModelViewSet):
     A sablonok lehetővé teszik gyakori utalási ciklusok (pl. hó eleji fizetések)
     gyors betöltését és ismételt használatát.
     """
-    queryset = TransferTemplate.objects.filter(is_active=True)
+    queryset = TransferTemplate.objects.filter(is_active=True).order_by('-created_at')
     serializer_class = TransferTemplateSerializer
     
     @swagger_auto_schema(
@@ -207,12 +208,19 @@ class TransferTemplateViewSet(viewsets.ModelViewSet):
             
             transfers = []
             for template_beneficiary in template.template_beneficiaries.filter(is_active=True):
+                # Use template's default execution date if available, otherwise use user-provided date
+                beneficiary_execution_date = (
+                    template_beneficiary.default_execution_date.strftime('%Y-%m-%d') 
+                    if template_beneficiary.default_execution_date 
+                    else execution_date
+                )
+                
                 transfer_data = {
                     'originator_account': originator_account.id,
                     'beneficiary': template_beneficiary.beneficiary.id,
                     'amount': template_beneficiary.default_amount or 0,
                     'currency': 'HUF',
-                    'execution_date': execution_date,
+                    'execution_date': beneficiary_execution_date,
                     'remittance_info': template_beneficiary.default_remittance or template_beneficiary.beneficiary.remittance_information or '',
                     'template': template.id
                 }
@@ -432,6 +440,76 @@ class TransferViewSet(viewsets.ModelViewSet):
                 'transfer_count': len(transfers),
                 'total_amount': str(sum(t.amount for t in transfers))
             })
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @swagger_auto_schema(
+        operation_description="KH Bank formátumú szöveges export generálás",
+        request_body=XMLGenerateSerializer,
+        responses={
+            200: openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'content': openapi.Schema(type=openapi.TYPE_STRING, description='KH Bank .HUF.CSV file tartalma'),
+                    'filename': openapi.Schema(type=openapi.TYPE_STRING, description='Ajánlott fájlnév'),
+                    'transfer_count': openapi.Schema(type=openapi.TYPE_INTEGER),
+                    'total_amount': openapi.Schema(type=openapi.TYPE_STRING)
+                }
+            ),
+            404: 'No transfers found',
+            400: 'Export error'
+        }
+    )
+    @action(detail=False, methods=['post'])
+    def generate_kh_export(self, request):
+        """KH Bank formátumú .HUF.CSV export generálás"""
+        serializer = XMLGenerateSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            transfer_ids = serializer.validated_data['transfer_ids']
+            batch_name = serializer.validated_data.get('batch_name')
+            
+            transfers = Transfer.objects.filter(id__in=transfer_ids).select_related(
+                'beneficiary', 'originator_account'
+            ).order_by('order', 'execution_date')
+            
+            if not transfers:
+                return Response({'detail': 'No transfers found'}, status=404)
+            
+            try:
+                # Generate KH Bank export
+                exporter = KHBankExporter()
+                kh_content = exporter.generate_kh_export(transfers)
+                filename = exporter.get_filename(batch_name)
+                
+                # Create batch if name provided
+                if batch_name:
+                    # Get next order number
+                    max_order = TransferBatch.objects.aggregate(max_order=models.Max('order'))['max_order'] or 0
+                    
+                    batch = TransferBatch.objects.create(
+                        name=f"{batch_name} (KH Export)",
+                        xml_generated_at=timezone.now(),
+                        total_amount=sum(t.amount for t in transfers),
+                        order=max_order + 1
+                    )
+                    batch.transfers.set(transfers)
+                
+                # Mark transfers as processed
+                transfers.update(is_processed=True)
+                
+                return Response({
+                    'content': kh_content,
+                    'filename': filename,
+                    'transfer_count': len(transfers),
+                    'total_amount': str(sum(t.amount for t in transfers))
+                })
+                
+            except ValueError as e:
+                return Response({
+                    'detail': 'KH Bank export error',
+                    'error': str(e)
+                }, status=status.HTTP_400_BAD_REQUEST)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

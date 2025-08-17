@@ -25,7 +25,9 @@ import {
   useTemplates, 
   useLoadTemplate, 
   useBulkCreateTransfers, 
+  useBulkUpdateTransfers,
   useGenerateXml,
+  useGenerateKHExport,
   useDefaultBankAccount,
   useBeneficiaries
 } from '../../hooks/api';
@@ -57,7 +59,9 @@ const TransferWorkflow: React.FC = () => {
   const { data: beneficiariesData } = useBeneficiaries();
   const loadTemplateMutation = useLoadTemplate();
   const bulkCreateMutation = useBulkCreateTransfers();
+  const bulkUpdateMutation = useBulkUpdateTransfers();
   const generateXmlMutation = useGenerateXml();
+  const generateKHExportMutation = useGenerateKHExport();
 
   const templates = templatesData?.results || [];
   const beneficiaries = beneficiariesData?.results || [];
@@ -169,7 +173,7 @@ const TransferWorkflow: React.FC = () => {
     return errors;
   };
 
-  const handleSaveTransfers = async () => {
+  const handleSaveTransfers = async (): Promise<false | number[]> => {
     const errors = validateTransfers();
     if (errors.length > 0) {
       setValidationErrors(errors);
@@ -182,9 +186,18 @@ const TransferWorkflow: React.FC = () => {
     }
 
     try {
-      // Create all transfers that don't have IDs yet
+      // Separate transfers into create and update groups
       const transfersToCreate = transfers.filter(t => !t.id);
+      const transfersToUpdate = transfers.filter(t => t.id);
       
+      console.log('Transfers to create:', transfersToCreate.length);
+      console.log('Transfers to update:', transfersToUpdate.length);
+      
+      // Collect all transfer IDs that will be available after saving
+      const allTransferIds: number[] = [];
+      
+      // Step 1: Create new transfers
+      let createdTransfers: any[] = [];
       if (transfersToCreate.length > 0) {
         console.log('Creating transfers:', transfersToCreate);
         
@@ -198,37 +211,85 @@ const TransferWorkflow: React.FC = () => {
           order: transfers.indexOf(t), // Preserve the order from the UI
         }));
         
-        console.log('Sending payload to backend:', { transfers: transfersPayload });
+        console.log('Sending create payload to backend:', { transfers: transfersPayload });
         
         const bulkResult = await bulkCreateMutation.mutateAsync({
           transfers: transfersPayload,
         });
         
         console.log('Bulk create response:', bulkResult);
-        console.log('Response data:', bulkResult.data);
         
         // Handle the response structure - check if it's wrapped or direct array
         const responseData: any = bulkResult.data;
-        const createdTransfers = Array.isArray(responseData) 
+        createdTransfers = Array.isArray(responseData) 
           ? responseData 
           : responseData?.transfers || responseData?.results || [];
         
         console.log('Created transfers:', createdTransfers);
         
-        // Update the transfers state with the created transfer IDs
+        // Add created transfer IDs
+        createdTransfers.forEach(transfer => {
+          if (transfer.id) {
+            allTransferIds.push(transfer.id);
+          }
+        });
+      }
+      
+      // Step 2: Update existing transfers with current order and modifications
+      if (transfersToUpdate.length > 0) {
+        console.log('Updating transfers:', transfersToUpdate);
+        
+        const updatePayloads = transfersToUpdate.map(t => ({
+          id: t.id!,
+          data: {
+            beneficiary: t.beneficiary,
+            amount: parseFloat(t.amount).toFixed(2),
+            currency: t.currency,
+            execution_date: t.execution_date,
+            remittance_info: t.remittance_info,
+            order: transfers.indexOf(t), // Update order based on current UI position
+          }
+        }));
+        
+        console.log('Sending update payloads to backend:', updatePayloads);
+        
+        await bulkUpdateMutation.mutateAsync(updatePayloads);
+        console.log('Bulk updates completed');
+        
+        // Add existing transfer IDs (they already exist)
+        transfersToUpdate.forEach(t => {
+          if (t.id) {
+            allTransferIds.push(t.id);
+          }
+        });
+      }
+      
+      // Step 3: Update state with newly created transfers (for UI consistency)
+      if (createdTransfers.length > 0) {
         const newTransfers = createdTransfers.map((createdTransfer: any, index: number) => ({
           ...transfersToCreate[index],
           id: createdTransfer.id,
         }));
         
-        // Replace the unsaved transfers with saved ones
-        setTransfers(prev => [
-          ...prev.filter(t => t.id), // Keep existing saved transfers
-          ...newTransfers // Add newly saved transfers
-        ]);
+        // Update the transfers state with the created transfer IDs
+        setTransfers(prev => prev.map(t => {
+          if (!t.id) {
+            // Find the corresponding created transfer
+            const matchingCreated = newTransfers.find(nt => 
+              nt.beneficiary === t.beneficiary && 
+              nt.amount === t.amount &&
+              nt.execution_date === t.execution_date
+            );
+            return matchingCreated || t;
+          }
+          return t;
+        }));
       }
       
-      return true;
+      console.log('All transfers saved successfully');
+      console.log('Transfer IDs for XML generation:', allTransferIds);
+      return allTransferIds;
+      
     } catch (error: any) {
       console.error('Failed to save transfers:', error);
       console.error('Error response:', error.response?.data);
@@ -266,33 +327,27 @@ const TransferWorkflow: React.FC = () => {
   };
 
   const handleGenerateXML = async () => {
-    // First, ensure all transfers are saved
-    const saveSuccess = await handleSaveTransfers();
-    if (!saveSuccess) return;
+    // First, ensure all transfers are saved and get their IDs
+    const transferIds = await handleSaveTransfers();
+    if (!transferIds) return;
 
     try {
-      // Get all transfer IDs (now all should have IDs)
-      const allTransferIds = transfers
-        .filter(t => t.id)
-        .map(t => t.id!);
-
-      console.log('Current transfers state:', transfers);
-      console.log('Transfer IDs for XML generation:', allTransferIds);
-
-      if (allTransferIds.length === 0) {
+      console.log('Transfer IDs for XML generation:', transferIds);
+      
+      if (transferIds.length === 0) {
         setValidationErrors(['Nincsenek mentett átutalások az XML generáláshoz.']);
         return;
       }
-
-      // Generate XML from saved transfers
-      console.log('Calling XML generation with IDs:', allTransferIds);
+      
+      // Use the returned transfer IDs directly instead of reading from state
+      console.log('Calling XML generation with IDs:', transferIds);
       
       // Generate batch name with current date and time
       const now = new Date();
       const batchName = `Átutalás ${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
       
       const xmlResult = await generateXmlMutation.mutateAsync({
-        transfer_ids: allTransferIds,
+        transfer_ids: transferIds,
         batch_name: batchName,
       });
 
@@ -327,11 +382,65 @@ const TransferWorkflow: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleGenerateKHExport = async () => {
+    // First, ensure all transfers are saved and get their IDs
+    const transferIds = await handleSaveTransfers();
+    if (!transferIds) return;
+
+    try {
+      console.log('Transfer IDs for KH export:', transferIds);
+      
+      if (transferIds.length === 0) {
+        setValidationErrors(['Nincsenek mentett átutalások a KH export generálásához.']);
+        return;
+      }
+      
+      // Check if more than 40 transfers (KH Bank limit)
+      if (transferIds.length > 40) {
+        setValidationErrors([`KH Bank maximum 40 átutalást támogat, de ${transferIds.length} átutalás található.`]);
+        return;
+      }
+      
+      // Use the returned transfer IDs directly instead of reading from state
+      console.log('Calling KH export generation with IDs:', transferIds);
+      
+      // Generate batch name with current date and time
+      const now = new Date();
+      const batchName = `KH Export ${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      
+      const khResult = await generateKHExportMutation.mutateAsync({
+        transfer_ids: transferIds,
+        batch_name: batchName,
+      });
+      
+      console.log('KH export result:', khResult);
+      
+      // Automatically download the file
+      const blob = new Blob([khResult.data.content], { type: 'text/csv; charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = khResult.data.filename;
+      link.click();
+      URL.revokeObjectURL(url);
+      
+      setValidationErrors([]);
+      console.log(`KH Bank export sikeresen generálva: ${khResult.data.transfer_count} átutalás, ${parseFloat(khResult.data.total_amount).toLocaleString('hu-HU')} HUF`);
+      
+    } catch (error: any) {
+      console.error('KH export generation failed:', error);
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.detail || 
+                          'Hiba történt a KH export generálása során.';
+      setValidationErrors([errorMessage]);
+    }
+  };
+
   const totalAmount = transfers.reduce((sum, transfer) => 
     sum + (parseFloat(transfer.amount) || 0), 0
   );
 
-  const isGenerating = bulkCreateMutation.isPending || generateXmlMutation.isPending;
+  const isGenerating = bulkCreateMutation.isPending || bulkUpdateMutation.isPending || generateXmlMutation.isPending || generateKHExportMutation.isPending;
 
   return (
     <Box sx={{ p: 3 }}>
@@ -409,19 +518,6 @@ const TransferWorkflow: React.FC = () => {
             </Box>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <Button
-                variant="outlined"
-                color="primary"
-                onClick={handleSaveTransfers}
-                disabled={isGenerating || transfers.length === 0}
-                sx={{ 
-                  minWidth: 160,
-                  borderWidth: 2,
-                  '&:hover': { borderWidth: 2 }
-                }}
-              >
-                {bulkCreateMutation.isPending ? 'Mentés...' : 'Átutalások mentése'}
-              </Button>
-              <Button
                 variant="contained"
                 color="success"
                 startIcon={<DownloadIcon />}
@@ -438,7 +534,29 @@ const TransferWorkflow: React.FC = () => {
                   }
                 }}
               >
-                {isGenerating ? 'Generálás...' : 'XML Generálás'}
+                {bulkCreateMutation.isPending ? 'Új átutalások mentése...' : 
+                 bulkUpdateMutation.isPending ? 'Változások mentése...' :
+                 generateXmlMutation.isPending ? 'XML generálás...' : 
+                 'XML Generálás'}
+              </Button>
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<DownloadIcon />}
+                onClick={handleGenerateKHExport}
+                disabled={isGenerating || transfers.length === 0}
+                sx={{ 
+                  minWidth: 160,
+                  background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+                  boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)',
+                    transform: 'translateY(-1px)',
+                    boxShadow: '0 6px 16px rgba(25, 118, 210, 0.4)',
+                  }
+                }}
+              >
+                {generateKHExportMutation.isPending ? 'KH Export...' : 'KH Bank Export'}
               </Button>
             </Stack>
           </Stack>

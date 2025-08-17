@@ -9,6 +9,7 @@ import {
   BulkCreateTransferRequest,
   GenerateXmlRequest,
   GenerateXmlResponse,
+  GenerateKHExportResponse,
   LoadTemplateResponse,
   ExcelImportResponse,
 } from '../types/api';
@@ -96,8 +97,20 @@ export const transfersApi = {
   bulkCreate: (data: BulkCreateTransferRequest) =>
     apiClient.post<Transfer[]>('/transfers/bulk_create/', data),
   
+  update: (id: number, data: Partial<Transfer>) =>
+    apiClient.put<Transfer>(`/transfers/${id}/`, data),
+  
+  partialUpdate: (id: number, data: Partial<Transfer>) =>
+    apiClient.patch<Transfer>(`/transfers/${id}/`, data),
+  
+  delete: (id: number) =>
+    apiClient.delete(`/transfers/${id}/`),
+  
   generateXml: (data: GenerateXmlRequest) =>
     apiClient.post<GenerateXmlResponse>('/transfers/generate_xml/', data),
+  
+  generateKHExport: (data: GenerateXmlRequest) =>
+    apiClient.post<GenerateKHExportResponse>('/transfers/generate_kh_export/', data),
 };
 
 // Bank Accounts API
