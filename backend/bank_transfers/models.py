@@ -1,10 +1,72 @@
 from django.db import models
+from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 from decimal import Decimal
 
+class Company(models.Model):
+    """Cég entitás multi-tenant architektúrához"""
+    name = models.CharField(max_length=200, verbose_name="Cég neve")
+    tax_id = models.CharField(max_length=20, unique=True, verbose_name="Adószám")
+    address = models.TextField(blank=True, verbose_name="Cím")
+    phone = models.CharField(max_length=50, blank=True, verbose_name="Telefon")
+    email = models.EmailField(blank=True, verbose_name="E-mail")
+    is_active = models.BooleanField(default=True, verbose_name="Aktív")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Cég"
+        verbose_name_plural = "Cégek"
+        ordering = ['name']
+    
+    def __str__(self):
+        return self.name
+
+class CompanyUser(models.Model):
+    """Felhasználó-cég kapcsolat szerepkörrel"""
+    ROLE_CHOICES = [
+        ('ADMIN', 'Cég adminisztrátor'),
+        ('USER', 'Felhasználó'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='company_memberships')
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='users')
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='USER', verbose_name="Szerepkör")
+    is_active = models.BooleanField(default=True, verbose_name="Aktív")
+    joined_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Cég felhasználó"
+        verbose_name_plural = "Cég felhasználók"
+        unique_together = ['user', 'company']
+        ordering = ['company__name', 'user__last_name', 'user__first_name']
+    
+    def __str__(self):
+        return f"{self.user.get_full_name() or self.user.username} - {self.company.name} ({self.role})"
+
+class UserProfile(models.Model):
+    """Felhasználói profil kiegészítő adatokkal"""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    phone = models.CharField(max_length=50, blank=True, verbose_name="Telefon")
+    preferred_language = models.CharField(max_length=10, default='hu', verbose_name="Nyelv")
+    timezone = models.CharField(max_length=50, default='Europe/Budapest', verbose_name="Időzóna")
+    last_active_company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, 
+                                          verbose_name="Utoljára aktív cég")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Felhasználói profil"
+        verbose_name_plural = "Felhasználói profilok"
+    
+    def __str__(self):
+        return f"{self.user.get_full_name() or self.user.username} profil"
+
 class BankAccount(models.Model):
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='bank_accounts', verbose_name="Cég", null=True, blank=True)
     name = models.CharField(max_length=200, verbose_name="Számla neve")
-    account_number = models.CharField(max_length=50, unique=True, verbose_name="Számlaszám")
+    account_number = models.CharField(max_length=50, verbose_name="Számlaszám")
+    bank_name = models.CharField(max_length=200, blank=True, verbose_name="Bank neve")
     is_default = models.BooleanField(default=False, verbose_name="Alapértelmezett")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -21,6 +83,7 @@ class BankAccount(models.Model):
         return self.account_number.replace('-', '').replace(' ', '')
 
 class Beneficiary(models.Model):
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='beneficiaries', verbose_name="Cég", null=True, blank=True)
     name = models.CharField(max_length=200, verbose_name="Kedvezményezett neve")
     account_number = models.CharField(max_length=50, verbose_name="Számlaszám")
     description = models.CharField(max_length=200, blank=True, verbose_name="Leírás", 
@@ -49,6 +112,7 @@ class Beneficiary(models.Model):
         return self.account_number.replace('-', '').replace(' ', '')
 
 class TransferTemplate(models.Model):
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='transfer_templates', verbose_name="Cég", null=True, blank=True)
     name = models.CharField(max_length=200, verbose_name="Sablon neve")
     description = models.TextField(blank=True, verbose_name="Leírás")
     is_active = models.BooleanField(default=True, verbose_name="Aktív")
@@ -68,6 +132,7 @@ class TemplateBeneficiary(models.Model):
     beneficiary = models.ForeignKey(Beneficiary, on_delete=models.CASCADE)
     default_amount = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
     default_remittance = models.CharField(max_length=500, blank=True)
+    default_execution_date = models.DateField(null=True, blank=True, verbose_name="Alapértelmezett teljesítési dátum")
     order = models.IntegerField(default=0, verbose_name="Sorrend")
     is_active = models.BooleanField(default=True)
     
@@ -109,8 +174,14 @@ class Transfer(models.Model):
     
     def __str__(self):
         return f"{self.beneficiary.name} - {self.amount} {self.currency}"
+    
+    @property
+    def company(self):
+        """Get company from the originator account"""
+        return self.originator_account.company
 
 class TransferBatch(models.Model):
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='transfer_batches', verbose_name="Cég", null=True, blank=True)
     name = models.CharField(max_length=200, verbose_name="Köteg neve")
     description = models.TextField(blank=True, verbose_name="Leírás")
     transfers = models.ManyToManyField(Transfer, verbose_name="Utalások")

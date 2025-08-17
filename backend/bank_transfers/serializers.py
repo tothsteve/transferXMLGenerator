@@ -25,7 +25,7 @@ class TemplateBeneficiarySerializer(serializers.ModelSerializer):
         model = TemplateBeneficiary
         fields = [
             'id', 'beneficiary', 'beneficiary_id', 
-            'default_amount', 'default_remittance', 
+            'default_amount', 'default_remittance', 'default_execution_date',
             'order', 'is_active'
         ]
 

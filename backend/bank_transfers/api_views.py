@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FileUploadParser
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponse
 from django.utils import timezone
@@ -22,6 +23,7 @@ from .serializers import (
 from .utils import generate_xml
 from .pdf_processor import PDFTransactionProcessor
 from .kh_export import KHBankExporter
+from .permissions import IsCompanyMember, IsCompanyAdmin, IsCompanyAdminOrReadOnly
 
 class BankAccountViewSet(viewsets.ModelViewSet):
     """
@@ -33,8 +35,18 @@ class BankAccountViewSet(viewsets.ModelViewSet):
     update: Bank számla módosítása
     destroy: Bank számla törlése
     """
-    queryset = BankAccount.objects.all()
     serializer_class = BankAccountSerializer
+    permission_classes = [IsAuthenticated, IsCompanyMember]
+    
+    def get_queryset(self):
+        """Company-scoped queryset"""
+        if hasattr(self.request, 'company') and self.request.company:
+            return BankAccount.objects.filter(company=self.request.company)
+        return BankAccount.objects.none()
+    
+    def perform_create(self, serializer):
+        """Assign company on creation"""
+        serializer.save(company=self.request.company)
     
     @swagger_auto_schema(
         operation_description="Alapértelmezett bank számla lekérése",
@@ -43,7 +55,10 @@ class BankAccountViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def default(self, request):
         """Alapértelmezett bank számla lekérése"""
-        account = BankAccount.objects.filter(is_default=True).first()
+        account = BankAccount.objects.filter(
+            company=request.company,
+            is_default=True
+        ).first()
         if account:
             serializer = self.get_serializer(account)
             return Response(serializer.data)
@@ -58,11 +73,14 @@ class BeneficiaryViewSet(viewsets.ModelViewSet):
     - is_frequent: true/false  
     - search: név alapján keresés
     """
-    queryset = Beneficiary.objects.all()
     serializer_class = BeneficiarySerializer
+    permission_classes = [IsAuthenticated, IsCompanyMember]
     
     def get_queryset(self):
-        queryset = Beneficiary.objects.all()
+        if not hasattr(self.request, 'company') or not self.request.company:
+            return Beneficiary.objects.none()
+            
+        queryset = Beneficiary.objects.filter(company=self.request.company)
         
         # Filtering
         is_active = self.request.query_params.get('is_active', None)
@@ -79,6 +97,10 @@ class BeneficiaryViewSet(viewsets.ModelViewSet):
             
         return queryset
     
+    def perform_create(self, serializer):
+        """Assign company on creation"""
+        serializer.save(company=self.request.company)
+    
     @swagger_auto_schema(
         operation_description="Gyakori kedvezményezettek listája",
         responses={200: BeneficiarySerializer(many=True)}
@@ -86,7 +108,11 @@ class BeneficiaryViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def frequent(self, request):
         """Gyakori kedvezményezettek listája"""
-        beneficiaries = Beneficiary.objects.filter(is_frequent=True, is_active=True)
+        beneficiaries = Beneficiary.objects.filter(
+            company=request.company,
+            is_frequent=True, 
+            is_active=True
+        )
         serializer = self.get_serializer(beneficiaries, many=True)
         return Response(serializer.data)
     
@@ -110,8 +136,20 @@ class TransferTemplateViewSet(viewsets.ModelViewSet):
     A sablonok lehetővé teszik gyakori utalási ciklusok (pl. hó eleji fizetések)
     gyors betöltését és ismételt használatát.
     """
-    queryset = TransferTemplate.objects.filter(is_active=True).order_by('-created_at')
     serializer_class = TransferTemplateSerializer
+    permission_classes = [IsAuthenticated, IsCompanyMember]
+    
+    def get_queryset(self):
+        if not hasattr(self.request, 'company') or not self.request.company:
+            return TransferTemplate.objects.none()
+        return TransferTemplate.objects.filter(
+            company=self.request.company,
+            is_active=True
+        ).order_by('-created_at')
+    
+    def perform_create(self, serializer):
+        """Assign company on creation"""
+        serializer.save(company=self.request.company)
     
     @swagger_auto_schema(
         operation_description="Kedvezményezett hozzáadása sablonhoz",
