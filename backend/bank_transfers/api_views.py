@@ -25,6 +25,24 @@ from .pdf_processor import PDFTransactionProcessor
 from .kh_export import KHBankExporter
 from .permissions import IsCompanyMember, IsCompanyAdmin, IsCompanyAdminOrReadOnly
 
+class DebugAuthView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Debug endpoint to check authentication and company context"""
+        return Response({
+            'user': {
+                'id': request.user.id,
+                'username': request.user.username,
+                'is_authenticated': request.user.is_authenticated,
+            },
+            'company': {
+                'id': request.company.id if hasattr(request, 'company') and request.company else None,
+                'name': request.company.name if hasattr(request, 'company') and request.company else None,
+            } if hasattr(request, 'company') and request.company else None,
+            'headers': dict(request.headers),
+        })
+
 class BankAccountViewSet(viewsets.ModelViewSet):
     """
     Bank számlák kezelése
@@ -359,11 +377,16 @@ class TransferViewSet(viewsets.ModelViewSet):
     - execution_date_from: dátum (YYYY-MM-DD)
     - execution_date_to: dátum (YYYY-MM-DD)
     """
-    queryset = Transfer.objects.all()
     serializer_class = TransferSerializer
+    permission_classes = [IsAuthenticated, IsCompanyMember]
     
     def get_queryset(self):
-        queryset = Transfer.objects.select_related('beneficiary', 'originator_account').all()
+        if not hasattr(self.request, 'company') or not self.request.company:
+            return Transfer.objects.none()
+            
+        queryset = Transfer.objects.select_related('beneficiary', 'originator_account').filter(
+            originator_account__company=self.request.company
+        )
         
         # Filtering
         is_processed = self.request.query_params.get('is_processed', None)
@@ -558,8 +581,13 @@ class TransferBatchViewSet(viewsets.ReadOnlyModelViewSet):
     A kötegek automatikusan létrejönnek XML generáláskor,
     és nyilvántartják a feldolgozott utalásokat.
     """
-    queryset = TransferBatch.objects.all()
     serializer_class = TransferBatchSerializer
+    permission_classes = [IsAuthenticated, IsCompanyMember]
+    
+    def get_queryset(self):
+        if not hasattr(self.request, 'company') or not self.request.company:
+            return TransferBatch.objects.none()
+        return TransferBatch.objects.filter(company=self.request.company)
     
     @swagger_auto_schema(
         operation_description="XML fájl letöltése köteghez",
@@ -651,9 +679,13 @@ class ExcelImportView(APIView):
             
             try:
                 if import_type == 'beneficiaries':
-                    beneficiaries = self.import_beneficiaries_from_excel(excel_file)
+                    result = self.import_beneficiaries_from_excel(excel_file)
+                    beneficiaries = result.get('beneficiaries', [])
+                    errors = result.get('errors', [])
+                    
                     return Response({
-                        'message': f'{len(beneficiaries)} kedvezményezett importálva',
+                        'imported_count': len(beneficiaries),
+                        'errors': errors,
                         'beneficiaries': BeneficiarySerializer(beneficiaries, many=True).data
                     })
                 else:
@@ -672,24 +704,47 @@ class ExcelImportView(APIView):
         worksheet = workbook.active
         
         beneficiaries = []
+        errors = []
         
-        for row in worksheet.iter_rows(min_row=3, values_only=True):
+        # Detect header row and start from the row after headers
+        start_row = 3
+        header_keywords = ['név', 'name', 'számlaszám', 'account', 'összeg', 'amount']
+        
+        # Check if row 3 contains headers and skip if so
+        if worksheet.max_row >= 3:
+            row_3_values = [str(cell.value or '').lower().strip() for cell in worksheet[3][:6]]
+            if any(keyword in ' '.join(row_3_values) for keyword in header_keywords):
+                start_row = 4  # Skip header row and start from row 4
+        
+        for row_num, row in enumerate(worksheet.iter_rows(min_row=start_row, values_only=True), start=start_row):
             if not any(row[:6]):
                 continue
                 
             try:
                 comment, name, account_number, amount, exec_date, remittance = row[:6]
                 
-                if not all([name, account_number]):
+                # Convert to strings and strip whitespace
+                name = str(name or '').strip() if name is not None else ''
+                account_number = str(account_number or '').strip() if account_number is not None else ''
+                
+                # Skip if either name or account number is missing
+                if not name or not account_number:
+                    if name or account_number:  # Only log if partially filled
+                        errors.append(f'Row {row_num}: Missing name or account number')
+                    continue
+                
+                # Skip obvious header rows
+                if name.lower() in ['név', 'name'] or account_number.lower() in ['számlaszám', 'account']:
                     continue
                 
                 beneficiary, created = Beneficiary.objects.get_or_create(
-                    name=str(name).strip(),
-                    account_number=str(account_number).strip(),
+                    name=name,
+                    account_number=account_number,
+                    company=self.request.company,  # Add company context
                     defaults={
-                        'description': '',
+                        'description': str(comment or '').strip(),
                         'is_active': True,
-                        'remittance_information': str(comment or '').strip()
+                        'remittance_information': str(remittance or '').strip()
                     }
                 )
                 
@@ -697,7 +752,19 @@ class ExcelImportView(APIView):
                     beneficiaries.append(beneficiary)
                     
             except Exception as e:
-                print(f"Error processing row: {e}")
+                error_msg = f"Row {row_num}: {str(e)}"
+                errors.append(error_msg)
+                print(f"Error processing row {row_num}: {e}")
                 continue
         
-        return beneficiaries
+        # Log import summary
+        print(f"Excel import completed: {len(beneficiaries)} new beneficiaries created")
+        if errors:
+            print(f"Errors encountered: {len(errors)}")
+            for error in errors[:5]:  # Log first 5 errors
+                print(f"  - {error}")
+        
+        return {
+            'beneficiaries': beneficiaries,
+            'errors': errors
+        }

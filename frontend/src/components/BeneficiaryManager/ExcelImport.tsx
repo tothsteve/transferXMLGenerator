@@ -59,7 +59,7 @@ const ExcelImport: React.FC<ExcelImportProps> = ({
       const result = await uploadMutation.mutateAsync(selectedFile);
       setUploadResult(result.data);
       
-      if (result.data.errors.length === 0 && onSuccess) {
+      if (result.data.errors?.length === 0 && onSuccess) {
         setTimeout(() => {
           onSuccess();
           handleClose();
@@ -176,21 +176,21 @@ Példa,Teszt Kft.,12345678-12345678-12345678,100000,2025-01-15,Számla 2025-001
           {/* Upload result */}
           {uploadResult && (
             <Alert 
-              severity={uploadResult.errors.length > 0 ? 'warning' : 'success'}
-              icon={uploadResult.errors.length > 0 ? <WarningIcon /> : <CheckCircleIcon />}
+              severity={uploadResult.errors?.length > 0 ? 'warning' : 'success'}
+              icon={uploadResult.errors?.length > 0 ? <WarningIcon /> : <CheckCircleIcon />}
             >
               <AlertTitle>Import eredmény</AlertTitle>
               <Typography variant="body2" gutterBottom>
                 Importált kedvezményezettek: {uploadResult.imported_count}
               </Typography>
               
-              {uploadResult.errors.length > 0 && (
+              {uploadResult.errors?.length > 0 && (
                 <Box sx={{ mt: 1 }}>
                   <Typography variant="body2" fontWeight={500} gutterBottom>
                     Hibák:
                   </Typography>
                   <List dense sx={{ pt: 0 }}>
-                    {uploadResult.errors.map((error, index) => (
+                    {uploadResult.errors?.map((error, index) => (
                       <ListItem key={index} sx={{ px: 0, py: 0.25 }}>
                         <Typography variant="body2">• {error}</Typography>
                       </ListItem>
