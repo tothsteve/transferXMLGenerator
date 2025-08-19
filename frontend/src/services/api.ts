@@ -16,12 +16,34 @@ import {
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
-const apiClient = axios.create({
+// Configure axios defaults
+axios.defaults.baseURL = API_BASE_URL;
+axios.defaults.headers.common['Content-Type'] = 'application/json';
+
+export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Authentication API (separate from main apiClient to avoid interceptor issues)
+export const authApi = {
+  login: (username: string, password: string) =>
+    axios.post('/auth/login/', { username, password }),
+  
+  register: (data: any) =>
+    axios.post('/auth/register/', data),
+  
+  refreshToken: (refreshToken: string) =>
+    axios.post('/auth/token/refresh/', { refresh: refreshToken }),
+  
+  switchCompany: (companyId: number) =>
+    apiClient.post('/auth/switch_company/', { company_id: companyId }),
+  
+  getProfile: () =>
+    apiClient.get('/auth/profile/'),
+};
 
 // Beneficiaries API
 export const beneficiariesApi = {
@@ -117,6 +139,18 @@ export const transfersApi = {
 export const bankAccountsApi = {
   getDefault: () =>
     apiClient.get<BankAccount>('/bank-accounts/default/'),
+  
+  getAll: () =>
+    apiClient.get<ApiResponse<BankAccount>>('/bank-accounts/'),
+  
+  create: (data: Omit<BankAccount, 'id'>) =>
+    apiClient.post<BankAccount>('/bank-accounts/', data),
+  
+  update: (id: number, data: Partial<BankAccount>) =>
+    apiClient.put<BankAccount>(`/bank-accounts/${id}/`, data),
+  
+  delete: (id: number) =>
+    apiClient.delete(`/bank-accounts/${id}/`),
 };
 
 // Batches API
