@@ -11,6 +11,7 @@ import {
   Typography,
   IconButton,
   Chip,
+  Divider,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -20,7 +21,10 @@ import {
   SwapHoriz as SwapHorizIcon,
   Folder as FolderIcon,
   CloudUpload as CloudUploadIcon,
+  AdminPanelSettings as AdminIcon,
+  Settings as SettingsIcon,
 } from '@mui/icons-material';
+import { useIsCompanyAdmin } from '../../hooks/useAuth';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -34,6 +38,7 @@ interface NavigationItem {
   href: string;
   icon: React.ElementType;
   badge?: string;
+  adminOnly?: boolean;
 }
 
 const navigation = [
@@ -43,9 +48,15 @@ const navigation = [
   { name: 'PDF Importálás', href: '/pdf-import', icon: CloudUploadIcon, badge: 'ÚJ' },
   { name: 'Átutalások', href: '/transfers', icon: SwapHorizIcon },
   { name: 'XML Kötegek', href: '/batches', icon: FolderIcon },
+  { name: 'Beállítások', href: '/settings', icon: SettingsIcon },
+];
+
+const adminNavigation: NavigationItem[] = [
+  { name: 'Felhasználókezelés', href: '/users', icon: AdminIcon },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) => {
+  const isAdmin = useIsCompanyAdmin();
   const drawerContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Header with Logo */}
@@ -68,7 +79,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
           />
           <Box>
             <Typography variant="h6" component="h1" fontWeight="bold" sx={{ lineHeight: 1.2 }}>
-              Transfer XML Generator
+              Transfer Generator
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
               by ITCardigan
@@ -131,6 +142,53 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
               </ListItemButton>
             </ListItem>
           ))}
+          
+          {/* Admin Navigation */}
+          {isAdmin && (
+            <>
+              <Divider sx={{ my: 1 }} />
+              <Typography 
+                variant="caption" 
+                color="text.secondary" 
+                sx={{ px: 2, py: 1, fontWeight: 600, textTransform: 'uppercase' }}
+              >
+                Adminisztráció
+              </Typography>
+              {adminNavigation.map((item) => (
+                <ListItem key={item.name} disablePadding sx={{ mb: 0.5 }}>
+                  <ListItemButton
+                    component={NavLink}
+                    to={item.href}
+                    onClick={isMobile ? onClose : undefined}
+                    sx={{
+                      borderRadius: 1,
+                      '&.active': {
+                        bgcolor: 'warning.50',
+                        color: 'warning.600',
+                        '& .MuiListItemIcon-root': {
+                          color: 'warning.600',
+                        },
+                      },
+                      '&:hover': {
+                        bgcolor: 'grey.50',
+                      },
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 40 }}>
+                      <item.icon />
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary={item.name}
+                      primaryTypographyProps={{
+                        fontWeight: 600,
+                        fontSize: '0.875rem',
+                      }}
+                    />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </>
+          )}
         </List>
       </Box>
     </Box>

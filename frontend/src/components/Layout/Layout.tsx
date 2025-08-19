@@ -9,6 +9,8 @@ import TemplateBuilder from '../TemplateBuilder/TemplateBuilder';
 import TransferWorkflow from '../TransferWorkflow/TransferWorkflow';
 import BatchManager from '../BatchManager/BatchManager';
 import { PDFImportWizard } from '../PDFImport';
+import { UserManagement } from '../UserManagement';
+import { Settings } from '../Settings';
 
 const SIDEBAR_WIDTH = 280;
 
@@ -62,6 +64,8 @@ const Layout: React.FC = () => {
             <Route path="/transfers" element={<TransferWorkflow />} />
             <Route path="/batches" element={<BatchManager />} />
             <Route path="/pdf-import" element={<PDFImportWizard />} />
+            <Route path="/users" element={<UserManagement />} />
+            <Route path="/settings" element={<Settings />} />
           </Routes>
         </Box>
       </Box>
