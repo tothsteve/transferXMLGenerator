@@ -63,6 +63,36 @@ CORS_ALLOWED_ORIGINS = [
 
 CORS_ALLOW_CREDENTIALS = True
 
+# Custom headers that need to be allowed
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'x-company-id',  # Custom header for company context
+]
+
+# Allow all standard HTTP methods
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+# For development - expose authorization header in responses
+CORS_EXPOSE_HEADERS = [
+    'authorization',
+    'x-company-id',
+]
+
 # REST Framework beállítások
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [

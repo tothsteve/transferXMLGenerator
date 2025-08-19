@@ -1,11 +1,20 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Typography,
+  Alert,
+  AlertTitle,
+  Paper,
+  Stepper,
+  Step,
+  StepLabel
+} from '@mui/material';
 import { useToast } from '../../hooks/useToast';
 import { TransferTemplate } from '../../types/api';
 import { UploadStep } from './UploadStep';
 import { ReviewStep } from './ReviewStep';
 import { TemplateStep } from './TemplateStep';
-import { ProgressIndicator } from './ProgressIndicator';
 import axios from 'axios';
 
 interface PDFImportWizardProps {
@@ -45,7 +54,7 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete }) 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const navigate = useNavigate();
-  const { success, error: showError } = useToast();
+  const { success } = useToast();
 
   const handleFilesSelected = (files: File[]) => {
     setSelectedFiles(files);
@@ -143,43 +152,45 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete }) 
   ];
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <Box sx={{ p: { xs: 2, sm: 3 }, maxWidth: '100%', mx: 'auto' }}>
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', pb: 2, mb: 3 }}>
+        <Typography variant="h5" component="h1" fontWeight="bold" gutterBottom>
           PDF Importálás
-        </h1>
-        <p className="text-gray-600">
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
           Töltse fel a NAV adó és fizetési PDF fájljait automatikus sablon létrehozásához vagy meglévő sablon frissítéséhez
-        </p>
-      </div>
+        </Typography>
+      </Box>
 
-      {/* Progress Indicator */}
-      <ProgressIndicator 
-        steps={steps} 
-        currentStep={currentStep} 
-        className="mb-8"
-      />
+      {/* Progress Stepper */}
+      <Paper elevation={0} sx={{ bgcolor: 'grey.50', p: { xs: 2, sm: 3 }, mb: 3, border: 1, borderColor: 'grey.200' }}>
+        <Stepper activeStep={currentStep - 1} sx={{ width: '100%' }} orientation="horizontal">
+          {steps.map((step) => (
+            <Step key={step.number}>
+              <StepLabel>
+                <Typography variant="body2" fontWeight={600} sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
+                  {step.title}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', md: 'block' } }}>
+                  {step.description}
+                </Typography>
+              </StepLabel>
+            </Step>
+          ))}
+        </Stepper>
+      </Paper>
 
       {/* Error Display */}
       {errorMessage && (
-        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-start space-x-3">
-            <div className="text-red-400 mt-0.5">
-              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-red-800 font-medium">Hiba</h3>
-              <p className="text-red-700 text-sm mt-1">{errorMessage}</p>
-            </div>
-          </div>
-        </div>
+        <Alert severity="error" sx={{ mb: 3 }}>
+          <AlertTitle>Hiba</AlertTitle>
+          {errorMessage}
+        </Alert>
       )}
 
       {/* Step Content */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 min-h-[500px]">
+      <Paper elevation={1} sx={{ minHeight: { xs: 400, sm: 500 } }}>
         {currentStep === 1 && (
           <UploadStep
             selectedFiles={selectedFiles}
@@ -208,7 +219,7 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete }) 
             onCreateTransfers={() => navigate(`/transfers?template=${previewData.template.id}`)}
           />
         )}
-      </div>
-    </div>
+      </Paper>
+    </Box>
   );
 };
