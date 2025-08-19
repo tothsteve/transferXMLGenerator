@@ -16,9 +16,15 @@ This is a Django + React application for generating XML files for bank transfers
 - **Swagger API docs** available via drf_yasg
 
 ### Frontend (React + TypeScript)
-- **Create React App** with TypeScript
-- Currently contains only default React starter template
-- API integration not yet implemented
+- **Create React App** with TypeScript and Material-UI
+- **Complete authentication system** with JWT tokens and multi-company support
+- **Full API integration** with axios interceptors for automatic authentication
+- **Multi-company architecture** with company context and role-based permissions
+- **Responsive dashboard** with sidebar navigation and modern design
+- **Complete CRUD operations** for beneficiaries, templates, transfers, and batches
+- **Settings management** for default bank account configuration with full CRUD operations
+- **React Query integration** for optimistic updates, caching, and error handling
+- **Modern UI components** with form validation, loading states, and Hungarian localization
 
 ## Development Commands
 
