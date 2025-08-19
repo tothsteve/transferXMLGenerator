@@ -1,4 +1,34 @@
 import React from 'react';
+import {
+  Box,
+  Typography,
+  Button,
+  Card,
+  CardContent,
+  Alert,
+  AlertTitle,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Stack,
+  Avatar,
+  Chip,
+  List,
+  ListItem,
+  ListItemText
+} from '@mui/material';
+import {
+  Description as DescriptionIcon,
+  CheckCircle as CheckCircleIcon,
+  Add as AddIcon,
+  AttachMoney as AttachMoneyIcon,
+  Warning as WarningIcon,
+  Info as InfoIcon
+} from '@mui/icons-material';
 import { PDFProcessingResult } from './PDFImportWizard';
 
 interface ReviewStepProps {
@@ -22,249 +52,306 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
   };
 
   return (
-    <div className="p-8">
-      <div className="max-w-6xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Adatok Áttekintése
-          </h2>
-          <p className="text-gray-600">
-            {previewData.template_updated 
-              ? 'Ellenőrizze a kinyert tranzakciókat és erősítse meg a sablon frissítését'
-              : 'Ellenőrizze a kinyert tranzakciókat és erősítse meg a sablon létrehozását'
-            }
-          </p>
-        </div>
+    <Box sx={{ p: { xs: 2, sm: 3 }, maxWidth: '100%', mx: 'auto' }}>
+      {/* Header */}
+      <Box sx={{ textAlign: 'center', mb: 3 }}>
+        <Typography variant="h6" component="h2" fontWeight="bold" gutterBottom>
+          Adatok Áttekintése
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
+          {previewData.template_updated 
+            ? 'Ellenőrizze a kinyert tranzakciókat és erősítse meg a sablon frissítését'
+            : 'Ellenőrizze a kinyert tranzakciókat és erősítse meg a sablon létrehozását'
+          }
+        </Typography>
+      </Box>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-            <div className="flex items-center">
-              <div className="text-blue-600">
-                <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-2xl font-bold text-blue-900">{previewData.transactions_processed}</p>
-                <p className="text-blue-700 text-sm">Tranzakció</p>
-              </div>
-            </div>
-          </div>
+      {/* Summary Cards */}
+      <Box 
+        sx={{ 
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: 'repeat(2, 1fr)',
+            sm: 'repeat(4, 1fr)',
+          },
+          gap: { xs: 1.5, sm: 2 },
+          mb: 3
+        }}
+      >
+        <Card elevation={1}>
+          <CardContent sx={{ p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 2 } } }}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} alignItems="center" spacing={{ xs: 1, sm: 2 }} textAlign={{ xs: 'center', sm: 'left' }}>
+              <Avatar sx={{ bgcolor: 'primary.main', width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 } }}>
+                <DescriptionIcon fontSize="small" />
+              </Avatar>
+              <Box>
+                <Typography variant="h5" fontWeight="bold" color="primary" sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
+                  {previewData.transactions_processed}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Tranzakció
+                </Typography>
+              </Box>
+            </Stack>
+          </CardContent>
+        </Card>
 
-          <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-            <div className="flex items-center">
-              <div className="text-green-600">
-                <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-2xl font-bold text-green-900">{previewData.beneficiaries_matched}</p>
-                <p className="text-green-700 text-sm">Meglévő kedvezményezett</p>
-              </div>
-            </div>
-          </div>
+        <Card elevation={1}>
+          <CardContent sx={{ p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 2 } } }}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} alignItems="center" spacing={{ xs: 1, sm: 2 }} textAlign={{ xs: 'center', sm: 'left' }}>
+              <Avatar sx={{ bgcolor: 'success.main', width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 } }}>
+                <CheckCircleIcon fontSize="small" />
+              </Avatar>
+              <Box>
+                <Typography variant="h5" fontWeight="bold" color="success.main" sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
+                  {previewData.beneficiaries_matched}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Meglévő
+                </Typography>
+              </Box>
+            </Stack>
+          </CardContent>
+        </Card>
 
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
-            <div className="flex items-center">
-              <div className="text-amber-600">
-                <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-2xl font-bold text-amber-900">{previewData.beneficiaries_created}</p>
-                <p className="text-amber-700 text-sm">Új kedvezményezett</p>
-              </div>
-            </div>
-          </div>
+        <Card elevation={1}>
+          <CardContent sx={{ p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 2 } } }}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} alignItems="center" spacing={{ xs: 1, sm: 2 }} textAlign={{ xs: 'center', sm: 'left' }}>
+              <Avatar sx={{ bgcolor: 'warning.main', width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 } }}>
+                <AddIcon fontSize="small" />
+              </Avatar>
+              <Box>
+                <Typography variant="h5" fontWeight="bold" color="warning.main" sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
+                  {previewData.beneficiaries_created}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Új
+                </Typography>
+              </Box>
+            </Stack>
+          </CardContent>
+        </Card>
 
-          <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
-            <div className="flex items-center">
-              <div className="text-purple-600">
-                <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-2xl font-bold text-purple-900">{formatCurrency(previewData.total_amount)}</p>
-                <p className="text-purple-700 text-sm">Összes összeg</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        <Card elevation={1}>
+          <CardContent sx={{ p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 2 } } }}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} alignItems="center" spacing={{ xs: 1, sm: 2 }} textAlign={{ xs: 'center', sm: 'left' }}>
+              <Avatar sx={{ bgcolor: 'secondary.main', width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 } }}>
+                <AttachMoneyIcon fontSize="small" />
+              </Avatar>
+              <Box>
+                <Typography variant="h6" fontWeight="bold" color="secondary.main" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
+                  {formatCurrency(previewData.total_amount)}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Összesen
+                </Typography>
+              </Box>
+            </Stack>
+          </CardContent>
+        </Card>
+      </Box>
 
-        {/* Template Info */}
-        <div className={`border rounded-lg p-6 ${previewData.template_updated 
-          ? 'bg-blue-50 border-blue-200' 
-          : 'bg-gray-50 border-gray-200'
-        }`}>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            {previewData.template_updated 
-              ? '🔄 Frissítendő sablon' 
-              : '📄 Létrehozandó sablon'
-            }
-          </h3>
-          <p className="text-gray-700">
-            <strong>Név:</strong> {previewData.template.name}
-          </p>
-          <p className="text-gray-700">
-            <strong>Kedvezményezettek száma:</strong> {previewData.template.beneficiary_count}
-          </p>
-          {previewData.template_updated && (
-            <div className="mt-3 p-3 bg-blue-100 border border-blue-200 rounded">
-              <p className="text-sm text-blue-800">
-                ✅ A rendszer észlelte, hogy már létezik sablon ugyanezekkel a kedvezményezettekkel. 
-                Az összegek és közlemények frissítésre kerülnek az új értékekkel.
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Consolidation Alerts */}
-        {previewData.consolidations && previewData.consolidations.length > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
-            <div className="flex items-start space-x-3">
-              <div className="text-amber-500 mt-0.5">
-                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-medium text-amber-800 mb-2">🔄 Tranzakciók összevonása</h3>
-                <ul className="space-y-1 text-sm text-amber-700">
-                  {previewData.consolidations.map((msg, index) => (
-                    <li key={index}>• {msg}</li>
-                  ))}
-                </ul>
-                <p className="text-xs text-amber-600 mt-2">
-                  Az azonos kedvezményezetthez tartozó tranzakciók automatikusan összevonásra kerültek.
-                </p>
-              </div>
-            </div>
-          </div>
+      {/* Template Info */}
+      <Alert 
+        severity={previewData.template_updated ? "info" : "success"} 
+        sx={{ mb: 4 }}
+        icon={previewData.template_updated ? <InfoIcon /> : <DescriptionIcon />}
+      >
+        <AlertTitle>
+          {previewData.template_updated 
+            ? 'Frissítendő sablon' 
+            : 'Létrehozandó sablon'
+          }
+        </AlertTitle>
+        <Typography variant="body2" component="div">
+          <strong>Név:</strong> {previewData.template.name}
+        </Typography>
+        <Typography variant="body2" component="div">
+          <strong>Kedvezményezettek száma:</strong> {previewData.template.beneficiary_count}
+        </Typography>
+        {previewData.template_updated && (
+          <Typography variant="body2" sx={{ mt: 2 }}>
+            A rendszer észlelte, hogy már létezik sablon ugyanezekkel a kedvezményezettekkel. 
+            Az összegek és közlemények frissítésre kerülnek az új értékekkel.
+          </Typography>
         )}
+      </Alert>
 
-        {/* Transaction Table */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-            <h3 className="text-lg font-medium text-gray-900">Kinyert Tranzakciók</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Kedvezményezett
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Számlaszám
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Összeg
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Közlemény
-                  </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Állapot
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {previewData.preview.map((transaction, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-gray-900">
-                        {transaction.beneficiary_name}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                      {transaction.account_number.length > 20
-                        ? `${transaction.account_number.substring(0, 8)}...${transaction.account_number.substring(transaction.account_number.length - 8)}`
-                        : transaction.account_number
-                      }
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+      {/* Consolidation Alerts */}
+      {previewData.consolidations && previewData.consolidations.length > 0 && (
+        <Alert severity="warning" sx={{ mb: 4 }} icon={<WarningIcon />}>
+          <AlertTitle>Tranzakciók összevonása</AlertTitle>
+          <List dense>
+            {previewData.consolidations.map((msg, index) => (
+              <ListItem key={index} sx={{ px: 0, py: 0.25 }}>
+                <ListItemText primary={`• ${msg}`} />
+              </ListItem>
+            ))}
+          </List>
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+            Az azonos kedvezményezetthez tartozó tranzakciók automatikusan összevonásra kerültek.
+          </Typography>
+        </Alert>
+      )}
+
+      {/* Transaction Table */}
+      <Paper elevation={1} sx={{ mb: 3 }}>
+        <Box sx={{ p: { xs: 2, sm: 3 }, borderBottom: 1, borderColor: 'divider' }}>
+          <Typography variant="h6" fontWeight={600} sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
+            Kinyert Tranzakciók
+          </Typography>
+        </Box>
+        <TableContainer sx={{ overflowX: 'auto' }}>
+          <Table 
+            sx={{ 
+              tableLayout: { xs: 'auto', sm: 'fixed' },
+              minWidth: { xs: 650, sm: '100%' }
+            }}
+            size="small"
+          >
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ width: { sm: '25%' }, fontWeight: 600, fontSize: '0.8rem' }}>
+                  Kedvezményezett
+                </TableCell>
+                <TableCell sx={{ width: { sm: '22%' }, fontWeight: 600, fontSize: '0.8rem' }}>
+                  Számlaszám
+                </TableCell>
+                <TableCell align="right" sx={{ width: { sm: '15%' }, fontWeight: 600, fontSize: '0.8rem' }}>
+                  Összeg
+                </TableCell>
+                <TableCell sx={{ width: { sm: '25%' }, fontWeight: 600, fontSize: '0.8rem' }}>
+                  Közlemény
+                </TableCell>
+                <TableCell align="center" sx={{ width: { sm: '13%' }, fontWeight: 600, fontSize: '0.8rem' }}>
+                  Állapot
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {previewData.preview.map((transaction, index) => (
+                <TableRow key={index} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                  <TableCell sx={{ py: 1.5 }}>
+                    <Typography variant="body2" fontWeight={500} sx={{ fontSize: '0.85rem' }}>
+                      {transaction.beneficiary_name}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={{ py: 1.5 }}>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        fontFamily: 'monospace',
+                        fontSize: '0.7rem',
+                        wordBreak: 'break-all',
+                        lineHeight: 1.2
+                      }}
+                    >
+                      {transaction.account_number}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right" sx={{ py: 1.5 }}>
+                    <Typography variant="body2" fontWeight={600} sx={{ fontSize: '0.85rem' }}>
                       {formatCurrency(transaction.amount)}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={{ py: 1.5 }}>
+                    <Typography 
+                      variant="body2" 
+                      color="text.secondary"
+                      sx={{ 
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        fontSize: '0.8rem'
+                      }}
+                      title={transaction.remittance_info || '-'}
+                    >
                       {transaction.remittance_info || '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      {transaction.beneficiary_id ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          ✓ Meglévő
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                          + Új
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="center" sx={{ py: 1.5 }}>
+                    {transaction.beneficiary_id ? (
+                      <Chip 
+                        label="Meglévő" 
+                        color="success" 
+                        size="small"
+                        sx={{ 
+                          fontSize: '0.7rem',
+                          height: 20,
+                          '& .MuiChip-label': { px: 1 },
+                          '& .MuiChip-icon': { fontSize: 12 }
+                        }}
+                        icon={<CheckCircleIcon />}
+                      />
+                    ) : (
+                      <Chip 
+                        label="Új" 
+                        color="warning" 
+                        size="small"
+                        sx={{ 
+                          fontSize: '0.7rem',
+                          height: 20,
+                          '& .MuiChip-label': { px: 1 },
+                          '& .MuiChip-icon': { fontSize: 12 }
+                        }}
+                        icon={<AddIcon />}
+                      />
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
 
-        {/* Info Box */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <div className="flex items-start space-x-3">
-            <div className="text-blue-500 mt-0.5">
-              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="font-medium text-blue-800 mb-1">ℹ️ Tudnivalók</h3>
-              <ul className="text-sm text-blue-700 space-y-1">
-                {previewData.template_updated ? (
-                  <>
-                    <li>• A meglévő sablon összegei és közleményei frissülnek az új PDF adatokkal</li>
-                    <li>• A kedvezményezettek listája változatlan marad</li>
-                    <li>• A frissítés után közvetlenül használhatja az utalások generálásához</li>
-                    <li>• Az eredeti sablon neve és beállításai megmaradnak</li>
-                  </>
-                ) : (
-                  <>
-                    <li>• A sablon létrehozása után közvetlenül használhatja az utalások generálásához</li>
-                    <li>• A meglévő kedvezményezettek nem kerülnek duplikálásra</li>
-                    <li>• Az összegek és közlemények módosíthatók az utalás létrehozásakor</li>
-                    <li>• A sablon később bármikor frissíthető újabb PDF-ekkel</li>
-                  </>
-                )}
-              </ul>
-            </div>
-          </div>
-        </div>
+      {/* Info Box */}
+      <Alert severity="info" sx={{ mb: 3, display: { xs: 'none', md: 'flex' } }} icon={<InfoIcon />}>
+        <AlertTitle sx={{ mb: 1, fontSize: '0.9rem' }}>Tudnivalók</AlertTitle>
+        <Box component="ul" sx={{ m: 0, pl: 1, fontSize: '0.8rem', '& li': { mb: 0.5 } }}>
+          {previewData.template_updated ? (
+            <>
+              <li>A meglévő sablon összegei és közleményei frissülnek az új PDF adatokkal</li>
+              <li>A kedvezményezettek listája változatlan marad</li>
+              <li>A frissítés után közvetlenül használhatja az utalások generálásához</li>
+            </>
+          ) : (
+            <>
+              <li>A sablon létrehozása után közvetlenül használhatja az utalások generálásához</li>
+              <li>A meglévő kedvezményezettek nem kerülnek duplikálásra</li>
+              <li>Az összegek és közlemények módosíthatók az utalás létrehozásakor</li>
+            </>
+          )}
+        </Box>
+      </Alert>
 
-        {/* Action Buttons */}
-        <div className="flex justify-between pt-6">
-          <button
-            onClick={onBack}
-            className="px-6 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            ← Vissza
-          </button>
-          <button
-            onClick={onConfirm}
-            className={`px-8 py-2 text-white rounded-lg transition-colors flex items-center space-x-2 ${
-              previewData.template_updated
-                ? 'bg-blue-600 hover:bg-blue-700'
-                : 'bg-green-600 hover:bg-green-700'
-            }`}
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            <span>{previewData.template_updated ? 'Sablon Frissítése' : 'Sablon Létrehozása'}</span>
-          </button>
-        </div>
-      </div>
-    </div>
+      {/* Action Buttons */}
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        pt: 1,
+        gap: 2,
+        flexDirection: { xs: 'column', sm: 'row' }
+      }}>
+        <Button
+          onClick={onBack}
+          variant="outlined"
+          size="medium"
+          sx={{ width: { xs: '100%', sm: 'auto' } }}
+        >
+          ← Vissza
+        </Button>
+        <Button
+          onClick={onConfirm}
+          variant="contained"
+          size="medium"
+          color={previewData.template_updated ? "primary" : "success"}
+          startIcon={<CheckCircleIcon />}
+          sx={{ width: { xs: '100%', sm: 'auto' }, minWidth: { sm: 200 } }}
+        >
+          {previewData.template_updated ? 'Sablon Frissítése' : 'Sablon Létrehozása'}
+        </Button>
+      </Box>
+    </Box>
   );
 };

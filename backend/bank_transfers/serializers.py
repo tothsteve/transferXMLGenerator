@@ -1,21 +1,25 @@
 from rest_framework import serializers
-from .models import BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch
+from .models import BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch, Company
 
 class BankAccountSerializer(serializers.ModelSerializer):
+    company_name = serializers.CharField(source='company.name', read_only=True)
+    
     class Meta:
         model = BankAccount
-        fields = ['id', 'name', 'account_number', 'is_default', 'created_at', 'updated_at']
-        read_only_fields = ['created_at', 'updated_at']
+        fields = ['id', 'name', 'account_number', 'bank_name', 'is_default', 'company_name', 'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at', 'company', 'company_name']
 
 class BeneficiarySerializer(serializers.ModelSerializer):
+    company_name = serializers.CharField(source='company.name', read_only=True)
+    
     class Meta:
         model = Beneficiary
         fields = [
             'id', 'name', 'account_number', 'description', 
             'is_frequent', 'is_active', 'remittance_information', 
-            'created_at', 'updated_at'
+            'company_name', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at', 'company', 'company_name']
 
 class TemplateBeneficiarySerializer(serializers.ModelSerializer):
     beneficiary = BeneficiarySerializer(read_only=True)
@@ -25,22 +29,23 @@ class TemplateBeneficiarySerializer(serializers.ModelSerializer):
         model = TemplateBeneficiary
         fields = [
             'id', 'beneficiary', 'beneficiary_id', 
-            'default_amount', 'default_remittance', 
+            'default_amount', 'default_remittance', 'default_execution_date',
             'order', 'is_active'
         ]
 
 class TransferTemplateSerializer(serializers.ModelSerializer):
     template_beneficiaries = TemplateBeneficiarySerializer(many=True, read_only=True)
     beneficiary_count = serializers.SerializerMethodField()
+    company_name = serializers.CharField(source='company.name', read_only=True)
     
     class Meta:
         model = TransferTemplate
         fields = [
             'id', 'name', 'description', 'is_active',
-            'template_beneficiaries', 'beneficiary_count',
+            'template_beneficiaries', 'beneficiary_count', 'company_name',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at', 'company', 'company_name']
     
     def get_beneficiary_count(self, obj):
         return obj.template_beneficiaries.filter(is_active=True).count()
@@ -65,6 +70,7 @@ class TransferBatchSerializer(serializers.ModelSerializer):
     transfers = TransferSerializer(many=True, read_only=True)
     transfer_count = serializers.SerializerMethodField()
     xml_filename = serializers.ReadOnlyField()
+    company_name = serializers.CharField(source='company.name', read_only=True)
     
     class Meta:
         model = TransferBatch
@@ -72,9 +78,9 @@ class TransferBatchSerializer(serializers.ModelSerializer):
             'id', 'name', 'description', 'transfers',
             'total_amount', 'transfer_count', 'order',
             'used_in_bank', 'bank_usage_date', 'xml_filename',
-            'created_at', 'xml_generated_at'
+            'company_name', 'created_at', 'xml_generated_at'
         ]
-        read_only_fields = ['created_at', 'xml_generated_at', 'total_amount', 'xml_filename']
+        read_only_fields = ['created_at', 'xml_generated_at', 'total_amount', 'xml_filename', 'company', 'company_name']
     
     def get_transfer_count(self, obj):
         return obj.transfers.count()
