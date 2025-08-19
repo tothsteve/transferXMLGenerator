@@ -1,0 +1,29 @@
+[build]
+builder = "nixpacks"
+buildCommand = "cd backend && pip install -r requirements.txt && python manage.py collectstatic --noinput && cd ../frontend && npm install && npm run build"
+
+[deploy]
+healthcheckPath = "/api/health/"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[[services]]
+name = "backend"
+source = "backend"
+
+[services.backend]
+startCommand = "cd backend && python manage.py migrate && gunicorn transferXMLGenerator.wsgi:application --bind 0.0.0.0:$PORT"
+healthcheckPath = "/api/health/"
+variables = { DJANGO_SETTINGS_MODULE = "transferXMLGenerator.settings_production" }
+
+[[services]]
+name = "frontend"
+source = "frontend"
+
+[services.frontend]
+startCommand = "npx serve -s build -l $PORT"
+
+[environments.production.variables]
+DEBUG = "false"
+DJANGO_SETTINGS_MODULE = "transferXMLGenerator.settings_production"

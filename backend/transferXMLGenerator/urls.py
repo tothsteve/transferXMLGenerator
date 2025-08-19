@@ -8,6 +8,9 @@ from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
+# Health check import
+from bank_transfers.api_views import health_check
+
 schema_view = get_schema_view(
     openapi.Info(
         title="Transfer XML Generator API",
@@ -37,6 +40,9 @@ schema_view = get_schema_view(
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    
+    # Health check for Railway
+    path('api/health/', health_check, name='health-check'),
     
     # API endpoints
     path('api/', include('bank_transfers.api_urls')),

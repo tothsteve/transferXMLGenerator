@@ -1,26 +1,13 @@
-"""
-Django settings for transferXMLGenerator project.
-
-This is the base settings file. For specific environments, use:
-- settings_local.py for local development (SQL Server)
-- settings_production.py for Railway deployment (PostgreSQL)
-"""
-
 import os
 from pathlib import Path
 from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Auto-detect environment and use appropriate settings
-ENVIRONMENT = config('ENVIRONMENT', default='local')
-
-if ENVIRONMENT == 'production':
-    # Import production settings
-    from .settings_production import *
-else:
-    # Import local development settings
-    from .settings_local import *
+# Development settings
+SECRET_KEY = config('SECRET_KEY', default='your-secret-key-here')
+DEBUG = config('DEBUG', default=True, cast=bool)
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -31,7 +18,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
-    'drf_yasg',  # ← Swagger hozzáadása
+    'drf_yasg',  # Swagger
     'bank_transfers',
 ]
 
@@ -48,7 +35,7 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'transferXMLGenerator.urls'
 
-# Templates konfigurációja
+# Templates configuration
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -65,7 +52,7 @@ TEMPLATES = [
     },
 ]
 
-# CORS beállítások
+# CORS settings for development
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # React dev server
     "http://127.0.0.1:3000",
@@ -74,10 +61,10 @@ CORS_ALLOWED_ORIGINS = [
 
 CORS_ALLOW_CREDENTIALS = True
 
-# REST Framework beállítások
+# REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',  # Development-ben
+        'rest_framework.permissions.AllowAny',  # Development-friendly
     ],
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
@@ -87,7 +74,7 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
 }
 
-# Swagger beállítások
+# Swagger settings
 SWAGGER_SETTINGS = {
     'SECURITY_DEFINITIONS': {
         'Basic': {
@@ -120,7 +107,7 @@ REDOC_SETTINGS = {
     'LAZY_RENDERING': False,
 }
 
-# SQL Server Database Configuration
+# SQL Server Database Configuration (for local development)
 DATABASES = {
     'default': {
         'ENGINE': 'mssql',
@@ -135,9 +122,59 @@ DATABASES = {
     }
 }
 
+# Static files
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 
+# Time zone
 USE_TZ = True
 TIME_ZONE = 'Europe/Budapest'
+
+# Internationalization
+LANGUAGE_CODE = 'hu-hu'
+USE_I18N = True
+USE_L10N = True
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# File upload settings
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+
+# Development logging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'bank_transfers': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}

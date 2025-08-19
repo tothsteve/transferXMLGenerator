@@ -14,7 +14,9 @@ import {
   ExcelImportResponse,
 } from '../types/api';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = process.env.NODE_ENV === 'production' 
+  ? `${process.env.REACT_APP_BACKEND_URL || 'https://your-backend.railway.app'}/api`
+  : 'http://localhost:8000/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,

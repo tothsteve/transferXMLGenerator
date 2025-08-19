@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FileUploadParser
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.db import transaction, models
 from drf_yasg.utils import swagger_auto_schema
@@ -22,6 +22,15 @@ from .serializers import (
 from .utils import generate_xml
 from .pdf_processor import PDFTransactionProcessor
 from .kh_export import KHBankExporter
+
+# Health check endpoint for Railway
+def health_check(request):
+    """Simple health check endpoint for Railway deployment"""
+    return JsonResponse({
+        'status': 'healthy',
+        'timestamp': timezone.now().isoformat(),
+        'service': 'transferXMLGenerator-backend'
+    })
 
 class BankAccountViewSet(viewsets.ModelViewSet):
     """
@@ -635,7 +644,17 @@ class ExcelImportView(APIView):
         
         beneficiaries = []
         
-        for row in worksheet.iter_rows(min_row=3, values_only=True):
+        # Detect header row and start from the row after headers
+        start_row = 3
+        header_keywords = ['név', 'name', 'számlaszám', 'account', 'összeg', 'amount']
+        
+        # Check if row 3 contains headers and skip if so
+        if worksheet.max_row >= 3:
+            row_3_values = [str(cell.value or '').lower().strip() for cell in worksheet[3][:6]]
+            if any(keyword in ' '.join(row_3_values) for keyword in header_keywords):
+                start_row = 4  # Skip header row and start from row 4
+        
+        for row in worksheet.iter_rows(min_row=start_row, values_only=True):
             if not any(row[:6]):
                 continue
                 
