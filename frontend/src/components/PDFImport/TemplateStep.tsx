@@ -1,4 +1,24 @@
 import React from 'react';
+import {
+  Box,
+  Typography,
+  Button,
+  Card,
+  CardContent,
+  Avatar,
+  Alert,
+  AlertTitle,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Stack,
+} from '@mui/material';
+import {
+  CheckCircle as CheckCircleIcon,
+  Visibility as VisibilityIcon,
+  Add as AddIcon,
+} from '@mui/icons-material';
 import { PDFProcessingResult } from './PDFImportWizard';
 
 interface TemplateStepProps {
@@ -22,157 +42,181 @@ export const TemplateStep: React.FC<TemplateStepProps> = ({
   };
 
   return (
-    <div className="p-8">
-      <div className="max-w-4xl mx-auto text-center space-y-8">
-        {/* Success Icon */}
-        <div className="flex justify-center">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-            <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-        </div>
+    <Box sx={{ p: { xs: 2, sm: 3 }, textAlign: 'center', maxWidth: '100%', mx: 'auto' }}>
+      {/* Success Icon */}
+      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+        <Avatar
+          sx={{
+            width: { xs: 60, sm: 70 },
+            height: { xs: 60, sm: 70 },
+            bgcolor: 'success.main',
+            fontSize: { xs: 30, sm: 35 }
+          }}
+        >
+          <CheckCircleIcon fontSize="inherit" />
+        </Avatar>
+      </Box>
 
-        {/* Success Message */}
-        <div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            🎉 Sablon Sikeresen Létrehozva!
-          </h2>
-          <p className="text-lg text-gray-600">
-            A PDF fájlok feldolgozása befejeződött és a sablon készen áll a használatra.
-          </p>
-        </div>
+      {/* Success Message */}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h5" component="h2" fontWeight="bold" gutterBottom sx={{ fontSize: { xs: '1.4rem', sm: '1.75rem' } }}>
+          🎉 Sablon Sikeresen {previewData.template_updated ? 'Frissítve' : 'Létrehozva'}!
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}>
+          A PDF fájlok feldolgozása befejeződött és a sablon készen áll a használatra.
+        </Typography>
+      </Box>
 
-        {/* Template Summary */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-8">
-          <h3 className="text-xl font-semibold text-gray-900 mb-6">📄 Sablon Összefoglaló</h3>
+      {/* Template Summary */}
+      <Card elevation={1} sx={{ mb: 3 }}>
+        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+          <Typography variant="subtitle1" fontWeight={600} gutterBottom textAlign="center" sx={{ fontSize: { xs: '1rem', sm: '1.1rem' } }}>
+            📄 Sablon Összefoglaló
+          </Typography>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
-            <div>
-              <h4 className="font-medium text-gray-700 mb-3">Alapadatok</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Sablon neve:</span>
-                  <span className="font-medium">{previewData.template.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Sablon ID:</span>
-                  <span className="font-medium">#{previewData.template.id}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Kedvezményezettek:</span>
-                  <span className="font-medium">{previewData.template.beneficiary_count}</span>
-                </div>
-              </div>
-            </div>
+          <Box sx={{ display: { xs: 'block', md: 'flex' }, gap: 4, textAlign: 'left' }}>
+            <Box sx={{ flex: 1, mb: { xs: 3, md: 0 } }}>
+              <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                Alapadatok
+              </Typography>
+              <Stack spacing={1}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2" color="text.secondary">Sablon neve:</Typography>
+                  <Typography variant="body2" fontWeight={500}>{previewData.template.name}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2" color="text.secondary">Sablon ID:</Typography>
+                  <Typography variant="body2" fontWeight={500}>#{previewData.template.id}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2" color="text.secondary">Kedvezményezettek:</Typography>
+                  <Typography variant="body2" fontWeight={500}>{previewData.template.beneficiary_count}</Typography>
+                </Box>
+              </Stack>
+            </Box>
 
-            <div>
-              <h4 className="font-medium text-gray-700 mb-3">Feldolgozás eredménye</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Tranzakciók:</span>
-                  <span className="font-medium">{previewData.transactions_processed}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Összes összeg:</span>
-                  <span className="font-medium">{formatCurrency(previewData.total_amount)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Meglévő kedvezményezett:</span>
-                  <span className="font-medium text-green-600">{previewData.beneficiaries_matched}</span>
-                </div>
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                Feldolgozás eredménye
+              </Typography>
+              <Stack spacing={1}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2" color="text.secondary">Tranzakciók:</Typography>
+                  <Typography variant="body2" fontWeight={500}>{previewData.transactions_processed}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2" color="text.secondary">Összes összeg:</Typography>
+                  <Typography variant="body2" fontWeight={500}>{formatCurrency(previewData.total_amount)}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2" color="text.secondary">Meglévő kedvezményezett:</Typography>
+                  <Typography variant="body2" fontWeight={500} color="success.main">{previewData.beneficiaries_matched}</Typography>
+                </Box>
                 {previewData.beneficiaries_created > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Új kedvezményezett:</span>
-                    <span className="font-medium text-amber-600">{previewData.beneficiaries_created}</span>
-                  </div>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" color="text.secondary">Új kedvezményezett:</Typography>
+                    <Typography variant="body2" fontWeight={500} color="warning.main">{previewData.beneficiaries_created}</Typography>
+                  </Box>
                 )}
-              </div>
-            </div>
-          </div>
-        </div>
+              </Stack>
+            </Box>
+          </Box>
+        </CardContent>
+      </Card>
 
-        {/* Consolidations Summary */}
-        {previewData.consolidations && previewData.consolidations.length > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
-            <h4 className="font-medium text-amber-800 mb-3">🔄 Összevonások</h4>
-            <ul className="text-sm text-amber-700 space-y-1 text-left">
-              {previewData.consolidations.map((msg, index) => (
-                <li key={index}>• {msg}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+      {/* Consolidations Summary */}
+      {previewData.consolidations && previewData.consolidations.length > 0 && (
+        <Alert severity="warning" sx={{ mb: 4 }}>
+          <AlertTitle>🔄 Összevonások</AlertTitle>
+          <List dense>
+            {previewData.consolidations.map((msg, index) => (
+              <ListItem key={index} sx={{ px: 0, py: 0.25 }}>
+                <ListItemText primary={`• ${msg}`} />
+              </ListItem>
+            ))}
+          </List>
+        </Alert>
+      )}
 
-        {/* Next Steps */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h4 className="font-medium text-blue-800 mb-3">📋 Következő lépések</h4>
-          <div className="text-left space-y-3">
-            <div className="flex items-start space-x-3">
-              <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                <span className="text-blue-800 text-xs font-medium">1</span>
-              </div>
-              <div>
-                <p className="text-blue-700 font-medium">Utalások létrehozása</p>
-                <p className="text-blue-600 text-sm">Használja a sablont azonnali utalás generáláshoz</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                <span className="text-blue-800 text-xs font-medium">2</span>
-              </div>
-              <div>
-                <p className="text-blue-700 font-medium">Összegek módosítása</p>
-                <p className="text-blue-600 text-sm">Szükség szerint módosítsa az összegeket és dátumokat</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                <span className="text-blue-800 text-xs font-medium">3</span>
-              </div>
-              <div>
-                <p className="text-blue-700 font-medium">XML generálás</p>
-                <p className="text-blue-600 text-sm">Töltse le az XML fájlt a banki importhoz</p>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Next Steps */}
+      <Alert severity="info" sx={{ mb: 4, textAlign: 'left' }}>
+        <AlertTitle>📋 Következő lépések</AlertTitle>
+        <List dense>
+          <ListItem sx={{ px: 0, py: 1 }}>
+            <ListItemIcon>
+              <Avatar sx={{ width: 24, height: 24, bgcolor: 'info.main', fontSize: '0.75rem' }}>1</Avatar>
+            </ListItemIcon>
+            <ListItemText
+              primary="Utalások létrehozása"
+              secondary="Használja a sablont azonnali utalás generáláshoz"
+            />
+          </ListItem>
+          <ListItem sx={{ px: 0, py: 1 }}>
+            <ListItemIcon>
+              <Avatar sx={{ width: 24, height: 24, bgcolor: 'info.main', fontSize: '0.75rem' }}>2</Avatar>
+            </ListItemIcon>
+            <ListItemText
+              primary="Összegek módosítása"
+              secondary="Szükség szerint módosítsa az összegeket és dátumokat"
+            />
+          </ListItem>
+          <ListItem sx={{ px: 0, py: 1 }}>
+            <ListItemIcon>
+              <Avatar sx={{ width: 24, height: 24, bgcolor: 'info.main', fontSize: '0.75rem' }}>3</Avatar>
+            </ListItemIcon>
+            <ListItemText
+              primary="XML generálás"
+              secondary="Töltse le az XML fájlt a banki importhoz"
+            />
+          </ListItem>
+        </List>
+      </Alert>
 
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6">
-          <button
-            onClick={onViewTemplate}
-            className="px-6 py-3 text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center space-x-2"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-            </svg>
-            <span>Sablon Megtekintése</span>
-          </button>
-          
-          <button
-            onClick={onCreateTransfers}
-            className="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            <span>Utalások Létrehozása</span>
-          </button>
-        </div>
+      {/* Action Buttons */}
+      <Stack 
+        direction={{ xs: 'column', sm: 'row' }} 
+        spacing={2} 
+        justifyContent="center" 
+        sx={{ mb: 4 }}
+      >
+        <Button
+          onClick={onViewTemplate}
+          variant="outlined"
+          size="large"
+          startIcon={<VisibilityIcon />}
+        >
+          Sablon Megtekintése
+        </Button>
+        
+        <Button
+          onClick={onCreateTransfers}
+          variant="contained"
+          color="success"
+          size="large"
+          startIcon={<AddIcon />}
+        >
+          Utalások Létrehozása
+        </Button>
+      </Stack>
 
-        {/* Tips */}
-        <div className="text-left bg-gray-50 border border-gray-200 rounded-lg p-6">
-          <h4 className="font-medium text-gray-700 mb-3">💡 Hasznos tippek</h4>
-          <ul className="text-sm text-gray-600 space-y-2">
-            <li>• A sablon újra felhasználható minden hónapban - csak töltse fel az új PDF-eket</li>
-            <li>• A kedvezményezettek automatikusan frissülnek, de az összegek mindig ellenőrizendők</li>
-            <li>• Az XML fájl közvetlenül importálható a legtöbb banki rendszerbe</li>
-            <li>• A sablon később szerkeszthető és kiegészíthető további kedvezményezettekkel</li>
-          </ul>
-        </div>
-      </div>
-    </div>
+      {/* Tips */}
+      <Alert severity="success" sx={{ textAlign: 'left' }}>
+        <AlertTitle>💡 Hasznos tippek</AlertTitle>
+        <List dense>
+          <ListItem sx={{ px: 0, py: 0.25 }}>
+            <ListItemText primary="• A sablon újra felhasználható minden hónapban - csak töltse fel az új PDF-eket" />
+          </ListItem>
+          <ListItem sx={{ px: 0, py: 0.25 }}>
+            <ListItemText primary="• A kedvezményezettek automatikusan frissülnek, de az összegek mindig ellenőrizendők" />
+          </ListItem>
+          <ListItem sx={{ px: 0, py: 0.25 }}>
+            <ListItemText primary="• Az XML fájl közvetlenül importálható a legtöbb banki rendszerbe" />
+          </ListItem>
+          <ListItem sx={{ px: 0, py: 0.25 }}>
+            <ListItemText primary="• A sablon később szerkeszthető és kiegészíthető további kedvezményezettekkel" />
+          </ListItem>
+        </List>
+      </Alert>
+    </Box>
   );
 };

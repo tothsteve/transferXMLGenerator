@@ -10,7 +10,16 @@
       "Bash(grep:*)",
       "Bash(npm ls:*)",
       "Bash(cp:*)",
-      "Bash(npm test:*)"
+      "Bash(npm test:*)",
+      "Bash(source:*)",
+      "Bash(python test:*)",
+      "Bash(npm run build:*)",
+      "Bash(rm:*)",
+      "Bash(python3:*)",
+      "Bash(python manage.py:*)",
+      "Bash(git add:*)",
+      "Bash(curl:*)",
+      "Bash(python:*)"
     ],
     "deny": []
   }
