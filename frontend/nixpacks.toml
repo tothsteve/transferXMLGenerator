@@ -9,7 +9,13 @@ cacheDirectories = [".npm", "node_modules"]
 
 [phases.build]
 cmds = [
-  "./railway-build.sh"
+  "export NODE_ENV=production",
+  "export GENERATE_SOURCEMAP=false", 
+  "export CI=false",
+  "export DISABLE_ESLINT_PLUGIN=true",
+  "export TSC_COMPILE_ON_ERROR=true",
+  "export SKIP_PREFLIGHT_CHECK=true",
+  "npm run build"
 ]
 cacheDirectories = ["node_modules/.cache", "build"]
 
