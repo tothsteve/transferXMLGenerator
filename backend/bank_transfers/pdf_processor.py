@@ -7,7 +7,7 @@ import pdfplumber
 import re
 from decimal import Decimal
 from datetime import datetime
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, Optional
 from django.core.files.uploadedfile import UploadedFile
 
 from .models import Beneficiary, TransferTemplate, TemplateBeneficiary
@@ -532,7 +532,7 @@ class PDFTransactionProcessor:
         
         return matched_transactions, consolidations
     
-    def find_matching_beneficiary(self, account_number: str, name: str = None, company=None) -> Beneficiary:
+    def find_matching_beneficiary(self, account_number: str, name: str = None, company=None) -> Optional[Beneficiary]:
         """Find existing beneficiary by account number or name"""
         # Clean account number for matching (remove dashes and spaces)
         clean_account = account_number.replace('-', '').replace(' ', '')
@@ -600,7 +600,7 @@ class PDFTransactionProcessor:
         
         # Only match by exact account number - no name-based fallback
         # This prevents different people with same names from being consolidated
-        return beneficiary
+        return beneficiary  # Returns None if no match found
     
     def create_template(self, transactions: List[Dict], template_name: str = None, company_name: str = None) -> TransferTemplate:
         """Create new transfer template"""
@@ -732,7 +732,6 @@ class PDFTransactionProcessor:
                 print(f"DEBUG: No execution_date in PDF - using today's date: {execution_date}")
             
             # Check if this beneficiary already exists in template
-            from .models import Beneficiary
             beneficiary = Beneficiary.objects.get(id=beneficiary_id)
             clean_account = beneficiary.account_number.replace('-', '').replace(' ', '')
             
