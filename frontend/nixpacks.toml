@@ -1,11 +1,18 @@
 [phases.setup]
-nixPkgs = ["nodejs", "npm"]
+nixPkgs = ["nodejs-18_x", "npm"]
 
 [phases.install]
-cmds = ["npm install"]
+cmds = ["npm ci --prefer-offline --no-audit --cache .npm"]
+cacheDirectories = [".npm", "node_modules"]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = [
+  "export NODE_ENV=production",
+  "export GENERATE_SOURCEMAP=false",
+  "export CI=false",
+  "npm run build"
+]
+cacheDirectories = ["node_modules/.cache"]
 
 [start]
 cmd = "npm run serve"

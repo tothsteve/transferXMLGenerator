@@ -56,7 +56,7 @@ class PDFTransactionProcessor:
             'error': result.error
         }
     
-    def process_pdf_files(self, pdf_files: List[UploadedFile], template_name: str = None, template_id: int = None) -> Dict[str, Any]:
+    def process_pdf_files(self, pdf_files: List[UploadedFile], template_name: str = None, template_id: int = None, company=None) -> Dict[str, Any]:
         """
         Main entry point - process multiple PDF files and create/update template
         
@@ -104,7 +104,7 @@ class PDFTransactionProcessor:
             most_common_company = None
         
         # Step 2: Match beneficiaries and consolidate transactions
-        all_transactions, consolidation_msgs = self.match_and_consolidate_beneficiaries(all_transactions)
+        all_transactions, consolidation_msgs = self.match_and_consolidate_beneficiaries(all_transactions, company)
         consolidations.extend(consolidation_msgs)
         
         # Step 3: Try to find existing template with matching beneficiaries (if not explicitly updating one)
@@ -479,7 +479,7 @@ class PDFTransactionProcessor:
             'company_tax_id': company_tax_id
         }
     
-    def match_and_consolidate_beneficiaries(self, transactions: List[Dict]) -> Tuple[List[Dict], List[str]]:
+    def match_and_consolidate_beneficiaries(self, transactions: List[Dict], company=None) -> Tuple[List[Dict], List[str]]:
         """Match transactions to existing beneficiaries and consolidate duplicates"""
         consolidations = []
         matched_transactions = []
@@ -494,7 +494,7 @@ class PDFTransactionProcessor:
         
         for (name, account), trans_group in grouped.items():
             # Try to match existing beneficiary
-            beneficiary = self.find_matching_beneficiary(account, name)
+            beneficiary = self.find_matching_beneficiary(account, name, company)
             
             if len(trans_group) > 1:
                 # Consolidate multiple transactions to same beneficiary
@@ -532,25 +532,27 @@ class PDFTransactionProcessor:
         
         return matched_transactions, consolidations
     
-    def find_matching_beneficiary(self, account_number: str, name: str = None) -> Beneficiary:
+    def find_matching_beneficiary(self, account_number: str, name: str = None, company=None) -> Beneficiary:
         """Find existing beneficiary by account number or name"""
         # Clean account number for matching (remove dashes and spaces)
         clean_account = account_number.replace('-', '').replace(' ', '')
         
         # Try exact full account match first (most reliable)
         beneficiary = Beneficiary.objects.filter(
-            account_number=clean_account
+            account_number=clean_account,
+            company=company
         ).first()
         
         # Try with original format (with dashes)
         if not beneficiary:
             beneficiary = Beneficiary.objects.filter(
-                account_number=account_number
+                account_number=account_number,
+                company=company
             ).first()
         
         # Try to match by cleaning both sides for comparison
         if not beneficiary:
-            for b in Beneficiary.objects.all():
+            for b in Beneficiary.objects.filter(company=company):
                 db_clean = b.account_number.replace('-', '').replace(' ', '')
                 if db_clean == clean_account:
                     beneficiary = b
@@ -564,7 +566,7 @@ class PDFTransactionProcessor:
                 short_account = clean_account[:16]  # First 16 digits (2x8 format)
                 
                 # Try to find beneficiary with 2x8 format
-                for b in Beneficiary.objects.all():
+                for b in Beneficiary.objects.filter(company=company):
                     db_clean = b.account_number.replace('-', '').replace(' ', '')
                     if db_clean == short_account:
                         beneficiary = b
@@ -581,7 +583,7 @@ class PDFTransactionProcessor:
         elif not beneficiary and len(clean_account) == 16:
             extended_account = clean_account + '00000000'  # Add trailing zeros
             
-            for b in Beneficiary.objects.all():
+            for b in Beneficiary.objects.filter(company=company):
                 db_clean = b.account_number.replace('-', '').replace(' ', '')
                 if db_clean == extended_account:
                     beneficiary = b
@@ -591,7 +593,8 @@ class PDFTransactionProcessor:
             if not beneficiary:
                 formatted_extended = f"{clean_account[:8]}-{clean_account[8:16]}-00000000"
                 beneficiary = Beneficiary.objects.filter(
-                    account_number=formatted_extended
+                    account_number=formatted_extended,
+                    company=company
                 ).first()
         
         # Only match by exact account number - no name-based fallback
@@ -681,7 +684,8 @@ class PDFTransactionProcessor:
                     name=transaction['beneficiary_name'],
                     account_number=clean_account,
                     is_frequent=True,
-                    is_active=True
+                    is_active=True,
+                    company=company
                 )
                 beneficiary_id = beneficiary.id
             else:

@@ -370,12 +370,13 @@ class TransferTemplateViewSet(viewsets.ModelViewSet):
                         'details': 'Csak PDF fájlok engedélyezettek'
                     }, status=status.HTTP_400_BAD_REQUEST)
             
-            # Process PDFs
+            # Process PDFs with company context
             processor = PDFTransactionProcessor()
             result = processor.process_pdf_files(
                 pdf_files=pdf_files,
                 template_name=template_name,
-                template_id=int(template_id) if template_id else None
+                template_id=int(template_id) if template_id else None,
+                company=request.company
             )
             
             return Response(result, status=status.HTTP_200_OK)
