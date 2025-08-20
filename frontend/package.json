@@ -33,7 +33,7 @@
     "build:ultra": "GENERATE_SOURCEMAP=false DISABLE_ESLINT_PLUGIN=true CI=false TSC_COMPILE_ON_ERROR=true SKIP_PREFLIGHT_CHECK=true INLINE_RUNTIME_CHUNK=false IMAGE_INLINE_SIZE_LIMIT=0 craco build --max-old-space-size=2048",
     "test": "craco test",
     "eject": "react-scripts eject",
-    "serve": "npx serve -s build -p 3000"
+    "serve": "npx serve -s build -l ${PORT:-3000}"
   },
   "eslintConfig": {
     "extends": [
