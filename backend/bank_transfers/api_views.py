@@ -25,6 +25,15 @@ from .pdf_processor import PDFTransactionProcessor
 from .kh_export import KHBankExporter
 from .permissions import IsCompanyMember, IsCompanyAdmin, IsCompanyAdminOrReadOnly
 
+# Health check endpoint for Railway
+def health_check(request):
+    """Simple health check endpoint for Railway deployment"""
+    return JsonResponse({
+        'status': 'healthy',
+        'timestamp': timezone.now().isoformat(),
+        'service': 'transferXMLGenerator-backend'
+    })
+
 class DebugAuthView(APIView):
     permission_classes = [IsAuthenticated]
     
