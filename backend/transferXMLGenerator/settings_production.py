@@ -36,8 +36,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
-    'transferXMLGenerator.cors_middleware.CustomCORSMiddleware',  # Custom CORS as backup
+    'transferXMLGenerator.cors_middleware.CustomCORSMiddleware',  # Custom CORS ONLY
     'whitenoise.middleware.WhiteNoiseMiddleware',  # For static files
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
