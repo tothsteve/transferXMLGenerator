@@ -17,7 +17,6 @@ import {
   Switch,
   FormControlLabel,
   Tooltip,
-  Button,
   Paper,
   CircularProgress,
   Alert,

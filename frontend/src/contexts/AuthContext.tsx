@@ -236,7 +236,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
     // Note: We removed the automatic localStorage clearing to prevent race conditions
     // localStorage will only be cleared on explicit logout action
-  }, [state.isAuthenticated, state.user, state.accessToken, state.refreshToken, state.currentCompany]);
+  }, [state.isAuthenticated, state.user, state.accessToken, state.refreshToken, state.currentCompany, state.companies]);
 
   const login = async (username: string, password: string) => {
     dispatch({ type: 'AUTH_START' });

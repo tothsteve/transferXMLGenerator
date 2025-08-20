@@ -20,10 +20,7 @@ import {
   Select,
   MenuItem,
   FormControl,
-  InputLabel,
-  FormHelperText,
-  Chip,
-  Avatar
+  InputLabel
 } from '@mui/material';
 import {
   Close as CloseIcon,
