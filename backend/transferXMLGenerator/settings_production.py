@@ -68,13 +68,33 @@ TEMPLATES = [
 WSGI_APPLICATION = 'transferXMLGenerator.wsgi.application'
 
 # Database - PostgreSQL for Railway
-DATABASES = {
-    'default': dj_database_url.parse(
-        config('DATABASE_URL'),
-        conn_max_age=600,
-        conn_health_checks=True,
-    )
-}
+DATABASE_URL = config('DATABASE_URL', default=None)
+
+if DATABASE_URL:
+    try:
+        DATABASES = {
+            'default': dj_database_url.parse(
+                DATABASE_URL,
+                conn_max_age=600,
+                conn_health_checks=True,
+            )
+        }
+    except Exception as e:
+        print(f"Error parsing DATABASE_URL: {e}")
+        print(f"DATABASE_URL value: {DATABASE_URL}")
+        raise
+else:
+    # Fallback for when DATABASE_URL is not set
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME', default='postgres'),
+            'USER': config('DB_USER', default='postgres'),
+            'PASSWORD': config('DB_PASSWORD', default=''),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+        }
+    }
 
 # Production CORS settings
 CORS_ALLOWED_ORIGINS = [
