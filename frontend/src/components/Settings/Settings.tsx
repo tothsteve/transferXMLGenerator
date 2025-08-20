@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -24,7 +24,6 @@ const Settings: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const queryClient = useQueryClient();
-  const hasLoadedInitialData = useRef(false);
 
   // Fetch default bank account
   const { data: defaultAccount, isLoading, error } = useQuery({
@@ -73,21 +72,31 @@ const Settings: React.FC = () => {
     },
   });
 
-  // Update form when default account is loaded (but not while editing)
+  // Update form when default account is loaded (but NEVER while editing)
   useEffect(() => {
-    if (defaultAccount?.data && !isEditing) {
-      // Only update on initial load or when explicitly not editing
-      if (!hasLoadedInitialData.current) {
-        hasLoadedInitialData.current = true;
-        setFormData({
-          account_number: defaultAccount.data.account_number || '',
-          name: defaultAccount.data.name || '',
-          bank_name: defaultAccount.data.bank_name || '',
-          is_default: defaultAccount.data.is_default || true,
-        });
-      }
+    console.log('🔍 Settings useEffect triggered:', { 
+      hasData: !!defaultAccount?.data, 
+      isEditing, 
+      accountNumber: defaultAccount?.data?.account_number 
+    });
+    
+    // CRITICAL: Never update form data while editing - this was causing the race condition
+    if (isEditing) {
+      console.log('⏸️ Skipping form update - currently editing');
+      return; // Exit early if editing - do not touch form data
     }
-  }, [defaultAccount, isEditing]);
+    
+    if (defaultAccount?.data) {
+      console.log('📝 Updating form data from API response');
+      // Only update on initial load or after successful save (when not editing)
+      setFormData({
+        account_number: defaultAccount.data.account_number || '',
+        name: defaultAccount.data.name || '',
+        bank_name: defaultAccount.data.bank_name || '',
+        is_default: defaultAccount.data.is_default || true,
+      });
+    }
+  }, [defaultAccount?.data, isEditing]);
 
   const handleInputChange = (field: string) => (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -192,7 +201,10 @@ const Settings: React.FC = () => {
               <Button
                 variant="contained"
                 startIcon={<AccountBalance />}
-                onClick={() => setIsEditing(true)}
+                onClick={() => {
+                  console.log('🔧 Edit button clicked, setting isEditing to true');
+                  setIsEditing(true);
+                }}
               >
                 Szerkesztés
               </Button>
