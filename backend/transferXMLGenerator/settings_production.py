@@ -96,59 +96,8 @@ else:
         }
     }
 
-# Production CORS settings - EXPLICIT HEADERS DUE TO BUG IN CORS_ALLOW_ALL_HEADERS
-FRONTEND_URL = config('FRONTEND_URL', default=None)
-
-# Explicit CORS configuration - don't use CORS_ALLOW_ALL_HEADERS due to bug
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
-]
-
-# Explicit origins
-CORS_ALLOWED_ORIGINS = [
-    'https://generous-generosity-production.up.railway.app',
-    'https://*.railway.app',
-    'https://*.up.railway.app',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-]
-
-# Explicit headers - expanded list with x-company-id
-CORS_ALLOWED_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
-    'x-company-id',
-    'cache-control',
-    'pragma',
-    'expires',
-    'x-forwarded-for',
-    'x-forwarded-proto',
-]
-
-# Preflight settings
-CORS_PREFLIGHT_MAX_AGE = 86400
-
-# Debug: Print CORS settings on startup
-RAILWAY_CORS_ALLOW_ALL = config('CORS_ALLOW_ALL', default=None)
-print(f"Railway CORS_ALLOW_ALL env var: {RAILWAY_CORS_ALLOW_ALL}")
-print(f"CORS_ALLOW_ALL_ORIGINS: {True}")
-print(f"CORS_ALLOWED_HEADERS: {CORS_ALLOWED_HEADERS}")
-print(f"CORS_ALLOWED_ORIGINS: {CORS_ALLOWED_ORIGINS}")
-print(f"FRONTEND_URL from env: {FRONTEND_URL}")
+# CORS is now handled by custom middleware (cors_middleware.py)
+# No django-cors-headers configuration needed
 
 # REST Framework settings
 REST_FRAMEWORK = {
