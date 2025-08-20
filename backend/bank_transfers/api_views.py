@@ -681,6 +681,7 @@ class ExcelImportView(APIView):
     - Csak a Név és Számlaszám kötelező
     """
     parser_classes = [MultiPartParser]
+    permission_classes = [IsAuthenticated, IsCompanyMember]
     
     @swagger_auto_schema(
         operation_description="Excel fájl feltöltése kedvezményezettek importálásához",
@@ -725,6 +726,7 @@ class ExcelImportView(APIView):
     def import_beneficiaries_from_excel(self, excel_file):
         """Kedvezményezettek importálása Excel fájlból"""
         import openpyxl
+        from .hungarian_account_validator import validate_and_format_hungarian_account_number
         
         workbook = openpyxl.load_workbook(excel_file)
         worksheet = workbook.active
@@ -763,9 +765,20 @@ class ExcelImportView(APIView):
                 if name.lower() in ['név', 'name'] or account_number.lower() in ['számlaszám', 'account']:
                     continue
                 
+                # Validate and format Hungarian account number
+                validation_result = validate_and_format_hungarian_account_number(account_number, validate_checksum=False)
+                
+                if not validation_result.is_valid:
+                    error_msg = f'Row {row_num}: Érvénytelen számlaszám "{account_number}": {validation_result.error}'
+                    errors.append(error_msg)
+                    continue
+                
+                # Use the properly formatted account number
+                formatted_account_number = validation_result.formatted
+                
                 beneficiary, created = Beneficiary.objects.get_or_create(
                     name=name,
-                    account_number=account_number,
+                    account_number=formatted_account_number,
                     company=self.request.company,  # Add company context
                     defaults={
                         'description': str(comment or '').strip(),
