@@ -177,7 +177,11 @@ REDOC_SETTINGS = {
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+
+# Only include static dirs if they exist
+import os
+static_dir = BASE_DIR / 'static'
+STATICFILES_DIRS = [static_dir] if os.path.exists(static_dir) else []
 
 # WhiteNoise configuration for static files
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
