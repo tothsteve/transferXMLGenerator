@@ -88,8 +88,8 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete }) 
         console.log('Template name:', templateName.trim());
       }
 
-      console.log('Making API request to http://localhost:8000/api/templates/process_pdf/');
-      const response = await axios.post('http://localhost:8000/api/templates/process_pdf/', formData, {
+      console.log('Making API request to /api/templates/process_pdf/');
+      const response = await axios.post('/api/templates/process_pdf/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
