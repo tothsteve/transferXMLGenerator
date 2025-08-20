@@ -15,7 +15,7 @@ import { TransferTemplate } from '../../types/api';
 import { UploadStep } from './UploadStep';
 import { ReviewStep } from './ReviewStep';
 import { TemplateStep } from './TemplateStep';
-import axios from 'axios';
+import { apiClient } from '../../services/api';
 
 interface PDFImportWizardProps {
   onComplete?: (template: TransferTemplate) => void;
@@ -89,7 +89,7 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete }) 
       }
 
       console.log('Making API request to /templates/process_pdf/');
-      const response = await axios.post('/templates/process_pdf/', formData, {
+      const response = await apiClient.post('/templates/process_pdf/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
