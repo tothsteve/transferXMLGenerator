@@ -128,7 +128,7 @@ class PDFTransactionProcessor:
                 template_created = True
         
         # Step 4: Update template with transactions
-        self.update_template_beneficiaries(template, all_transactions)
+        self.update_template_beneficiaries(template, all_transactions, company)
         
         return {
             'template': {
@@ -663,7 +663,7 @@ class PDFTransactionProcessor:
         print("DEBUG: No exact matching template found - will create new one")
         return None
     
-    def update_template_beneficiaries(self, template: TransferTemplate, transactions: List[Dict]):
+    def update_template_beneficiaries(self, template: TransferTemplate, transactions: List[Dict], company=None):
         """Update template with beneficiaries from transactions - merge with existing"""
         # Don't clear existing beneficiaries - merge instead
         # Get existing beneficiaries in the template
