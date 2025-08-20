@@ -576,7 +576,8 @@ class PDFTransactionProcessor:
                 if not beneficiary:
                     formatted_short = f"{short_account[:8]}-{short_account[8:16]}"
                     beneficiary = Beneficiary.objects.filter(
-                        account_number=formatted_short
+                        account_number=formatted_short,
+                        company=company
                     ).first()
         
         # Reverse check: if we have 2x8 format, check for 3x8 with trailing zeros
