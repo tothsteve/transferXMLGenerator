@@ -96,12 +96,11 @@ else:
         }
     }
 
-# Production CORS settings - VERY PERMISSIVE FOR DEBUGGING
+# Production CORS settings - EXPLICIT HEADERS DUE TO BUG IN CORS_ALLOW_ALL_HEADERS
 FRONTEND_URL = config('FRONTEND_URL', default=None)
 
-# Debug CORS issues by allowing everything
+# Explicit CORS configuration - don't use CORS_ALLOW_ALL_HEADERS due to bug
 CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_ALL_HEADERS = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
     'DELETE',
@@ -112,7 +111,7 @@ CORS_ALLOW_METHODS = [
     'PUT',
 ]
 
-# Explicit origins (kept for reference)
+# Explicit origins
 CORS_ALLOWED_ORIGINS = [
     'https://generous-generosity-production.up.railway.app',
     'https://*.railway.app',
@@ -121,7 +120,7 @@ CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:3000',
 ]
 
-# Explicit headers (should be ignored when CORS_ALLOW_ALL_HEADERS=True)
+# Explicit headers - expanded list with x-company-id
 CORS_ALLOWED_HEADERS = [
     'accept',
     'accept-encoding',
@@ -133,6 +132,11 @@ CORS_ALLOWED_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
     'x-company-id',
+    'cache-control',
+    'pragma',
+    'expires',
+    'x-forwarded-for',
+    'x-forwarded-proto',
 ]
 
 # Preflight settings
@@ -140,7 +144,7 @@ CORS_PREFLIGHT_MAX_AGE = 86400
 
 # Debug: Print CORS settings on startup
 print(f"CORS_ALLOW_ALL_ORIGINS: {True}")
-print(f"CORS_ALLOW_ALL_HEADERS: {True}")
+print(f"CORS_ALLOWED_HEADERS: {CORS_ALLOWED_HEADERS}")
 print(f"CORS_ALLOWED_ORIGINS: {CORS_ALLOWED_ORIGINS}")
 print(f"FRONTEND_URL from env: {FRONTEND_URL}")
 
