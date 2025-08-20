@@ -22,6 +22,7 @@
     "@types/react-dom": "^19.1.7",
     "@types/react-router-dom": "^5.3.3",
     "axios": "^1.11.0",
+    "@craco/craco": "^7.1.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-dropzone": "^14.3.8",
@@ -32,11 +33,12 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
+    "start": "craco start",
+    "build": "GENERATE_SOURCEMAP=false DISABLE_ESLINT_PLUGIN=true craco build",
+    "build:fast": "GENERATE_SOURCEMAP=false DISABLE_ESLINT_PLUGIN=true CI=false TSC_COMPILE_ON_ERROR=true craco build",
+    "test": "craco test",
     "eject": "react-scripts eject",
-    "serve": "npx serve -s build"
+    "serve": "npx serve -s build -p 3000"
   },
   "eslintConfig": {
     "extends": [

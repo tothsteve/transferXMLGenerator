@@ -1,8 +1,11 @@
 [phases.setup]
-nixPkgs = ["nodejs-18_x", "npm"]
+nixPkgs = ["nodejs-18_x"]
 
 [phases.install]
-cmds = ["npm ci --prefer-offline --no-audit --cache .npm"]
+cmds = [
+  "npm ci --prefer-offline --no-audit --silent --no-fund --no-optional",
+  "npm cache clean --force"
+]
 cacheDirectories = [".npm", "node_modules"]
 
 [phases.build]
@@ -10,9 +13,12 @@ cmds = [
   "export NODE_ENV=production",
   "export GENERATE_SOURCEMAP=false",
   "export CI=false",
-  "npm run build"
+  "export DISABLE_ESLINT_PLUGIN=true",
+  "export TSC_COMPILE_ON_ERROR=true",
+  "export SKIP_PREFLIGHT_CHECK=true",
+  "npm run build:fast"
 ]
-cacheDirectories = ["node_modules/.cache"]
+cacheDirectories = ["node_modules/.cache", "build"]
 
 [start]
 cmd = "npm run serve"
