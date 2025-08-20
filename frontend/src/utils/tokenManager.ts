@@ -109,7 +109,7 @@ class TokenManager {
 
           try {
             const response = await axios.post<TokenRefreshResponse>(
-              '/api/auth/token/refresh/',
+              '/auth/token/refresh/',
               { refresh: refreshToken }
             );
 
