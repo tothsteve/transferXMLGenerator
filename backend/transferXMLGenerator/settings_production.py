@@ -99,27 +99,23 @@ else:
 # Production CORS settings
 FRONTEND_URL = config('FRONTEND_URL', default=None)
 
+# Always allow all origins and headers for now to debug the issue
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_HEADERS = True
+CORS_ALLOW_CREDENTIALS = True
+
+# Keep specific origins for reference (will be used when we fix the config)
 if FRONTEND_URL:
     CORS_ALLOWED_ORIGINS = [FRONTEND_URL]
-    CORS_ALLOW_ALL_ORIGINS = False
 else:
-    # Allow common Railway domains and enable all origins temporarily
     CORS_ALLOWED_ORIGINS = [
         'https://*.railway.app',
         'https://*.up.railway.app',
         'http://localhost:3000',  # For local development
         'http://127.0.0.1:3000',
     ]
-    # Temporary: Allow all origins when FRONTEND_URL is not set
-    CORS_ALLOW_ALL_ORIGINS = True
 
-# Allow all origins in development/staging if needed
-if config('CORS_ALLOW_ALL', default=False, cast=bool):
-    CORS_ALLOW_ALL_ORIGINS = True
-
-# CORS configuration
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_HEADERS = True  # Temporary: Allow all headers to fix x-company-id issue
+# Explicit header configuration (kept for reference)
 CORS_ALLOWED_HEADERS = [
     'accept',
     'accept-encoding',
