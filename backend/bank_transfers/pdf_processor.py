@@ -117,14 +117,14 @@ class PDFTransactionProcessor:
             template_created = False
         else:
             # Check if there's an existing template with the same beneficiaries
-            existing_template = self.find_matching_template(all_transactions)
+            existing_template = self.find_matching_template(all_transactions, company)
             
             if existing_template:
                 template = existing_template
                 template_created = False
                 consolidations.append(f"Meglévő sablon frissítése: '{template.name}'")
             else:
-                template = self.create_template(all_transactions, template_name, most_common_company)
+                template = self.create_template(all_transactions, template_name, most_common_company, company)
                 template_created = True
         
         # Step 4: Update template with transactions
@@ -602,7 +602,7 @@ class PDFTransactionProcessor:
         # This prevents different people with same names from being consolidated
         return beneficiary  # Returns None if no match found
     
-    def create_template(self, transactions: List[Dict], template_name: str = None, company_name: str = None) -> TransferTemplate:
+    def create_template(self, transactions: List[Dict], template_name: str = None, company_name: str = None, company=None) -> TransferTemplate:
         """Create new transfer template"""
         if not template_name:
             # Auto-generate name based on company name and current date
@@ -615,12 +615,13 @@ class PDFTransactionProcessor:
         template = TransferTemplate.objects.create(
             name=template_name,
             description=f"Generated from PDF import - {len(transactions)} beneficiaries",
-            is_active=True
+            is_active=True,
+            company=company
         )
         
         return template
     
-    def find_matching_template(self, transactions: List[Dict]) -> TransferTemplate:
+    def find_matching_template(self, transactions: List[Dict], company=None) -> TransferTemplate:
         """
         Find existing template that has EXACTLY the same beneficiaries as PDF transactions
         
@@ -638,8 +639,8 @@ class PDFTransactionProcessor:
         
         print(f"DEBUG: PDF has {len(pdf_account_numbers)} unique accounts: {sorted(list(pdf_account_numbers))}")
         
-        # Find templates with EXACTLY the same beneficiaries
-        templates = TransferTemplate.objects.filter(is_active=True).prefetch_related(
+        # Find templates with EXACTLY the same beneficiaries (filtered by company)
+        templates = TransferTemplate.objects.filter(is_active=True, company=company).prefetch_related(
             'template_beneficiaries__beneficiary'
         ).order_by('-created_at')  # Check newest templates first
         
