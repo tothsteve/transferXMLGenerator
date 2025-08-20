@@ -1,7 +1,7 @@
 # Railway.app Deployment Guide
 
 ## Overview
-This guide explains how to deploy the Transfer XML Generator application (Django + React) to Railway.app.
+This guide explains how to deploy the Transfer XML Generator application (Django + React) to Railway.app as **separate services**.
 
 ## Prerequisites
 1. Railway account (railway.app)
@@ -19,122 +19,127 @@ This guide explains how to deploy the Transfer XML Generator application (Django
 3. **Update your models** if needed for PostgreSQL compatibility
 4. **Import your data** to the new PostgreSQL database
 
-### 2. Environment Variables Setup
+### 2. Deploy Backend Service (Django)
 
-In your Railway project dashboard, set these environment variables:
+1. **Add Service** → "GitHub Repo" → Select your repository
+2. **Configure backend service:**
+   - **Root Directory**: `backend`
+   - **Service Name**: `backend` or `api`
+   - Railway will auto-detect Django and use the `nixpacks.toml` configuration
+
+### 3. Set Environment Variables (Backend)
+
+In Railway backend service settings, add these variables:
 
 ```bash
 # Required
-SECRET_KEY=your-super-secret-key-here-min-50-chars
-DATABASE_URL=postgresql://... (provided by Railway PostgreSQL service)
+SECRET_KEY=your-super-secret-key-min-50-chars-long
+ENVIRONMENT=production
 DJANGO_SETTINGS_MODULE=transferXMLGenerator.settings_production
+DATABASE_URL=[automatically provided by Railway PostgreSQL service]
 
 # Optional
 DEBUG=false
-FRONTEND_URL=https://your-frontend-domain.railway.app
+FRONTEND_URL=https://your-frontend-name.railway.app
 CORS_ALLOW_ALL=false
 SECURE_SSL_REDIRECT=true
 DJANGO_LOG_LEVEL=INFO
 ```
 
-### 3. Deploy Backend (Django)
+### 4. Deploy Frontend Service (React)
 
-1. **Create a new Railway service** from your GitHub repository
-2. **Set the root directory** to `backend` in Railway service settings
-3. **Configure build command**:
-   ```bash
-   pip install -r requirements.txt && python manage.py collectstatic --noinput
-   ```
-4. **Configure start command**:
-   ```bash
-   python manage.py migrate && gunicorn transferXMLGenerator.wsgi:application --bind 0.0.0.0:$PORT
-   ```
+1. **Add Service** → "GitHub Repo" → Select the **same repository**
+2. **Configure frontend service:**
+   - **Root Directory**: `frontend`
+   - **Service Name**: `frontend` or `web`
+   - Railway will auto-detect React and use the `nixpacks.toml` configuration
 
-### 4. Deploy Frontend (React)
+### 5. Set Environment Variables (Frontend)
 
-1. **Create another Railway service** for the frontend
-2. **Set the root directory** to `frontend`
-3. **Configure build command**:
-   ```bash
-   npm install && npm run build
-   ```
-4. **Configure start command**:
-   ```bash
-   npx serve -s build -l $PORT
-   ```
+In Railway frontend service settings:
 
-### 5. Update Frontend API Configuration
-
-Update your React app to use the Railway backend URL:
-
-```typescript
-// In frontend/src/services/api.ts
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://your-backend-domain.railway.app/api'
-  : 'http://localhost:8000/api';
+```bash
+REACT_APP_BACKEND_URL=https://your-backend-name.railway.app
 ```
 
-## Database Migration Script
+### 6. Connect Services and Update URLs
 
-Here's a sample script to help migrate from SQL Server to PostgreSQL:
+1. Both services should deploy automatically
+2. Get the URLs from Railway dashboard
+3. Update the frontend environment variable with the actual backend URL
+4. Update backend CORS settings with the actual frontend URL
 
-```python
-# migration_script.py
-import os
-import django
-from django.core.management import execute_from_command_line
+### 7. Import Your Data
 
-# Set Django settings
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'transferXMLGenerator.settings_production')
-django.setup()
+Once backend is deployed and PostgreSQL is ready:
 
-# Your migration logic here
-# 1. Export data from SQL Server
-# 2. Transform data for PostgreSQL
-# 3. Import to PostgreSQL
+```bash
+# Switch to production settings locally and run:
+DJANGO_SETTINGS_MODULE=transferXMLGenerator.settings_production python migrate_to_postgresql.py --import-only
 ```
 
-## Updated Requirements
+## Service Configuration Files
 
-Add these to your `backend/requirements.txt`:
+Each service has its own `nixpacks.toml` for Railway:
 
+### Backend (`backend/nixpacks.toml`)
+```toml
+[phases.setup]
+nixPkgs = ["python38", "pip"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[phases.build] 
+cmds = ["python manage.py collectstatic --noinput"]
+
+[start]
+cmd = "python manage.py migrate && gunicorn transferXMLGenerator.wsgi:application --bind 0.0.0.0:$PORT"
 ```
-gunicorn==21.2.0
-whitenoise==6.6.0
-dj-database-url==2.1.0
-psycopg2-binary==2.9.7
+
+### Frontend (`frontend/nixpacks.toml`)
+```toml
+[phases.setup]
+nixPkgs = ["nodejs", "npm"]
+
+[phases.install]
+cmds = ["npm install"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm run serve"
 ```
-
-## Important Notes
-
-1. **Database Change**: You must migrate from SQL Server to PostgreSQL
-2. **Static Files**: Configured with WhiteNoise for production
-3. **Security**: Production settings include HTTPS redirects and security headers
-4. **CORS**: Configured for cross-origin requests between frontend and backend
-5. **Environment Variables**: All sensitive data moved to environment variables
 
 ## Testing Deployment
 
-1. **Check backend health**: `https://your-backend.railway.app/api/`
-2. **Check frontend**: `https://your-frontend.railway.app`
-3. **Test API connectivity**: Verify frontend can communicate with backend
-4. **Test database**: Ensure data migration was successful
+- **Backend health**: `https://your-backend.railway.app/api/health/`
+- **Frontend**: `https://your-frontend.railway.app`
+- **API docs**: `https://your-backend.railway.app/swagger/`
+
+## Important Notes
+
+1. **Separate Services**: Backend and frontend are deployed as completely separate Railway services
+2. **Different Repositories**: You can deploy from the same GitHub repo by setting different root directories
+3. **Database**: PostgreSQL is shared between services via environment variables
+4. **Static Files**: Backend serves its own static files, frontend is served by npm serve
+5. **CORS**: Make sure to update CORS settings with actual deployment URLs
 
 ## Troubleshooting
 
-- **500 errors**: Check Railway logs for Django errors
-- **Database connection**: Verify DATABASE_URL environment variable
-- **Static files**: Ensure collectstatic runs successfully during build
-- **CORS issues**: Check CORS_ALLOWED_ORIGINS in production settings
+- **Build failures**: Check the `nixpacks.toml` configuration for each service
+- **Environment variables**: Ensure all required variables are set for each service
+- **CORS issues**: Update `FRONTEND_URL` in backend settings
+- **Database connection**: Verify `DATABASE_URL` is correctly provided by PostgreSQL service
 
 ## Production Checklist
 
 - [ ] PostgreSQL database service created
-- [ ] Data migrated from SQL Server
-- [ ] Environment variables configured
-- [ ] Backend service deployed and healthy
-- [ ] Frontend service deployed and accessible
-- [ ] API connectivity working
-- [ ] Static files serving correctly
-- [ ] HTTPS redirects working
-- [ ] Admin panel accessible (if needed)
+- [ ] Data exported from SQL Server (`python migrate_to_postgresql.py --export-only`)
+- [ ] Backend service deployed with correct environment variables
+- [ ] Frontend service deployed with backend URL
+- [ ] Services can communicate (test API calls)
+- [ ] Data imported to PostgreSQL (`python migrate_to_postgresql.py --import-only`)
+- [ ] CORS settings updated with actual URLs
+- [ ] SSL/HTTPS working correctly

@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["python38", "pip"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[phases.build] 
+cmds = ["python manage.py collectstatic --noinput"]
+
+[start]
+cmd = "python manage.py migrate && gunicorn transferXMLGenerator.wsgi:application --bind 0.0.0.0:$PORT"
