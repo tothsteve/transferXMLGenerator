@@ -101,8 +101,9 @@ FRONTEND_URL = config('FRONTEND_URL', default=None)
 
 if FRONTEND_URL:
     CORS_ALLOWED_ORIGINS = [FRONTEND_URL]
+    CORS_ALLOW_ALL_ORIGINS = False
 else:
-    # Allow common Railway domains
+    # Allow common Railway domains and enable all origins temporarily
     CORS_ALLOWED_ORIGINS = [
         'https://*.railway.app',
         'https://*.up.railway.app',
@@ -116,7 +117,9 @@ else:
 if config('CORS_ALLOW_ALL', default=False, cast=bool):
     CORS_ALLOW_ALL_ORIGINS = True
 
+# CORS configuration
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_HEADERS = True  # Temporary: Allow all headers to fix x-company-id issue
 CORS_ALLOWED_HEADERS = [
     'accept',
     'accept-encoding',
@@ -129,6 +132,9 @@ CORS_ALLOWED_HEADERS = [
     'x-requested-with',
     'x-company-id',  # Custom header for company context
 ]
+
+# Additional CORS settings for preflight requests
+CORS_PREFLIGHT_MAX_AGE = 86400
 
 # REST Framework settings
 REST_FRAMEWORK = {
