@@ -186,4 +186,16 @@ export const uploadApi = {
   },
 };
 
+// User Management API
+export const userManagementApi = {
+  getCompanyUsers: () =>
+    apiClient.get<any[]>('/company/users/'),
+  
+  updateUserRole: (userId: number, role: 'ADMIN' | 'USER') =>
+    apiClient.put(`/company/users/${userId}/`, { role }),
+  
+  removeUser: (userId: number) =>
+    apiClient.delete(`/company/users/${userId}/`),
+};
+
 export default apiClient;
