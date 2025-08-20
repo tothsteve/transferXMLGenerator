@@ -97,9 +97,20 @@ else:
     }
 
 # Production CORS settings
-CORS_ALLOWED_ORIGINS = [
-    config('FRONTEND_URL', default='https://your-frontend.railway.app'),
-]
+FRONTEND_URL = config('FRONTEND_URL', default=None)
+
+if FRONTEND_URL:
+    CORS_ALLOWED_ORIGINS = [FRONTEND_URL]
+else:
+    # Allow common Railway domains
+    CORS_ALLOWED_ORIGINS = [
+        'https://*.railway.app',
+        'https://*.up.railway.app',
+        'http://localhost:3000',  # For local development
+        'http://127.0.0.1:3000',
+    ]
+    # Temporary: Allow all origins when FRONTEND_URL is not set
+    CORS_ALLOW_ALL_ORIGINS = True
 
 # Allow all origins in development/staging if needed
 if config('CORS_ALLOW_ALL', default=False, cast=bool):
