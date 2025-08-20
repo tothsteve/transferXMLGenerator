@@ -1,6 +1,6 @@
 Django==4.2.7
 djangorestframework==3.14.0
-django-cors-headers==4.3.1
+django-cors-headers==4.4.0
 python-decouple==3.8
 openpyxl==3.1.2
 pdfplumber==0.10.2
