@@ -3,22 +3,24 @@ nixPkgs = ["nodejs-18_x"]
 
 [phases.install]
 cmds = [
-  "npm ci --prefer-offline --no-audit --silent --no-fund --no-optional",
-  "npm cache clean --force"
+  "npm ci --prefer-offline --no-audit --silent --no-fund --no-optional --production=false"
 ]
-cacheDirectories = [".npm", "node_modules"]
+cacheDirectories = [".npm", "node_modules", ".cache"]
 
 [phases.build]
 cmds = [
   "export NODE_ENV=production",
+  "export NODE_OPTIONS='--max-old-space-size=2048'",
   "export GENERATE_SOURCEMAP=false",
-  "export CI=false",
+  "export CI=false", 
   "export DISABLE_ESLINT_PLUGIN=true",
   "export TSC_COMPILE_ON_ERROR=true",
   "export SKIP_PREFLIGHT_CHECK=true",
-  "npm run build:fast"
+  "export INLINE_RUNTIME_CHUNK=false",
+  "export IMAGE_INLINE_SIZE_LIMIT=0",
+  "npm run build:ultra"
 ]
-cacheDirectories = ["node_modules/.cache", "build"]
+cacheDirectories = ["node_modules/.cache", "build", ".cache", "node_modules/.bin"]
 
 [start]
 cmd = "npm run serve"
