@@ -114,25 +114,35 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete }) 
     }
   };
 
-  const handleConfirmTemplate = () => {
+  const handleConfirmTemplate = async () => {
     if (!previewData) return;
     
-    setCurrentStep(3);
-    
-    // Show different success message based on whether template was created or updated
-    if (previewData.template_updated) {
-      success(`Sablon frissítve: ${previewData.template.name}`);
-    } else {
-      success(`Sablon létrehozva: ${previewData.template.name}`);
-    }
-    
-    // Navigate to transfer workflow with the template
-    setTimeout(() => {
-      navigate(`/transfers?template=${previewData.template.id}`);
-      if (onComplete) {
-        onComplete(previewData.template as any);
+    try {
+      // Verify the template actually exists in the database
+      const response = await apiClient.get(`/templates/${previewData.template.id}/`);
+      
+      if (response.data) {
+        setCurrentStep(3);
+        
+        // Show different success message based on whether template was created or updated
+        if (previewData.template_updated) {
+          success(`Sablon frissítve: ${previewData.template.name}`);
+        } else {
+          success(`Sablon létrehozva: ${previewData.template.name}`);
+        }
+        
+        // Navigate to transfer workflow with the template
+        setTimeout(() => {
+          navigate(`/transfers?template=${previewData.template.id}`);
+          if (onComplete) {
+            onComplete(response.data);
+          }
+        }, 1500);
       }
-    }, 1500);
+    } catch (error: any) {
+      console.error('Template verification failed:', error);
+      setErrorMessage(`Hiba: A sablon nem található az adatbázisban. ${error.response?.data?.detail || error.message}`);
+    }
   };
 
   const handleBack = () => {

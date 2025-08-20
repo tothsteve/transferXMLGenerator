@@ -349,7 +349,7 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
           startIcon={<CheckCircleIcon />}
           sx={{ width: { xs: '100%', sm: 'auto' }, minWidth: { sm: 200 } }}
         >
-          {previewData.template_updated ? 'Sablon Frissítése' : 'Sablon Létrehozása'}
+          {previewData.template_updated ? 'Jóváhagyás és Folytatás' : 'Jóváhagyás és Folytatás'}
         </Button>
       </Box>
     </Box>
