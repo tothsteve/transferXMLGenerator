@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -24,6 +24,7 @@ const Settings: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const queryClient = useQueryClient();
+  const hasLoadedInitialData = useRef(false);
 
   // Fetch default bank account
   const { data: defaultAccount, isLoading, error } = useQuery({
@@ -75,12 +76,16 @@ const Settings: React.FC = () => {
   // Update form when default account is loaded (but not while editing)
   useEffect(() => {
     if (defaultAccount?.data && !isEditing) {
-      setFormData({
-        account_number: defaultAccount.data.account_number || '',
-        name: defaultAccount.data.name || '',
-        bank_name: defaultAccount.data.bank_name || '',
-        is_default: defaultAccount.data.is_default || true,
-      });
+      // Only update on initial load or when explicitly not editing
+      if (!hasLoadedInitialData.current) {
+        hasLoadedInitialData.current = true;
+        setFormData({
+          account_number: defaultAccount.data.account_number || '',
+          name: defaultAccount.data.name || '',
+          bank_name: defaultAccount.data.bank_name || '',
+          is_default: defaultAccount.data.is_default || true,
+        });
+      }
     }
   }, [defaultAccount, isEditing]);
 

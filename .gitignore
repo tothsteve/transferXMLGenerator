@@ -209,3 +209,8 @@ backend/venv/
 backend/db.sqlite3
 backend/**/__pycache__/
 backend/**/*.pyc
+
+# PDF imports - sensitive financial documents
+*.pdf
+Bankiutalasok*.pdf
+Adoesjarulekbefizetesek*.pdf
