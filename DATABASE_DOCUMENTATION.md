@@ -1,286 +1,333 @@
 # Database Schema Documentation
 ## Transfer XML Generator - Hungarian Banking System
 
-**Last Updated:** 2025-08-11  
-**Database:** SQL Server - `administration` on localhost:1435  
-**Schema Version:** After migration 0003_rename_beneficiary_fields
+**Last Updated:** 2025-08-20  
+**Database:** PostgreSQL (Production on Railway) / SQL Server (Local Development)  
+**Schema Version:** Multi-Company Architecture with Migration 0010  
 
-> **Note:** This documentation reflects the current database schema after all Django migrations have been applied, including field renames that occurred in migration 0003.
+> **Note:** This documentation is the **single source of truth** for database schema. All database comment scripts should be generated from this document.
 
-### Database Tables and Column Descriptions
+## Multi-Company Architecture Overview
+
+The system implements a **multi-tenant architecture** where:
+- **Companies** are isolated data containers
+- **Users** can belong to multiple companies with different roles
+- **All business data** is company-scoped for complete data isolation
+- **Authentication** is handled via JWT with company context switching
 
 ---
 
-## 1. **bank_transfers_bankaccount**
-**Table Comment:** *Stores originator bank accounts for transfers. Contains company/organization accounts that will be debited during XML generation.*
+## 1. **bank_transfers_company**
+**Table Comment:** *Company entities for multi-tenant architecture. Each company has complete data isolation.*
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | INTEGER | PRIMARY KEY, AUTO_INCREMENT | Unique identifier for bank account record |
-| `name` | VARCHAR(200) | NOT NULL | Display name for the bank account (e.g., "Main Business Account", "Payroll Account") |
-| `account_number` | VARCHAR(50) | NOT NULL, UNIQUE | Hungarian bank account number in standard format (with dashes, e.g., "1210001119014874") |
-| `is_default` | BOOLEAN | DEFAULT FALSE | Flags the default account for new transfers. Only one account should be default |
-| `created_at` | DATETIME | NOT NULL, AUTO_NOW_ADD | Timestamp when the account record was created |
-| `updated_at` | DATETIME | NOT NULL, AUTO_NOW | Timestamp when the account record was last modified |
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for company |
+| `name` | VARCHAR(200) | NOT NULL | Company legal name |
+| `tax_id` | VARCHAR(20) | NOT NULL, UNIQUE | Hungarian tax identification number (adószám) |
+| `address` | TEXT | | Company registered address |
+| `phone` | VARCHAR(50) | | Primary contact phone number |
+| `email` | VARCHAR(254) | | Primary contact email address |
+| `is_active` | BOOLEAN | DEFAULT TRUE | Soft delete flag for company deactivation |
+| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Company registration timestamp |
+| `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
 
 **Indexes:**
 - Primary key on `id`
-- Unique index on `account_number`
+- Unique index on `tax_id`
+- Index on `is_active` for filtering
 
 ---
 
-## 2. **bank_transfers_beneficiary**
-**Table Comment:** *Stores beneficiary information for bank transfers. Contains payees, suppliers, employees, and tax authorities that receive payments.*
+## 2. **bank_transfers_companyuser**
+**Table Comment:** *User-company relationships with role-based access control. Enables multi-company membership.*
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | INTEGER | PRIMARY KEY, AUTO_INCREMENT | Unique identifier for beneficiary record |
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for user-company relationship |
+| `user_id` | INTEGER | NOT NULL, FK(auth_user.id) | Reference to Django User |
+| `company_id` | INTEGER | NOT NULL, FK(bank_transfers_company.id) | Reference to Company |
+| `role` | VARCHAR(10) | NOT NULL, DEFAULT 'USER' | Role: 'ADMIN' or 'USER' |
+| `is_active` | BOOLEAN | DEFAULT TRUE | Active membership flag |
+| `joined_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Membership creation timestamp |
+
+**Indexes:**
+- Primary key on `id`
+- Unique constraint on `user_id, company_id`
+- Index on `company_id` for membership queries
+- Index on `role` for role filtering
+
+**Constraints:**
+- `role` CHECK constraint: VALUES ('ADMIN', 'USER')
+
+---
+
+## 3. **bank_transfers_userprofile**
+**Table Comment:** *Extended user profile information with company preferences and localization settings.*
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for user profile |
+| `user_id` | INTEGER | NOT NULL, UNIQUE, FK(auth_user.id) | One-to-one reference to Django User |
+| `phone` | VARCHAR(50) | | User phone number |
+| `preferred_language` | VARCHAR(10) | DEFAULT 'hu' | UI language preference |
+| `timezone` | VARCHAR(50) | DEFAULT 'Europe/Budapest' | User timezone setting |
+| `last_active_company_id` | INTEGER | FK(bank_transfers_company.id) | Last company context used |
+| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Profile creation timestamp |
+| `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
+
+**Indexes:**
+- Primary key on `id`
+- Unique index on `user_id`
+- Index on `last_active_company_id`
+
+---
+
+## 4. **bank_transfers_bankaccount**
+**Table Comment:** *Company-scoped originator bank accounts for transfers. Contains accounts that will be debited during XML generation.*
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for bank account record |
+| `company_id` | INTEGER | FK(bank_transfers_company.id) | Company owner of this account |
+| `name` | VARCHAR(200) | NOT NULL | Display name for the account (e.g., "Main Business Account", "Payroll Account") |
+| `account_number` | VARCHAR(50) | NOT NULL | Hungarian bank account number in formatted form (e.g., "1210001119014874" or "12100011-19014874") |
+| `bank_name` | VARCHAR(200) | | Name of the bank holding this account |
+| `is_default` | BOOLEAN | DEFAULT FALSE | Flags the default account for new transfers within the company |
+| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Account registration timestamp |
+| `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
+
+**Indexes:**
+- Primary key on `id`
+- Index on `company_id` for company-scoped queries
+- Index on `is_default` for default account lookup
+
+**Business Rules:**
+- Only one account per company should have `is_default = TRUE`
+- Account numbers must follow Hungarian banking format validation
+
+---
+
+## 5. **bank_transfers_beneficiary**
+**Table Comment:** *Company-scoped beneficiary information for bank transfers. Contains payees, suppliers, employees, and tax authorities.*
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for beneficiary record |
+| `company_id` | INTEGER | FK(bank_transfers_company.id) | Company owner of this beneficiary |
 | `name` | VARCHAR(200) | NOT NULL | Full legal name of the beneficiary (person or organization) |
-| `account_number` | VARCHAR(50) | NOT NULL | Beneficiary's bank account number in Hungarian format |
-| `description` | VARCHAR(200) | NULLABLE | Additional information about the beneficiary (bank name, organization details, etc.) |
-| `is_frequent` | BOOLEAN | DEFAULT FALSE | Marks frequently used beneficiaries for quick access |
+| `account_number` | VARCHAR(50) | NOT NULL | Beneficiary's bank account number in Hungarian format (validated and formatted) |
+| `description` | VARCHAR(200) | | Additional information about the beneficiary (bank name, organization details, etc.) |
+| `is_frequent` | BOOLEAN | DEFAULT FALSE | Marks frequently used beneficiaries for quick access in UI |
 | `is_active` | BOOLEAN | DEFAULT TRUE | Soft delete flag - inactive beneficiaries are hidden from selection |
-| `remittance_information` | TEXT | NULLABLE | Default payment references, account numbers, or other transaction-specific information |
-| `created_at` | DATETIME | NOT NULL, AUTO_NOW_ADD | Timestamp when the beneficiary was added to the system |
-| `updated_at` | DATETIME | NOT NULL, AUTO_NOW | Timestamp when the beneficiary record was last modified |
+| `remittance_information` | TEXT | | Default payment references, invoice numbers, or transaction-specific information |
+| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Beneficiary registration timestamp |
+| `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
 
 **Indexes:**
 - Primary key on `id`
-- Index on `name` for search performance
-- Index on `is_frequent` for filtering frequent beneficiaries
-- Index on `is_active` for filtering active beneficiaries
+- Index on `company_id` for company-scoped queries
+- Index on `name` for search functionality
+- Index on `is_frequent` for frequent beneficiary lookup
+- Index on `is_active` for active filtering
+
+**Business Rules:**
+- Account numbers are validated using Hungarian banking rules (16 or 24 digits)
+- Account numbers are automatically formatted (8-8 or 8-8-8 with dashes)
 
 ---
 
-## 3. **bank_transfers_transfertemplate**
-**Table Comment:** *Defines reusable transfer templates for recurring payments like monthly payroll, VAT payments, or supplier batches.*
+## 6. **bank_transfers_transfertemplate**
+**Table Comment:** *Company-scoped reusable transfer templates for recurring payments like monthly payroll, VAT payments, or supplier batches.*
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | INTEGER | PRIMARY KEY, AUTO_INCREMENT | Unique identifier for transfer template |
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for transfer template |
+| `company_id` | INTEGER | FK(bank_transfers_company.id) | Company owner of this template |
 | `name` | VARCHAR(200) | NOT NULL | Descriptive name for the template (e.g., "Monthly Payroll", "Q1 VAT Payments") |
-| `description` | TEXT | NULLABLE | Detailed description of when and how to use this template |
+| `description` | TEXT | | Detailed description of when and how to use this template |
 | `is_active` | BOOLEAN | DEFAULT TRUE | Soft delete flag - inactive templates are hidden from selection |
-| `created_at` | DATETIME | NOT NULL, AUTO_NOW_ADD | Timestamp when the template was created |
-| `updated_at` | DATETIME | NOT NULL, AUTO_NOW | Timestamp when the template was last modified |
+| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Template creation timestamp |
+| `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
 
 **Indexes:**
 - Primary key on `id`
+- Index on `company_id` for company-scoped queries
+- Index on `name` for search functionality
+- Index on `is_active` for active filtering
 
 ---
 
-## 4. **bank_transfers_templatebeneficiary**
+## 7. **bank_transfers_templatebeneficiary**
 **Table Comment:** *Junction table linking templates to beneficiaries with default payment amounts and remittance information.*
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | INTEGER | PRIMARY KEY, AUTO_INCREMENT | Unique identifier for template-beneficiary relationship |
-| `template_id` | INTEGER | NOT NULL, FK | Reference to the transfer template |
-| `beneficiary_id` | INTEGER | NOT NULL, FK | Reference to the beneficiary |
-| `default_amount` | DECIMAL(15,2) | NULLABLE | Default payment amount for this beneficiary in this template |
-| `default_remittance` | VARCHAR(500) | NULLABLE | Default remittance information/memo for payments to this beneficiary |
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for template-beneficiary relationship |
+| `template_id` | INTEGER | NOT NULL, FK(bank_transfers_transfertemplate.id) | Reference to the transfer template |
+| `beneficiary_id` | INTEGER | NOT NULL, FK(bank_transfers_beneficiary.id) | Reference to the beneficiary |
+| `default_amount` | DECIMAL(15,2) | | Default payment amount for this beneficiary in this template |
+| `default_remittance` | VARCHAR(500) | | Default remittance information/memo for payments to this beneficiary |
+| `default_execution_date` | DATE | | Default execution date for this beneficiary's payments |
 | `order` | INTEGER | DEFAULT 0 | Display order of beneficiaries within the template |
 | `is_active` | BOOLEAN | DEFAULT TRUE | Whether this beneficiary is active in the template |
 
-**Constraints:**
-- Foreign key to `bank_transfers_transfertemplate(id)` ON DELETE CASCADE
-- Foreign key to `bank_transfers_beneficiary(id)` ON DELETE CASCADE
-- Unique constraint on `(template_id, beneficiary_id)` - each beneficiary can only appear once per template
-
 **Indexes:**
 - Primary key on `id`
-- Index on `template_id`
-- Index on `beneficiary_id`
+- Unique constraint on `template_id, beneficiary_id`
+- Index on `template_id` for template beneficiary lookup
+- Index on `order` for ordered display
 
 ---
 
-## 5. **bank_transfers_transfer**
+## 8. **bank_transfers_transfer**
 **Table Comment:** *Individual transfer records representing single bank payments. These are processed into XML batches for bank import.*
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | INTEGER | PRIMARY KEY, AUTO_INCREMENT | Unique identifier for individual transfer |
-| `originator_account_id` | INTEGER | NOT NULL, FK | Reference to the bank account that will be debited |
-| `beneficiary_id` | INTEGER | NOT NULL, FK | Reference to the payment recipient |
-| `amount` | DECIMAL(15,2) | NOT NULL, > 0.01 | Transfer amount in the specified currency |
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for individual transfer |
+| `originator_account_id` | INTEGER | NOT NULL, FK(bank_transfers_bankaccount.id) | Reference to the bank account that will be debited |
+| `beneficiary_id` | INTEGER | NOT NULL, FK(bank_transfers_beneficiary.id) | Reference to the payment recipient |
+| `amount` | DECIMAL(15,2) | NOT NULL, CHECK(amount >= 0.01) | Transfer amount in the specified currency |
 | `currency` | VARCHAR(3) | NOT NULL, DEFAULT 'HUF' | ISO currency code (HUF, EUR, USD) |
 | `execution_date` | DATE | NOT NULL | Requested date for the bank to process the transfer |
 | `remittance_info` | VARCHAR(500) | NOT NULL | Payment reference/memo that appears on bank statements |
-| `template_id` | INTEGER | NULLABLE, FK | Reference to template if this transfer was created from a template |
+| `template_id` | INTEGER | FK(bank_transfers_transfertemplate.id) | Reference to template if this transfer was created from a template |
+| `order` | INTEGER | DEFAULT 0 | Transfer order within batch for XML generation |
 | `is_processed` | BOOLEAN | DEFAULT FALSE | Marks transfers that have been included in generated XML files |
-| `order` | INTEGER | DEFAULT 0 | Display order for sorting transfers within a batch or template |
-| `notes` | TEXT | NULLABLE | Internal notes or comments about this transfer (not included in XML output) |
-| `created_at` | DATETIME | NOT NULL, AUTO_NOW_ADD | Timestamp when the transfer was created |
-| `updated_at` | DATETIME | NOT NULL, AUTO_NOW | Timestamp when the transfer was last modified |
-
-**Constraints:**
-- Foreign key to `bank_transfers_bankaccount(id)` ON DELETE CASCADE
-- Foreign key to `bank_transfers_beneficiary(id)` ON DELETE CASCADE
-- Foreign key to `bank_transfers_transfertemplate(id)` ON DELETE SET NULL
-- Check constraint: `amount >= 0.01`
+| `notes` | TEXT | | Internal notes about this specific transfer |
+| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Transfer creation timestamp |
+| `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
 
 **Indexes:**
 - Primary key on `id`
-- Index on `execution_date` for date-based queries
-- Index on `is_processed` for filtering processed/unprocessed transfers
-- Index on `created_at` for chronological sorting
+- Index on `originator_account_id` for account-based queries
+- Index on `beneficiary_id` for beneficiary-based queries
+- Index on `execution_date` for date-based filtering
+- Index on `is_processed` for processing status queries
+- Index on `created_at` for chronological ordering
+
+**Constraints:**
+- `currency` CHECK constraint: VALUES ('HUF', 'EUR', 'USD')
+- `amount` must be >= 0.01
 
 ---
 
-## 6. **bank_transfers_transferbatch**
+## 9. **bank_transfers_transferbatch**
 **Table Comment:** *Groups transfers into batches for XML generation. Each batch represents one XML file sent to the bank.*
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | INTEGER | PRIMARY KEY, AUTO_INCREMENT | Unique identifier for transfer batch |
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for transfer batch |
+| `company_id` | INTEGER | FK(bank_transfers_company.id) | Company owner of this batch |
 | `name` | VARCHAR(200) | NOT NULL | User-defined name for the batch (e.g., "Payroll 2025-01", "Supplier Payments Week 3") |
-| `description` | TEXT | NULLABLE | Detailed description of the batch contents and purpose |
+| `description` | TEXT | | Detailed description of the batch contents and purpose |
 | `total_amount` | DECIMAL(15,2) | DEFAULT 0 | Sum of all transfer amounts in this batch |
-| `used_in_bank` | BOOLEAN | DEFAULT FALSE | Flag indicating whether this XML batch has been uploaded to internet banking |
-| `bank_usage_date` | DATETIME | NULLABLE | Timestamp when the batch was marked as used in internet banking |
-| `order` | INTEGER | DEFAULT 0 | Sequential order number for batch organization and listing |
-| `created_at` | DATETIME | NOT NULL, AUTO_NOW_ADD | Timestamp when the batch was created |
-| `xml_generated_at` | DATETIME | NULLABLE | Timestamp when the XML file was generated for this batch |
+| `used_in_bank` | BOOLEAN | DEFAULT FALSE | Flag indicating whether XML file was uploaded to internet banking |
+| `bank_usage_date` | TIMESTAMP | | Timestamp when the XML was uploaded to bank system |
+| `order` | INTEGER | DEFAULT 0 | Display order for batch listing and downloads |
+| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Batch creation timestamp |
+| `xml_generated_at` | TIMESTAMP | | Timestamp when the XML file was generated for this batch |
 
 **Indexes:**
 - Primary key on `id`
+- Index on `company_id` for company-scoped queries
+- Index on `created_at` for chronological ordering
+- Index on `used_in_bank` for filtering processed batches
 
 ---
 
-## 7. **bank_transfers_transferbatch_transfers**
+## 10. **bank_transfers_transferbatch_transfers**
 **Table Comment:** *Many-to-many junction table linking transfer batches to individual transfers.*
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | INTEGER | PRIMARY KEY, AUTO_INCREMENT | Unique identifier for batch-transfer relationship |
-| `transferbatch_id` | INTEGER | NOT NULL, FK | Reference to the transfer batch |
-| `transfer_id` | INTEGER | NOT NULL, FK | Reference to the individual transfer |
-
-**Constraints:**
-- Foreign key to `bank_transfers_transferbatch(id)` ON DELETE CASCADE
-- Foreign key to `bank_transfers_transfer(id)` ON DELETE CASCADE
-- Unique constraint on `(transferbatch_id, transfer_id)` - each transfer can only appear once per batch
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for batch-transfer relationship |
+| `transferbatch_id` | INTEGER | NOT NULL, FK(bank_transfers_transferbatch.id) | Reference to the transfer batch |
+| `transfer_id` | INTEGER | NOT NULL, FK(bank_transfers_transfer.id) | Reference to the individual transfer |
 
 **Indexes:**
 - Primary key on `id`
-- Index on `transferbatch_id`
-- Index on `transfer_id`
+- Unique constraint on `transferbatch_id, transfer_id`
+- Index on `transferbatch_id` for batch transfer lookup
+- Index on `transfer_id` for transfer batch lookup
 
 ---
 
-## Business Rules and Data Flow
+## Data Isolation and Multi-Company Features
 
-### 1. **Account Management**
-- Only one bank account should have `is_default = TRUE` at any time
-- Account numbers are stored with dashes but cleaned (dashes removed) for XML generation
+### Company Scoping
+All core business models include a `company_id` foreign key:
+- `BankAccount.company_id`
+- `Beneficiary.company_id` 
+- `TransferTemplate.company_id`
+- `TransferBatch.company_id`
 
-### 2. **Beneficiary Management**
-- Beneficiaries marked `is_frequent = TRUE` appear first in selection lists
-- Beneficiaries with `is_active = FALSE` are soft-deleted and hidden from normal operations
-- Account numbers follow Hungarian banking format
+### Company Context Resolution
+- **Transfer.company**: Derived from `originator_account.company`
+- **TemplateBeneficiary.company**: Derived from `template.company` and `beneficiary.company`
 
-### 3. **Template System**
-- Templates allow pre-configuration of recurring payment scenarios
-- Template beneficiaries have default amounts and remittance info that can be customized per execution
-- Templates can be activated/deactivated without losing historical data
+### Permission Model
+- **ADMIN**: Full CRUD access to company data, user management
+- **USER**: Read/write access to transfers, beneficiaries, templates
 
-### 4. **Transfer Processing**
-- Transfers start with `is_processed = FALSE`
-- When XML is generated, included transfers are marked `is_processed = TRUE`
-- Processed transfers should not be modified to maintain audit trail
-
-### 5. **Batch Generation**
-- Batches group transfers for XML file generation
-- `total_amount` is calculated sum of all transfers in the batch
-- `xml_generated_at` timestamp marks when the batch was exported
-- `order` field auto-increments to maintain batch creation sequence
-- `used_in_bank` flag tracks whether XML has been uploaded to internet banking
-- `bank_usage_date` records when the batch was marked as used
-
-### 6. **XML Output**
-- Generated XML follows Hungarian SEPA format
-- Account numbers are cleaned (no dashes/spaces)
-- Currency is always specified (HUF, EUR, USD)
-- Execution dates follow ISO format (YYYY-MM-DD)
+### Authentication Flow
+1. User logs in → JWT token issued
+2. `X-Company-ID` header or user profile determines active company
+3. All API requests scoped to active company context
+4. Company switching updates `UserProfile.last_active_company`
 
 ---
 
-## Schema Change History
+## Hungarian Banking Validation
 
-### Migration 0003_rename_beneficiary_fields
-**Applied:** During development  
-**Changes:**
-- `bank_transfers_beneficiary.bank_name` → `bank_transfers_beneficiary.description`
-- `bank_transfers_beneficiary.notes` → `bank_transfers_beneficiary.remittance_information`
+### Account Number Format
+- **16-digit legacy**: `XXXXXXXX-XXXXXXXX`
+- **24-digit BBAN**: `XXXXXXXX-XXXXXXXX-XXXXXXXX`
+- Validated using Hungarian checksum algorithm
+- Stored with proper formatting (dashes included)
 
-**Reason:** Field names were renamed to better reflect their purpose and align with the Django model design.
-
-### Migration 0005_alter_transferbatch_options_and_more
-**Applied:** 2025-08-11  
-**Changes:**
-- Added `used_in_bank` BOOLEAN field to `bank_transfers_transferbatch`
-- Added `bank_usage_date` DATETIME field to `bank_transfers_transferbatch`
-- Added `order` INTEGER field to `bank_transfers_transferbatch`
-- Updated table ordering to `['order', '-created_at']`
-
-**Reason:** Enhanced batch management to track XML usage status in internet banking systems and maintain proper ordering.
-
-### Migration 0006_remove_xml_content
-**Applied:** 2025-08-11  
-**Changes:**
-- Removed `xml_content` TEXT field from `bank_transfers_transferbatch`
-
-**Reason:** Eliminated redundant XML storage in favor of regenerating XML from transfer data, reducing database size and complexity.
+### XML Export Format
+- Clean account numbers (no dashes) for XML generation
+- SEPA-compatible Hungarian transaction format
+- Support for HUF, EUR, USD currencies
 
 ---
 
-## Common Queries
+## Performance Optimizations
 
-```sql
--- Get default bank account
-SELECT * FROM bank_transfers_bankaccount WHERE is_default = 1;
+### Database Indexes
+- All foreign keys indexed for fast joins
+- Search fields (`name`, `account_number`) indexed
+- Filtering fields (`is_active`, `is_frequent`, `is_processed`) indexed
+- Chronological fields (`created_at`, `execution_date`) indexed
 
--- Get frequent beneficiaries
-SELECT * FROM bank_transfers_beneficiary 
-WHERE is_frequent = 1 AND is_active = 1 
-ORDER BY name;
+### Query Optimization
+- Company-scoped queries use `company_id` index
+- Pagination implemented for large result sets
+- Select-related used for foreign key joins
 
--- Get unprocessed transfers for a specific date range
-SELECT t.*, b.name as beneficiary_name 
-FROM bank_transfers_transfer t
-JOIN bank_transfers_beneficiary b ON t.beneficiary_id = b.id
-WHERE t.is_processed = 0 
-  AND t.execution_date BETWEEN '2025-01-01' AND '2025-01-31'
-ORDER BY t.execution_date, b.name;
+---
 
--- Get template with beneficiaries and default amounts
-SELECT t.name as template_name, b.name as beneficiary_name, 
-       tb.default_amount, tb.default_remittance
-FROM bank_transfers_transfertemplate t
-JOIN bank_transfers_templatebeneficiary tb ON t.id = tb.template_id
-JOIN bank_transfers_beneficiary b ON tb.beneficiary_id = b.id
-WHERE t.id = 1 AND t.is_active = 1 AND tb.is_active = 1
-ORDER BY tb.order, b.name;
+## Migration History
 
--- Get all transfer batches with usage status
-SELECT id, name, total_amount, used_in_bank, bank_usage_date, 
-       xml_generated_at, created_at
-FROM bank_transfers_transferbatch
-ORDER BY [order], created_at DESC;
+- **0008**: Added multi-company architecture (`Company`, `CompanyUser`, `UserProfile`)
+- **0009**: Populated default company for existing data
+- **0010**: Added unique constraints for company-scoped models
+- **Current**: Full multi-tenant isolation implemented
 
--- Get batches that haven't been used in internet banking
-SELECT id, name, total_amount, xml_generated_at
-FROM bank_transfers_transferbatch
-WHERE used_in_bank = 0 AND xml_generated_at IS NOT NULL
-ORDER BY xml_generated_at DESC;
+---
 
--- Get batch details with transfer count and total amount
-SELECT b.id, b.name, b.used_in_bank, b.bank_usage_date,
-       COUNT(bt.transfer_id) as transfer_count,
-       SUM(t.amount) as calculated_total
-FROM bank_transfers_transferbatch b
-LEFT JOIN bank_transfers_transferbatch_transfers bt ON b.id = bt.transferbatch_id
-LEFT JOIN bank_transfers_transfer t ON bt.transfer_id = t.id
-GROUP BY b.id, b.name, b.used_in_bank, b.bank_usage_date
-ORDER BY b.[order], b.created_at DESC;
-```
+## Development vs Production
+
+### Local Development (SQL Server)
+- Database: `administration` on `localhost:1435`
+- Uses SQL Server extended properties for comments
+- MSSQL-specific data types and constraints
+
+### Production (Railway + PostgreSQL)  
+- Database: PostgreSQL managed by Railway
+- Uses PostgreSQL COMMENT ON statements
+- PostgreSQL-specific data types and constraints
+
+**Note**: This documentation represents the PostgreSQL production schema. SQL Server development retains compatibility through Django model abstraction.
