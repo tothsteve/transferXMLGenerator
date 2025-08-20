@@ -96,26 +96,32 @@ else:
         }
     }
 
-# Production CORS settings
+# Production CORS settings - VERY PERMISSIVE FOR DEBUGGING
 FRONTEND_URL = config('FRONTEND_URL', default=None)
 
-# Always allow all origins and headers for now to debug the issue
+# Debug CORS issues by allowing everything
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_ALL_HEADERS = True
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
 
-# Keep specific origins for reference (will be used when we fix the config)
-if FRONTEND_URL:
-    CORS_ALLOWED_ORIGINS = [FRONTEND_URL]
-else:
-    CORS_ALLOWED_ORIGINS = [
-        'https://*.railway.app',
-        'https://*.up.railway.app',
-        'http://localhost:3000',  # For local development
-        'http://127.0.0.1:3000',
-    ]
+# Explicit origins (kept for reference)
+CORS_ALLOWED_ORIGINS = [
+    'https://generous-generosity-production.up.railway.app',
+    'https://*.railway.app',
+    'https://*.up.railway.app',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
 
-# Explicit header configuration (kept for reference)
+# Explicit headers (should be ignored when CORS_ALLOW_ALL_HEADERS=True)
 CORS_ALLOWED_HEADERS = [
     'accept',
     'accept-encoding',
@@ -126,11 +132,17 @@ CORS_ALLOWED_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
-    'x-company-id',  # Custom header for company context
+    'x-company-id',
 ]
 
-# Additional CORS settings for preflight requests
+# Preflight settings
 CORS_PREFLIGHT_MAX_AGE = 86400
+
+# Debug: Print CORS settings on startup
+print(f"CORS_ALLOW_ALL_ORIGINS: {True}")
+print(f"CORS_ALLOW_ALL_HEADERS: {True}")
+print(f"CORS_ALLOWED_ORIGINS: {CORS_ALLOWED_ORIGINS}")
+print(f"FRONTEND_URL from env: {FRONTEND_URL}")
 
 # REST Framework settings
 REST_FRAMEWORK = {
