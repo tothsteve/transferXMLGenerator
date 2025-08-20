@@ -34,6 +34,22 @@ def health_check(request):
         'service': 'transferXMLGenerator-backend'
     })
 
+# CORS debug endpoint
+def cors_debug(request):
+    """Debug endpoint to check CORS configuration"""
+    from django.conf import settings
+    
+    return JsonResponse({
+        'method': request.method,
+        'headers': dict(request.headers),
+        'cors_settings': {
+            'CORS_ALLOW_ALL_ORIGINS': getattr(settings, 'CORS_ALLOW_ALL_ORIGINS', 'Not set'),
+            'CORS_ALLOW_ALL_HEADERS': getattr(settings, 'CORS_ALLOW_ALL_HEADERS', 'Not set'),
+            'CORS_ALLOWED_ORIGINS': getattr(settings, 'CORS_ALLOWED_ORIGINS', 'Not set'),
+            'CORS_ALLOWED_HEADERS': getattr(settings, 'CORS_ALLOWED_HEADERS', 'Not set'),
+        }
+    })
+
 class DebugAuthView(APIView):
     permission_classes = [IsAuthenticated]
     
