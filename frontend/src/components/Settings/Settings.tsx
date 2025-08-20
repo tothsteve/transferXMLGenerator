@@ -43,11 +43,22 @@ const Settings: React.FC = () => {
         return bankAccountsApi.create(data);
       }
     },
-    onSuccess: () => {
-      // Invalidate and refetch default account
-      queryClient.invalidateQueries({ queryKey: ['bankAccount', 'default'] });
+    onSuccess: (response) => {
+      // Update form data with the response to prevent flicker
+      if (response?.data) {
+        setFormData({
+          account_number: response.data.account_number || '',
+          name: response.data.name || '',
+          bank_name: response.data.bank_name || '',
+          is_default: response.data.is_default || true,
+        });
+      }
+      
       setSuccessMessage('Alapértelmezett bank számla beállításai mentve!');
       setIsEditing(false);
+      
+      // Invalidate and refetch default account
+      queryClient.invalidateQueries({ queryKey: ['bankAccount', 'default'] });
       
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(''), 3000);
@@ -61,9 +72,9 @@ const Settings: React.FC = () => {
     },
   });
 
-  // Update form when default account is loaded
+  // Update form when default account is loaded (but not while editing)
   useEffect(() => {
-    if (defaultAccount?.data) {
+    if (defaultAccount?.data && !isEditing) {
       setFormData({
         account_number: defaultAccount.data.account_number || '',
         name: defaultAccount.data.name || '',
@@ -71,7 +82,7 @@ const Settings: React.FC = () => {
         is_default: defaultAccount.data.is_default || true,
       });
     }
-  }, [defaultAccount]);
+  }, [defaultAccount, isEditing]);
 
   const handleInputChange = (field: string) => (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
