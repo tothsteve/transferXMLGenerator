@@ -39,6 +39,12 @@ const Settings: React.FC = () => {
       console.log('🔍 Current isEditing state:', isEditing);
       console.log('📍 Stack trace:', new Error().stack);
       
+      // CRITICAL SAFEGUARD: Don't allow mutation if not in editing mode
+      if (!isEditing) {
+        console.log('🚫 BLOCKING MUTATION - not in editing mode');
+        throw new Error('Cannot save when not in editing mode');
+      }
+      
       if (defaultAccount?.data?.id) {
         // Update existing account
         console.log('📝 Updating existing account:', defaultAccount.data.id);
@@ -119,6 +125,15 @@ const Settings: React.FC = () => {
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    console.log('📝 handleSubmit called, isEditing:', isEditing);
+    
+    // CRITICAL: Only allow submission if we're actually in editing mode
+    if (!isEditing) {
+      console.log('🚫 Prevented submission - not in editing mode');
+      return;
+    }
+    
+    console.log('✅ Proceeding with mutation');
     saveBankAccountMutation.mutate(formData);
   };
 

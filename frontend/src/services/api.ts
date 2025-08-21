@@ -16,7 +16,7 @@ import {
 
 const API_BASE_URL = process.env.NODE_ENV === 'production' 
   ? `${process.env.REACT_APP_BACKEND_URL || 'https://transferxmlgenerator-production.up.railway.app'}/api`
-  : 'http://localhost:8001/api';
+  : 'http://localhost:8002/api';
 
 // Configure axios defaults
 axios.defaults.baseURL = API_BASE_URL;
