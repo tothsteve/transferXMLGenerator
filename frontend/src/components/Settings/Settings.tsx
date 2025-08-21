@@ -199,6 +199,7 @@ const Settings: React.FC = () => {
           <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
             {!isEditing ? (
               <Button
+                type="button"
                 variant="contained"
                 startIcon={<AccountBalance />}
                 onClick={() => {
@@ -220,6 +221,7 @@ const Settings: React.FC = () => {
                   {saveBankAccountMutation.isPending ? 'Mentés...' : 'Mentés'}
                 </Button>
                 <Button
+                  type="button"
                   variant="outlined"
                   onClick={() => {
                     setIsEditing(false);
