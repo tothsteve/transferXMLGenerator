@@ -35,15 +35,25 @@ const Settings: React.FC = () => {
   // Mutation for creating/updating bank account
   const saveBankAccountMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      console.log('🚀 saveBankAccountMutation called with data:', data);
+      console.log('🔍 Current isEditing state:', isEditing);
+      console.log('📍 Stack trace:', new Error().stack);
+      
       if (defaultAccount?.data?.id) {
         // Update existing account
+        console.log('📝 Updating existing account:', defaultAccount.data.id);
         return bankAccountsApi.update(defaultAccount.data.id, data);
       } else {
         // Create new account
+        console.log('🆕 Creating new account');
         return bankAccountsApi.create(data);
       }
     },
     onSuccess: (response) => {
+      console.log('✅ saveBankAccountMutation onSuccess called');
+      console.log('📦 Response:', response);
+      console.log('🔍 Current isEditing state in onSuccess:', isEditing);
+      
       // Update form data with the response to prevent flicker
       if (response?.data) {
         setFormData({
@@ -96,7 +106,7 @@ const Settings: React.FC = () => {
         is_default: defaultAccount.data.is_default || true,
       });
     }
-  }, [defaultAccount?.data, isEditing]);
+  }, [defaultAccount?.data]);
 
   const handleInputChange = (field: string) => (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
