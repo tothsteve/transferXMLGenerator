@@ -178,6 +178,23 @@ const Settings: React.FC = () => {
           Ez a számla lesz automatikusan kiválasztva új utalások létrehozásakor.
         </Typography>
 
+        {/* Edit Button - Outside form to prevent auto-submit */}
+        {!isEditing && (
+          <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
+            <Button
+              type="button"
+              variant="contained"
+              startIcon={<AccountBalance />}
+              onClick={() => {
+                console.log('🔧 Edit button clicked, setting isEditing to true');
+                setIsEditing(true);
+              }}
+            >
+              Szerkesztés
+            </Button>
+          </Box>
+        )}
+
         <form onSubmit={handleSubmit}>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3, mb: 3 }}>
             <TextField
@@ -221,51 +238,38 @@ const Settings: React.FC = () => {
             label="Alapértelmezett számla"
           />
 
-          <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-            {!isEditing ? (
+          {/* Form Buttons - Only shown when editing */}
+          {isEditing && (
+            <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
+              <Button
+                type="submit"
+                variant="contained"
+                startIcon={saveBankAccountMutation.isPending ? <CircularProgress size={20} /> : <Save />}
+                color="primary"
+                disabled={saveBankAccountMutation.isPending}
+              >
+                {saveBankAccountMutation.isPending ? 'Mentés...' : 'Mentés'}
+              </Button>
               <Button
                 type="button"
-                variant="contained"
-                startIcon={<AccountBalance />}
+                variant="outlined"
                 onClick={() => {
-                  console.log('🔧 Edit button clicked, setting isEditing to true');
-                  setIsEditing(true);
+                  setIsEditing(false);
+                  // Reset form to original values
+                  if (defaultAccount?.data) {
+                    setFormData({
+                      account_number: defaultAccount.data.account_number || '',
+                      name: defaultAccount.data.name || '',
+                      bank_name: defaultAccount.data.bank_name || '',
+                      is_default: defaultAccount.data.is_default || true,
+                    });
+                  }
                 }}
               >
-                Szerkesztés
+                Mégse
               </Button>
-            ) : (
-              <>
-                <Button
-                  type="submit"
-                  variant="contained"
-                  startIcon={saveBankAccountMutation.isPending ? <CircularProgress size={20} /> : <Save />}
-                  color="primary"
-                  disabled={saveBankAccountMutation.isPending}
-                >
-                  {saveBankAccountMutation.isPending ? 'Mentés...' : 'Mentés'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outlined"
-                  onClick={() => {
-                    setIsEditing(false);
-                    // Reset form to original values
-                    if (defaultAccount?.data) {
-                      setFormData({
-                        account_number: defaultAccount.data.account_number || '',
-                        name: defaultAccount.data.name || '',
-                        bank_name: defaultAccount.data.bank_name || '',
-                        is_default: defaultAccount.data.is_default || true,
-                      });
-                    }
-                  }}
-                >
-                  Mégse
-                </Button>
-              </>
-            )}
-          </Box>
+            </Box>
+          )}
         </form>
 
         {!defaultAccount?.data && !error && (
