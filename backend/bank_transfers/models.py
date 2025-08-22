@@ -210,3 +210,196 @@ class TransferBatch(models.Model):
             return f"{safe_name}_{date_str}.xml"
         return f"{self.name.replace(' ', '_')}.xml"
 
+
+# NAV Online Invoice Synchronization Models
+
+class NavConfiguration(models.Model):
+    """
+    Company-specific NAV API credentials and synchronization settings.
+    
+    Key Architecture Notes:
+    - Each company has their own NAV API credentials stored encrypted in the database
+    - All company credentials are encrypted using the application's master encryption key
+    - No company-specific keys are stored in environment variables
+    - Multi-tenant architecture with complete data isolation per company
+    """
+    company = models.OneToOneField(Company, on_delete=models.CASCADE, related_name='nav_config')
+    
+    # Company-specific NAV credentials
+    tax_number = models.CharField(max_length=20, verbose_name="NAV adószám")
+    technical_user_login = models.CharField(max_length=100, verbose_name="Technikai felhasználó")
+    technical_user_password = models.TextField(verbose_name="Jelszó (titkosítva)")  # Encrypted with MASTER_ENCRYPTION_KEY
+    signing_key = models.TextField(verbose_name="Aláíró kulcs (titkosítva)")  # Encrypted with MASTER_ENCRYPTION_KEY
+    exchange_key = models.TextField(verbose_name="Csere kulcs (titkosítva)")  # Encrypted with MASTER_ENCRYPTION_KEY
+    
+    # Company-specific NAV encryption key (for internal company use)
+    company_encryption_key = models.TextField(verbose_name="Cég titkosítási kulcs (titkosítva)")  # Encrypted with MASTER_ENCRYPTION_KEY
+    
+    # Configuration settings
+    api_environment = models.CharField(
+        max_length=10, 
+        choices=[('test', 'Test'), ('production', 'Éles')], 
+        default='test',
+        verbose_name="API környezet"
+    )
+    is_active = models.BooleanField(default=True, verbose_name="Aktív")
+    sync_enabled = models.BooleanField(default=False, verbose_name="Szinkronizáció engedélyezett")
+    last_sync_timestamp = models.DateTimeField(null=True, blank=True, verbose_name="Utolsó szinkronizáció")
+    sync_frequency_hours = models.IntegerField(default=12, verbose_name="Szinkronizáció gyakorisága (óra)")
+    
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "NAV konfiguráció"
+        verbose_name_plural = "NAV konfigurációk"
+    
+    def __str__(self):
+        return f"NAV konfiguráció - {self.company.name}"
+    
+    def save(self, *args, **kwargs):
+        # Auto-generate company encryption key if not exists
+        if not self.company_encryption_key:
+            from .services.credential_manager import CredentialManager
+            credential_manager = CredentialManager()
+            company_key = credential_manager.generate_company_encryption_key()
+            self.company_encryption_key = credential_manager.encrypt_credential(company_key)
+        super().save(*args, **kwargs)
+
+
+class Invoice(models.Model):
+    """
+    Core invoice data synchronized from NAV API.
+    """
+    DIRECTION_CHOICES = [
+        ('INBOUND', 'Bejövő számla'),
+        ('OUTBOUND', 'Kimenő számla'),
+    ]
+    
+    SYNC_STATUS_CHOICES = [
+        ('SUCCESS', 'Sikeres'),
+        ('PARTIAL', 'Részleges'),
+        ('FAILED', 'Sikertelen'),
+    ]
+    
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='invoices')
+    nav_invoice_number = models.CharField(max_length=100, verbose_name="NAV számlaszám")
+    invoice_direction = models.CharField(max_length=10, choices=DIRECTION_CHOICES, verbose_name="Irány")
+    
+    # Supplier information
+    supplier_name = models.CharField(max_length=200, verbose_name="Szállító neve")
+    supplier_tax_number = models.CharField(max_length=20, blank=True, verbose_name="Szállító adószáma")
+    
+    # Customer information  
+    customer_name = models.CharField(max_length=200, verbose_name="Vevő neve")
+    customer_tax_number = models.CharField(max_length=20, blank=True, verbose_name="Vevő adószáma")
+    
+    # Invoice dates
+    issue_date = models.DateField(verbose_name="Kiállítás dátuma")
+    fulfillment_date = models.DateField(null=True, blank=True, verbose_name="Teljesítés dátuma")
+    payment_due_date = models.DateField(null=True, blank=True, verbose_name="Fizetési határidő")
+    
+    # Financial data
+    currency_code = models.CharField(max_length=3, default='HUF', verbose_name="Pénznem")
+    invoice_net_amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Nettó összeg")
+    invoice_vat_amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="ÁFA összeg")
+    invoice_gross_amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Bruttó összeg")
+    
+    # NAV metadata
+    original_request_version = models.CharField(max_length=10, verbose_name="NAV verzió")
+    completion_date = models.DateTimeField(null=True, blank=True, verbose_name="NAV feldolgozás dátuma")
+    source = models.CharField(max_length=20, default='NAV_SYNC', verbose_name="Forrás")
+    nav_transaction_id = models.CharField(max_length=100, blank=True, verbose_name="NAV tranzakció azonosító")
+    last_modified_date = models.DateTimeField(verbose_name="Utolsó módosítás (NAV)")
+    
+    # Sync metadata
+    sync_status = models.CharField(max_length=10, choices=SYNC_STATUS_CHOICES, default='SUCCESS')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Számla"
+        verbose_name_plural = "Számlák"
+        ordering = ['-issue_date', '-created_at']
+        unique_together = ['company', 'nav_invoice_number', 'invoice_direction']
+        indexes = [
+            models.Index(fields=['company', 'invoice_direction']),
+            models.Index(fields=['issue_date']),
+            models.Index(fields=['supplier_tax_number']),
+            models.Index(fields=['customer_tax_number']),
+            models.Index(fields=['nav_invoice_number']),
+        ]
+    
+    def __str__(self):
+        return f"{self.nav_invoice_number} - {self.supplier_name} ({self.invoice_direction})"
+
+
+class InvoiceLineItem(models.Model):
+    """
+    Detailed line items for each invoice.
+    """
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='line_items')
+    line_number = models.IntegerField(verbose_name="Sor száma")
+    line_description = models.TextField(verbose_name="Megnevezés")
+    quantity = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True, verbose_name="Mennyiség")
+    unit_of_measure = models.CharField(max_length=50, blank=True, verbose_name="Mértékegység")
+    unit_price = models.DecimalField(max_digits=15, decimal_places=4, null=True, blank=True, verbose_name="Egységár")
+    line_net_amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Sor nettó összeg")
+    vat_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="ÁFA kulcs (%)")
+    line_vat_amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Sor ÁFA összeg")
+    line_gross_amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Sor bruttó összeg")
+    
+    # Product classification
+    product_code_category = models.CharField(max_length=50, blank=True, verbose_name="Termékkód kategória")
+    product_code_value = models.CharField(max_length=100, blank=True, verbose_name="Termékkód érték")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Számla tétel"
+        verbose_name_plural = "Számla tételek"
+        ordering = ['line_number']
+        unique_together = ['invoice', 'line_number']
+    
+    def __str__(self):
+        return f"{self.invoice.nav_invoice_number} - Sor {self.line_number}"
+
+
+class InvoiceSyncLog(models.Model):
+    """
+    Audit trail for synchronization operations.
+    """
+    SYNC_STATUS_CHOICES = [
+        ('RUNNING', 'Futás'),
+        ('SUCCESS', 'Sikeres'),
+        ('PARTIAL_SUCCESS', 'Részlegesen sikeres'),
+        ('FAILED', 'Sikertelen'),
+    ]
+    
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='sync_logs')
+    sync_start_time = models.DateTimeField(verbose_name="Szinkronizáció kezdete")
+    sync_end_time = models.DateTimeField(null=True, blank=True, verbose_name="Szinkronizáció vége")
+    direction_synced = models.CharField(max_length=10, verbose_name="Szinkronizált irány")  # INBOUND, OUTBOUND, BOTH
+    
+    # Statistics
+    invoices_processed = models.IntegerField(default=0, verbose_name="Feldolgozott számlák")
+    invoices_created = models.IntegerField(default=0, verbose_name="Létrehozott számlák")
+    invoices_updated = models.IntegerField(default=0, verbose_name="Frissített számlák")
+    errors_count = models.IntegerField(default=0, verbose_name="Hibák száma")
+    
+    # Error information
+    last_error_message = models.TextField(blank=True, verbose_name="Utolsó hibaüzenet")
+    sync_status = models.CharField(max_length=20, choices=SYNC_STATUS_CHOICES, default='RUNNING')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Szinkronizáció napló"
+        verbose_name_plural = "Szinkronizáció naplók"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.company.name} - {self.sync_start_time.strftime('%Y-%m-%d %H:%M')} ({self.sync_status})"
+
