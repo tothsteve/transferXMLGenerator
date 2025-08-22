@@ -56,8 +56,13 @@ class NavConfigurationAdmin(admin.ModelAdmin):
             'fields': ('company', 'tax_number')
         }),
         ('NAV API adatok', {
-            'fields': ('technical_user_login', 'technical_user_password', 'signing_key', 'exchange_key', 'company_encryption_key'),
-            'description': 'FIGYELEM: Ezek az adatok titkosítva tárolódnak az adatbázisban.'
+            'fields': ('technical_user_login', 'technical_user_password', 'signing_key', 'exchange_key'),
+            'description': 'Adja meg a NAV API adatokat sima szövegként. Az adatok automatikusan titkosítva lesznek mentéskor.'
+        }),
+        ('Automatikus kulcsok', {
+            'fields': ('company_encryption_key',),
+            'description': 'Ez a kulcs automatikusan generálódik és titkosítva tárolódik.',
+            'classes': ('collapse',)
         }),
         ('Beállítások', {
             'fields': ('api_environment', 'is_active', 'sync_enabled', 'sync_frequency_hours')

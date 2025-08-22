@@ -228,12 +228,12 @@ class NavConfiguration(models.Model):
     # Company-specific NAV credentials
     tax_number = models.CharField(max_length=20, verbose_name="NAV adószám")
     technical_user_login = models.CharField(max_length=100, verbose_name="Technikai felhasználó")
-    technical_user_password = models.TextField(verbose_name="Jelszó (titkosítva)")  # Encrypted with MASTER_ENCRYPTION_KEY
-    signing_key = models.TextField(verbose_name="Aláíró kulcs (titkosítva)")  # Encrypted with MASTER_ENCRYPTION_KEY
-    exchange_key = models.TextField(verbose_name="Csere kulcs (titkosítva)")  # Encrypted with MASTER_ENCRYPTION_KEY
+    technical_user_password = models.TextField(verbose_name="Technikai felhasználó jelszó")  # Will be encrypted on save
+    signing_key = models.TextField(verbose_name="Aláíró kulcs")  # Will be encrypted on save
+    exchange_key = models.TextField(verbose_name="Csere kulcs")  # Will be encrypted on save
     
     # Company-specific NAV encryption key (for internal company use)
-    company_encryption_key = models.TextField(verbose_name="Cég titkosítási kulcs (titkosítva)")  # Encrypted with MASTER_ENCRYPTION_KEY
+    company_encryption_key = models.TextField(verbose_name="Cég titkosítási kulcs", blank=True)  # Auto-generated and encrypted
     
     # Configuration settings
     api_environment = models.CharField(
@@ -259,13 +259,66 @@ class NavConfiguration(models.Model):
         return f"NAV konfiguráció - {self.company.name}"
     
     def save(self, *args, **kwargs):
+        from .services.credential_manager import CredentialManager
+        credential_manager = CredentialManager()
+        
+        # Check if this is a new instance or if credential fields have changed
+        if self.pk is None:
+            # New instance - encrypt all credential fields
+            if self.technical_user_password and not self._is_encrypted(self.technical_user_password):
+                self.technical_user_password = credential_manager.encrypt_credential(self.technical_user_password)
+            if self.signing_key and not self._is_encrypted(self.signing_key):
+                self.signing_key = credential_manager.encrypt_credential(self.signing_key)
+            if self.exchange_key and not self._is_encrypted(self.exchange_key):
+                self.exchange_key = credential_manager.encrypt_credential(self.exchange_key)
+        else:
+            # Existing instance - only encrypt if values have changed and are not already encrypted
+            original = NavConfiguration.objects.get(pk=self.pk)
+            
+            if self.technical_user_password != original.technical_user_password and not self._is_encrypted(self.technical_user_password):
+                self.technical_user_password = credential_manager.encrypt_credential(self.technical_user_password)
+            if self.signing_key != original.signing_key and not self._is_encrypted(self.signing_key):
+                self.signing_key = credential_manager.encrypt_credential(self.signing_key)
+            if self.exchange_key != original.exchange_key and not self._is_encrypted(self.exchange_key):
+                self.exchange_key = credential_manager.encrypt_credential(self.exchange_key)
+        
         # Auto-generate company encryption key if not exists
         if not self.company_encryption_key:
-            from .services.credential_manager import CredentialManager
-            credential_manager = CredentialManager()
             company_key = credential_manager.generate_company_encryption_key()
             self.company_encryption_key = credential_manager.encrypt_credential(company_key)
+        
         super().save(*args, **kwargs)
+    
+    def _is_encrypted(self, value):
+        """Check if a value is already encrypted (simple heuristic)"""
+        if not value:
+            return True
+        # Encrypted values are typically base64-encoded and much longer
+        return len(value) > 100 and '=' in value
+    
+    def get_decrypted_password(self):
+        """Get decrypted technical user password"""
+        if not self.technical_user_password:
+            return ""
+        from .services.credential_manager import CredentialManager
+        credential_manager = CredentialManager()
+        return credential_manager.decrypt_credential(self.technical_user_password)
+    
+    def get_decrypted_signing_key(self):
+        """Get decrypted signing key"""
+        if not self.signing_key:
+            return ""
+        from .services.credential_manager import CredentialManager
+        credential_manager = CredentialManager()
+        return credential_manager.decrypt_credential(self.signing_key)
+    
+    def get_decrypted_exchange_key(self):
+        """Get decrypted exchange key"""
+        if not self.exchange_key:
+            return ""
+        from .services.credential_manager import CredentialManager
+        credential_manager = CredentialManager()
+        return credential_manager.decrypt_credential(self.exchange_key)
 
 
 class Invoice(models.Model):
