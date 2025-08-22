@@ -242,6 +242,22 @@ class NavConfiguration(models.Model):
         default='test',
         verbose_name="API környezet"
     )
+    
+    # Certificate files for client authentication (if required)
+    client_certificate = models.FileField(
+        upload_to='nav_certificates/',
+        null=True,
+        blank=True,
+        verbose_name="Kliens tanúsítvány (.p12/.pfx)",
+        help_text="NAV kliens tanúsítvány fájl (opcionális)"
+    )
+    certificate_password = models.CharField(
+        max_length=500,
+        blank=True,
+        verbose_name="Tanúsítvány jelszó",
+        help_text="Kliens tanúsítvány jelszava (titkosítva tárolva)"
+    )
+    
     is_active = models.BooleanField(default=True, verbose_name="Aktív")
     sync_enabled = models.BooleanField(default=False, verbose_name="Szinkronizáció engedélyezett")
     last_sync_timestamp = models.DateTimeField(null=True, blank=True, verbose_name="Utolsó szinkronizáció")
@@ -271,6 +287,8 @@ class NavConfiguration(models.Model):
                 self.signing_key = credential_manager.encrypt_credential(self.signing_key)
             if self.exchange_key and not self._is_encrypted(self.exchange_key):
                 self.exchange_key = credential_manager.encrypt_credential(self.exchange_key)
+            if self.certificate_password and not self._is_encrypted(self.certificate_password):
+                self.certificate_password = credential_manager.encrypt_credential(self.certificate_password)
         else:
             # Existing instance - only encrypt if values have changed and are not already encrypted
             original = NavConfiguration.objects.get(pk=self.pk)
@@ -281,6 +299,8 @@ class NavConfiguration(models.Model):
                 self.signing_key = credential_manager.encrypt_credential(self.signing_key)
             if self.exchange_key != original.exchange_key and not self._is_encrypted(self.exchange_key):
                 self.exchange_key = credential_manager.encrypt_credential(self.exchange_key)
+            if self.certificate_password != original.certificate_password and not self._is_encrypted(self.certificate_password):
+                self.certificate_password = credential_manager.encrypt_credential(self.certificate_password)
         
         # Auto-generate company encryption key if not exists
         if not self.company_encryption_key:
@@ -319,6 +339,14 @@ class NavConfiguration(models.Model):
         from .services.credential_manager import CredentialManager
         credential_manager = CredentialManager()
         return credential_manager.decrypt_credential(self.exchange_key)
+    
+    def get_decrypted_certificate_password(self):
+        """Get decrypted certificate password"""
+        if not self.certificate_password:
+            return ""
+        from .services.credential_manager import CredentialManager
+        credential_manager = CredentialManager()
+        return credential_manager.decrypt_credential(self.certificate_password)
 
 
 class Invoice(models.Model):

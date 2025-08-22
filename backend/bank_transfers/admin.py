@@ -59,6 +59,11 @@ class NavConfigurationAdmin(admin.ModelAdmin):
             'fields': ('technical_user_login', 'technical_user_password', 'signing_key', 'exchange_key'),
             'description': 'Adja meg a NAV API adatokat sima szövegként. Az adatok automatikusan titkosítva lesznek mentéskor.'
         }),
+        ('Tanúsítvány beállítások', {
+            'fields': ('client_certificate', 'certificate_password'),
+            'description': 'Töltse fel a NAV kliens tanúsítványt (.p12/.pfx) ha szükséges. A tanúsítvány jelszó automatikusan titkosítva lesz.',
+            'classes': ('collapse',)
+        }),
         ('Automatikus kulcsok', {
             'fields': ('company_encryption_key',),
             'description': 'Ez a kulcs automatikusan generálódik és titkosítva tárolódik.',

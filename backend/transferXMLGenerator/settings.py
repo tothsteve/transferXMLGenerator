@@ -216,4 +216,6 @@ NAV_SYNC_BATCH_SIZE = config('NAV_SYNC_BATCH_SIZE', default=100, cast=int)
 
 # Master encryption key for application-level encryption
 # This is used to encrypt/decrypt company-specific NAV credentials
-MASTER_ENCRYPTION_KEY = config('MASTER_ENCRYPTION_KEY', default=Fernet.generate_key().decode())
+# IMPORTANT: In production, set MASTER_ENCRYPTION_KEY environment variable
+# For development, using a fixed key to avoid decryption issues
+MASTER_ENCRYPTION_KEY = config('MASTER_ENCRYPTION_KEY', default='xzHCWpmz42ogX-qf_3gSYR85YU4hlbWxx8t8bSVMgJ8=')
