@@ -46,7 +46,7 @@ class TransferBatchAdmin(admin.ModelAdmin):
 
 @admin.register(NavConfiguration)
 class NavConfigurationAdmin(admin.ModelAdmin):
-    list_display = ['company', 'tax_number', 'api_environment', 'sync_enabled', 'is_active', 'last_sync_timestamp']
+    list_display = ['company', 'tax_number', 'technical_user_login', 'api_environment', 'sync_enabled', 'is_active', 'last_sync_timestamp']
     list_filter = ['api_environment', 'sync_enabled', 'is_active', 'created_at']
     search_fields = ['company__name', 'tax_number', 'technical_user_login']
     readonly_fields = ['created_at', 'updated_at', 'last_sync_timestamp']
@@ -58,11 +58,6 @@ class NavConfigurationAdmin(admin.ModelAdmin):
         ('NAV API adatok', {
             'fields': ('technical_user_login', 'technical_user_password', 'signing_key', 'exchange_key'),
             'description': 'Adja meg a NAV API adatokat sima szövegként. Az adatok automatikusan titkosítva lesznek mentéskor.'
-        }),
-        ('Tanúsítvány beállítások', {
-            'fields': ('client_certificate', 'certificate_password'),
-            'description': 'Töltse fel a NAV kliens tanúsítványt (.p12/.pfx) ha szükséges. A tanúsítvány jelszó automatikusan titkosítva lesz.',
-            'classes': ('collapse',)
         }),
         ('Automatikus kulcsok', {
             'fields': ('company_encryption_key',),

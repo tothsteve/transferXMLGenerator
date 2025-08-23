@@ -218,19 +218,19 @@ class NavConfiguration(models.Model):
     Company-specific NAV API credentials and synchronization settings.
     
     Key Architecture Notes:
-    - Each company has their own NAV API credentials stored encrypted in the database
+    - Each company can have multiple NAV API configurations (one for test, one for production)
     - All company credentials are encrypted using the application's master encryption key
     - No company-specific keys are stored in environment variables
     - Multi-tenant architecture with complete data isolation per company
     """
-    company = models.OneToOneField(Company, on_delete=models.CASCADE, related_name='nav_config')
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='nav_configs')
     
     # Company-specific NAV credentials
     tax_number = models.CharField(max_length=20, verbose_name="NAV adószám")
-    technical_user_login = models.CharField(max_length=100, verbose_name="Technikai felhasználó")
-    technical_user_password = models.TextField(verbose_name="Technikai felhasználó jelszó")  # Will be encrypted on save
-    signing_key = models.TextField(verbose_name="Aláíró kulcs")  # Will be encrypted on save
-    exchange_key = models.TextField(verbose_name="Csere kulcs")  # Will be encrypted on save
+    technical_user_login = models.CharField(max_length=100, verbose_name="Technikai felhasználó", default='')
+    technical_user_password = models.TextField(verbose_name="Technikai felhasználó jelszó", default='')  # Will be encrypted on save
+    signing_key = models.TextField(verbose_name="Aláíró kulcs", default='')  # Will be encrypted on save
+    exchange_key = models.TextField(verbose_name="Csere kulcs", default='')  # Will be encrypted on save
     
     # Company-specific NAV encryption key (for internal company use)
     company_encryption_key = models.TextField(verbose_name="Cég titkosítási kulcs", blank=True)  # Auto-generated and encrypted
@@ -243,20 +243,6 @@ class NavConfiguration(models.Model):
         verbose_name="API környezet"
     )
     
-    # Certificate files for client authentication (if required)
-    client_certificate = models.FileField(
-        upload_to='nav_certificates/',
-        null=True,
-        blank=True,
-        verbose_name="Kliens tanúsítvány (.p12/.pfx)",
-        help_text="NAV kliens tanúsítvány fájl (opcionális)"
-    )
-    certificate_password = models.CharField(
-        max_length=500,
-        blank=True,
-        verbose_name="Tanúsítvány jelszó",
-        help_text="Kliens tanúsítvány jelszava (titkosítva tárolva)"
-    )
     
     is_active = models.BooleanField(default=True, verbose_name="Aktív")
     sync_enabled = models.BooleanField(default=False, verbose_name="Szinkronizáció engedélyezett")
@@ -287,8 +273,6 @@ class NavConfiguration(models.Model):
                 self.signing_key = credential_manager.encrypt_credential(self.signing_key)
             if self.exchange_key and not self._is_encrypted(self.exchange_key):
                 self.exchange_key = credential_manager.encrypt_credential(self.exchange_key)
-            if self.certificate_password and not self._is_encrypted(self.certificate_password):
-                self.certificate_password = credential_manager.encrypt_credential(self.certificate_password)
         else:
             # Existing instance - only encrypt if values have changed and are not already encrypted
             original = NavConfiguration.objects.get(pk=self.pk)
@@ -299,8 +283,6 @@ class NavConfiguration(models.Model):
                 self.signing_key = credential_manager.encrypt_credential(self.signing_key)
             if self.exchange_key != original.exchange_key and not self._is_encrypted(self.exchange_key):
                 self.exchange_key = credential_manager.encrypt_credential(self.exchange_key)
-            if self.certificate_password != original.certificate_password and not self._is_encrypted(self.certificate_password):
-                self.certificate_password = credential_manager.encrypt_credential(self.certificate_password)
         
         # Auto-generate company encryption key if not exists
         if not self.company_encryption_key:
@@ -340,13 +322,6 @@ class NavConfiguration(models.Model):
         credential_manager = CredentialManager()
         return credential_manager.decrypt_credential(self.exchange_key)
     
-    def get_decrypted_certificate_password(self):
-        """Get decrypted certificate password"""
-        if not self.certificate_password:
-            return ""
-        from .services.credential_manager import CredentialManager
-        credential_manager = CredentialManager()
-        return credential_manager.decrypt_credential(self.certificate_password)
 
 
 class Invoice(models.Model):

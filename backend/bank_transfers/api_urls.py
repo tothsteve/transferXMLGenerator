@@ -7,6 +7,9 @@ from .api_views import (
     CompanyUsersView, CompanyUserDetailView
 )
 from .authentication import AuthenticationViewSet
+from .views.nav_views import (
+    NavConfigurationViewSet, InvoiceViewSet, InvoiceLineItemViewSet, InvoiceSyncLogViewSet
+)
 
 router = DefaultRouter()
 router.register(r'auth', AuthenticationViewSet, basename='auth')
@@ -15,6 +18,12 @@ router.register(r'beneficiaries', BeneficiaryViewSet, basename='beneficiary')
 router.register(r'templates', TransferTemplateViewSet, basename='transfertemplate')
 router.register(r'transfers', TransferViewSet, basename='transfer')
 router.register(r'batches', TransferBatchViewSet, basename='transferbatch')
+
+# NAV Invoice Synchronization endpoints
+router.register(r'nav/configurations', NavConfigurationViewSet, basename='navconfig')
+router.register(r'nav/invoices', InvoiceViewSet, basename='invoice')
+router.register(r'nav/line-items', InvoiceLineItemViewSet, basename='invoicelineitem')
+router.register(r'nav/sync-logs', InvoiceSyncLogViewSet, basename='invoicesynclog')
 
 urlpatterns = [
     path('', include(router.urls)),
