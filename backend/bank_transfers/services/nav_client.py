@@ -423,14 +423,20 @@ class NavApiClient:
         
         # Convert datetime to string format needed by NAV
         if date_from:
-            date_from_str = date_from.strftime('%Y-%m-%d')
+            if isinstance(date_from, str):
+                date_from_str = date_from
+            else:
+                date_from_str = date_from.strftime('%Y-%m-%d')
         else:
             # Default to last 30 days to stay within NAV's 35-day limit
             default_date_from = datetime.now() - timedelta(days=30)
             date_from_str = default_date_from.strftime('%Y-%m-%d')
             
         if date_to:
-            date_to_str = date_to.strftime('%Y-%m-%d')
+            if isinstance(date_to, str):
+                date_to_str = date_to
+            else:
+                date_to_str = date_to.strftime('%Y-%m-%d')
         else:
             date_to_str = datetime.now().strftime('%Y-%m-%d')
         
