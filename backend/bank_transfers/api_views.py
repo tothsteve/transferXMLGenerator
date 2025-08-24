@@ -24,6 +24,11 @@ from .utils import generate_xml
 from .pdf_processor import PDFTransactionProcessor
 from .kh_export import KHBankExporter
 from .permissions import IsCompanyMember, IsCompanyAdmin, IsCompanyAdminOrReadOnly
+from .services.bank_account_service import BankAccountService
+from .services.beneficiary_service import BeneficiaryService
+from .services.template_service import TemplateService
+from .services.transfer_service import TransferService, TransferBatchService
+from .services.excel_import_service import ExcelImportService
 
 # Health check endpoint for Railway
 def health_check(request):
@@ -52,7 +57,7 @@ class BankAccountViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Company-scoped queryset"""
         if hasattr(self.request, 'company') and self.request.company:
-            return BankAccount.objects.filter(company=self.request.company)
+            return BankAccountService.get_company_accounts(self.request.company)
         return BankAccount.objects.none()
     
     def perform_create(self, serializer):
@@ -66,10 +71,7 @@ class BankAccountViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def default(self, request):
         """Alapértelmezett bank számla lekérése"""
-        account = BankAccount.objects.filter(
-            company=request.company,
-            is_default=True
-        ).first()
+        account = BankAccountService.get_default_account(request.company)
         if account:
             serializer = self.get_serializer(account)
             return Response(serializer.data)
@@ -82,7 +84,7 @@ class BeneficiaryViewSet(viewsets.ModelViewSet):
     Támogatott szűrések:
     - is_active: true/false
     - is_frequent: true/false  
-    - search: név alapján keresés
+    - search: név, számlaszám és leírás alapján keresés
     """
     serializer_class = BeneficiarySerializer
     permission_classes = [IsAuthenticated, IsCompanyMember]
@@ -90,23 +92,23 @@ class BeneficiaryViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if not hasattr(self.request, 'company') or not self.request.company:
             return Beneficiary.objects.none()
-            
-        queryset = Beneficiary.objects.filter(company=self.request.company)
         
-        # Filtering
+        # Build filters from query parameters
+        filters = {}
+        
         is_active = self.request.query_params.get('is_active', None)
         if is_active is not None:
-            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+            filters['is_active'] = is_active.lower() == 'true'
             
         is_frequent = self.request.query_params.get('is_frequent', None)
         if is_frequent is not None:
-            queryset = queryset.filter(is_frequent=is_frequent.lower() == 'true')
+            filters['is_frequent'] = is_frequent.lower() == 'true'
             
         search = self.request.query_params.get('search', None)
         if search:
-            queryset = queryset.filter(name__icontains=search)
-            
-        return queryset
+            filters['search'] = search
+        
+        return BeneficiaryService.get_company_beneficiaries(self.request.company, filters)
     
     def perform_create(self, serializer):
         """Assign company on creation"""
@@ -119,11 +121,7 @@ class BeneficiaryViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def frequent(self, request):
         """Gyakori kedvezményezettek listája"""
-        beneficiaries = Beneficiary.objects.filter(
-            company=request.company,
-            is_frequent=True, 
-            is_active=True
-        )
+        beneficiaries = BeneficiaryService.get_frequent_beneficiaries(request.company)
         serializer = self.get_serializer(beneficiaries, many=True)
         return Response(serializer.data)
     
@@ -135,8 +133,7 @@ class BeneficiaryViewSet(viewsets.ModelViewSet):
     def toggle_frequent(self, request, pk=None):
         """Gyakori státusz váltása"""
         beneficiary = self.get_object()
-        beneficiary.is_frequent = not beneficiary.is_frequent
-        beneficiary.save()
+        beneficiary = BeneficiaryService.toggle_frequent_status(beneficiary)
         serializer = self.get_serializer(beneficiary)
         return Response(serializer.data)
 
@@ -153,10 +150,7 @@ class TransferTemplateViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if not hasattr(self.request, 'company') or not self.request.company:
             return TransferTemplate.objects.none()
-        return TransferTemplate.objects.filter(
-            company=self.request.company,
-            is_active=True
-        ).order_by('-created_at')
+        return TemplateService.get_company_templates(self.request.company)
     
     def perform_create(self, serializer):
         """Assign company on creation"""
@@ -252,28 +246,12 @@ class TransferTemplateViewSet(viewsets.ModelViewSet):
         
         if serializer.is_valid():
             data = serializer.validated_data
-            originator_account = get_object_or_404(BankAccount, id=data['originator_account_id'])
+            originator_account_id = data['originator_account_id']
             execution_date = data['execution_date']
             
-            transfers = []
-            for template_beneficiary in template.template_beneficiaries.filter(is_active=True):
-                # Use template's default execution date if available, otherwise use user-provided date
-                beneficiary_execution_date = (
-                    template_beneficiary.default_execution_date.strftime('%Y-%m-%d') 
-                    if template_beneficiary.default_execution_date 
-                    else execution_date
-                )
-                
-                transfer_data = {
-                    'originator_account': originator_account.id,
-                    'beneficiary': template_beneficiary.beneficiary.id,
-                    'amount': template_beneficiary.default_amount or 0,
-                    'currency': 'HUF',
-                    'execution_date': beneficiary_execution_date,
-                    'remittance_info': template_beneficiary.default_remittance or template_beneficiary.beneficiary.remittance_information or '',
-                    'template': template.id
-                }
-                transfers.append(transfer_data)
+            transfers = TemplateService.load_template_transfers(
+                template, originator_account_id, execution_date
+            )
             
             return Response({
                 'template': TransferTemplateSerializer(template).data,
@@ -377,29 +355,27 @@ class TransferViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if not hasattr(self.request, 'company') or not self.request.company:
             return Transfer.objects.none()
-            
-        queryset = Transfer.objects.select_related('beneficiary', 'originator_account').filter(
-            originator_account__company=self.request.company
-        )
         
-        # Filtering
+        # Build filters from query parameters
+        filters = {}
+        
         is_processed = self.request.query_params.get('is_processed', None)
         if is_processed is not None:
-            queryset = queryset.filter(is_processed=is_processed.lower() == 'true')
+            filters['is_processed'] = is_processed.lower() == 'true'
             
         template_id = self.request.query_params.get('template', None)
         if template_id:
-            queryset = queryset.filter(template_id=template_id)
+            filters['template_id'] = template_id
             
         execution_date_from = self.request.query_params.get('execution_date_from', None)
         if execution_date_from:
-            queryset = queryset.filter(execution_date__gte=execution_date_from)
+            filters['execution_date_from'] = execution_date_from
             
         execution_date_to = self.request.query_params.get('execution_date_to', None)
         if execution_date_to:
-            queryset = queryset.filter(execution_date__lte=execution_date_to)
-            
-        return queryset
+            filters['execution_date_to'] = execution_date_to
+        
+        return TransferService.get_company_transfers(self.request.company, filters)
     
     @swagger_auto_schema(
         operation_description="Több utalás egyszerre létrehozása",
@@ -415,23 +391,17 @@ class TransferViewSet(viewsets.ModelViewSet):
             transfers_data = serializer.validated_data['transfers']
             batch_name = serializer.validated_data.get('batch_name')
             
-            with transaction.atomic():
-                transfers = []
-                for transfer_data in transfers_data:
-                    transfer_serializer = TransferSerializer(data=transfer_data)
-                    if transfer_serializer.is_valid():
-                        transfer = transfer_serializer.save()
-                        transfers.append(transfer)
-                    else:
-                        return Response(transfer_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-                
-                # Create batch if name provided
-                if batch_name and transfers:
-                    batch = TransferBatch.objects.create(name=batch_name)
-                    batch.transfers.set(transfers)
-                    total_amount = sum(t.amount for t in transfers)
-                    batch.total_amount = total_amount
-                    batch.save()
+            # Validate all transfers first
+            validated_transfers = []
+            for transfer_data in transfers_data:
+                transfer_serializer = TransferSerializer(data=transfer_data)
+                if transfer_serializer.is_valid():
+                    validated_transfers.append(transfer_serializer.validated_data)
+                else:
+                    return Response(transfer_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Use service for bulk creation
+            transfers, batch = TransferService.bulk_create_transfers(validated_transfers, batch_name)
             
             return Response({
                 'transfers': TransferSerializer(transfers, many=True).data,
@@ -464,37 +434,11 @@ class TransferViewSet(viewsets.ModelViewSet):
             transfer_ids = serializer.validated_data['transfer_ids']
             batch_name = serializer.validated_data.get('batch_name')
             
-            transfers = Transfer.objects.filter(id__in=transfer_ids).select_related(
-                'beneficiary', 'originator_account'
-            ).order_by('order', 'execution_date')
-            
-            if not transfers:
-                return Response({'detail': 'No transfers found'}, status=404)
-            
-            # Generate XML
-            xml_content = generate_xml(transfers)
-            
-            # Create batch if name provided
-            if batch_name:
-                # Get next order number
-                max_order = TransferBatch.objects.aggregate(max_order=models.Max('order'))['max_order'] or 0
-                
-                batch = TransferBatch.objects.create(
-                    name=batch_name,
-                    xml_generated_at=timezone.now(),
-                    total_amount=sum(t.amount for t in transfers),
-                    order=max_order + 1  # Set incrementing order
-                )
-                batch.transfers.set(transfers)
-            
-            # Mark transfers as processed
-            transfers.update(is_processed=True)
-            
-            return Response({
-                'xml': xml_content,
-                'transfer_count': len(transfers),
-                'total_amount': str(sum(t.amount for t in transfers))
-            })
+            try:
+                result = TransferService.generate_xml_from_transfers(transfer_ids, batch_name)
+                return Response(result)
+            except ValueError as e:
+                return Response({'detail': str(e)}, status=404)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
@@ -524,42 +468,9 @@ class TransferViewSet(viewsets.ModelViewSet):
             transfer_ids = serializer.validated_data['transfer_ids']
             batch_name = serializer.validated_data.get('batch_name')
             
-            transfers = Transfer.objects.filter(id__in=transfer_ids).select_related(
-                'beneficiary', 'originator_account'
-            ).order_by('order', 'execution_date')
-            
-            if not transfers:
-                return Response({'detail': 'No transfers found'}, status=404)
-            
             try:
-                # Generate KH Bank export
-                exporter = KHBankExporter()
-                kh_content = exporter.generate_kh_export(transfers)
-                filename = exporter.get_filename(batch_name)
-                
-                # Create batch if name provided
-                if batch_name:
-                    # Get next order number
-                    max_order = TransferBatch.objects.aggregate(max_order=models.Max('order'))['max_order'] or 0
-                    
-                    batch = TransferBatch.objects.create(
-                        name=f"{batch_name} (KH Export)",
-                        xml_generated_at=timezone.now(),
-                        total_amount=sum(t.amount for t in transfers),
-                        order=max_order + 1
-                    )
-                    batch.transfers.set(transfers)
-                
-                # Mark transfers as processed
-                transfers.update(is_processed=True)
-                
-                return Response({
-                    'content': kh_content,
-                    'filename': filename,
-                    'transfer_count': len(transfers),
-                    'total_amount': str(sum(t.amount for t in transfers))
-                })
-                
+                result = TransferService.generate_kh_export_from_transfers(transfer_ids, batch_name)
+                return Response(result)
             except ValueError as e:
                 return Response({
                     'detail': 'KH Bank export error',
@@ -581,7 +492,7 @@ class TransferBatchViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         if not hasattr(self.request, 'company') or not self.request.company:
             return TransferBatch.objects.none()
-        return TransferBatch.objects.filter(company=self.request.company)
+        return TransferBatchService.get_company_batches(self.request.company)
     
     @swagger_auto_schema(
         operation_description="XML fájl letöltése köteghez",
@@ -591,17 +502,14 @@ class TransferBatchViewSet(viewsets.ReadOnlyModelViewSet):
     def download_xml(self, request, pk=None):
         """XML fájl letöltése - regenerálja az XML-t a mentett adatokból"""
         batch = self.get_object()
-        transfers = batch.transfers.select_related('beneficiary', 'originator_account').order_by('order', 'execution_date')
         
-        if not transfers:
-            return Response({'detail': 'No transfers in batch'}, status=404)
-        
-        # Regenerate XML from saved transfer data
-        xml_content = generate_xml(transfers)
-        
-        response = HttpResponse(xml_content, content_type='application/xml')
-        response['Content-Disposition'] = f'attachment; filename="{batch.xml_filename}"'
-        return response
+        try:
+            xml_content = TransferBatchService.regenerate_xml_for_batch(batch)
+            response = HttpResponse(xml_content, content_type='application/xml')
+            response['Content-Disposition'] = f'attachment; filename="{batch.xml_filename}"'
+            return response
+        except ValueError as e:
+            return Response({'detail': str(e)}, status=404)
     
     @swagger_auto_schema(
         operation_description="XML köteg megjelölése bankban felhasználtként",
@@ -611,9 +519,7 @@ class TransferBatchViewSet(viewsets.ReadOnlyModelViewSet):
     def mark_used_in_bank(self, request, pk=None):
         """XML köteg megjelölése bankban felhasználtként"""
         batch = self.get_object()
-        batch.used_in_bank = True
-        batch.bank_usage_date = timezone.now()
-        batch.save()
+        batch = TransferBatchService.mark_batch_as_used(batch)
         
         return Response({
             'detail': 'Batch marked as used in bank',
@@ -629,9 +535,7 @@ class TransferBatchViewSet(viewsets.ReadOnlyModelViewSet):
     def mark_unused_in_bank(self, request, pk=None):
         """XML köteg megjelölése nem felhasználtként"""
         batch = self.get_object()
-        batch.used_in_bank = False
-        batch.bank_usage_date = None
-        batch.save()
+        batch = TransferBatchService.mark_batch_as_unused(batch)
         
         return Response({
             'detail': 'Batch marked as unused in bank',
@@ -674,14 +578,14 @@ class ExcelImportView(APIView):
             
             try:
                 if import_type == 'beneficiaries':
-                    result = self.import_beneficiaries_from_excel(excel_file)
-                    beneficiaries = result.get('beneficiaries', [])
-                    errors = result.get('errors', [])
+                    result = ExcelImportService.import_beneficiaries_from_excel(
+                        excel_file, request.company
+                    )
                     
                     return Response({
-                        'imported_count': len(beneficiaries),
-                        'errors': errors,
-                        'beneficiaries': BeneficiarySerializer(beneficiaries, many=True).data
+                        'imported_count': result['imported_count'],
+                        'errors': result['errors'],
+                        'beneficiaries': BeneficiarySerializer(result['beneficiaries'], many=True).data
                     })
                 else:
                     return Response({'detail': 'Invalid import type'}, status=400)
@@ -690,91 +594,6 @@ class ExcelImportView(APIView):
                 return Response({'detail': str(e)}, status=400)
         
         return Response(serializer.errors, status=400)
-    
-    def import_beneficiaries_from_excel(self, excel_file):
-        """Kedvezményezettek importálása Excel fájlból"""
-        import openpyxl
-        from .hungarian_account_validator import validate_and_format_hungarian_account_number
-        
-        workbook = openpyxl.load_workbook(excel_file)
-        worksheet = workbook.active
-        
-        beneficiaries = []
-        errors = []
-        
-        # Detect header row and start from the row after headers
-        start_row = 3
-        header_keywords = ['név', 'name', 'számlaszám', 'account', 'összeg', 'amount']
-        
-        # Check if row 3 contains headers and skip if so
-        if worksheet.max_row >= 3:
-            row_3_values = [str(cell.value or '').lower().strip() for cell in worksheet[3][:6]]
-            if any(keyword in ' '.join(row_3_values) for keyword in header_keywords):
-                start_row = 4  # Skip header row and start from row 4
-        
-        for row_num, row in enumerate(worksheet.iter_rows(min_row=start_row, values_only=True), start=start_row):
-            if not any(row[:6]):
-                continue
-                
-            try:
-                comment, name, account_number, amount, exec_date, remittance = row[:6]
-                
-                # Convert to strings and strip whitespace
-                name = str(name or '').strip() if name is not None else ''
-                account_number = str(account_number or '').strip() if account_number is not None else ''
-                
-                # Skip if either name or account number is missing
-                if not name or not account_number:
-                    if name or account_number:  # Only log if partially filled
-                        errors.append(f'Row {row_num}: Missing name or account number')
-                    continue
-                
-                # Skip obvious header rows
-                if name.lower() in ['név', 'name'] or account_number.lower() in ['számlaszám', 'account']:
-                    continue
-                
-                # Validate and format Hungarian account number
-                validation_result = validate_and_format_hungarian_account_number(account_number, validate_checksum=False)
-                
-                if not validation_result.is_valid:
-                    error_msg = f'Row {row_num}: Érvénytelen számlaszám "{account_number}": {validation_result.error}'
-                    errors.append(error_msg)
-                    continue
-                
-                # Use the properly formatted account number
-                formatted_account_number = validation_result.formatted
-                
-                beneficiary, created = Beneficiary.objects.get_or_create(
-                    name=name,
-                    account_number=formatted_account_number,
-                    company=self.request.company,  # Add company context
-                    defaults={
-                        'description': str(comment or '').strip(),
-                        'is_active': True,
-                        'remittance_information': str(remittance or '').strip()
-                    }
-                )
-                
-                if created:
-                    beneficiaries.append(beneficiary)
-                    
-            except Exception as e:
-                error_msg = f"Row {row_num}: {str(e)}"
-                errors.append(error_msg)
-                print(f"Error processing row {row_num}: {e}")
-                continue
-        
-        # Log import summary
-        print(f"Excel import completed: {len(beneficiaries)} new beneficiaries created")
-        if errors:
-            print(f"Errors encountered: {len(errors)}")
-            for error in errors[:5]:  # Log first 5 errors
-                print(f"  - {error}")
-        
-        return {
-            'beneficiaries': beneficiaries,
-            'errors': errors
-        }
 
 class CompanyUsersView(APIView):
     """
