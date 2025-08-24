@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 from .api_views import (
     BankAccountViewSet, BeneficiaryViewSet, TransferTemplateViewSet,
-    TransferViewSet, TransferBatchViewSet, ExcelImportView, DebugAuthView,
+    TransferViewSet, TransferBatchViewSet, ExcelImportView,
     CompanyUsersView, CompanyUserDetailView
 )
 from .authentication import AuthenticationViewSet
@@ -28,7 +28,6 @@ router.register(r'nav/sync-logs', InvoiceSyncLogViewSet, basename='invoicesynclo
 urlpatterns = [
     path('', include(router.urls)),
     path('upload/excel/', ExcelImportView.as_view(), name='excel-import'),
-    path('debug/auth/', DebugAuthView.as_view(), name='debug-auth'),
     # User Management endpoints
     path('company/users/', CompanyUsersView.as_view(), name='company-users'),
     path('company/users/<int:user_id>/', CompanyUserDetailView.as_view(), name='company-user-detail'),

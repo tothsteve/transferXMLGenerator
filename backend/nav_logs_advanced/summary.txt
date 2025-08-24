@@ -1,8 +1,0 @@
-Advanced NAV Flow Test Summary
-========================================
-Date tested: 2025-08-23 23:13:10.250087
-Invoice tested: A/A28700200/1180/00013
-Chain status: 200
-Detail status: 200
-Chain elements: 1
-Metadata found: version=3.0, operation=CREATE
