@@ -6,12 +6,5 @@
   "deploy": {
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3
-  },
-  "cron": [
-    {
-      "name": "nav-sync-every-2min",
-      "schedule": "*/2 * * * *",
-      "command": "cd backend && python manage.py sync_nav_invoices --days=7"
-    }
-  ]
+  }
 }
