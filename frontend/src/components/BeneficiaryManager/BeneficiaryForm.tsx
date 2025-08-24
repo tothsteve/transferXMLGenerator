@@ -23,7 +23,7 @@ import {
 interface BeneficiaryFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: Omit<Beneficiary, 'id'>) => void;
+  onSubmit: (data: Omit<Beneficiary, 'id'>) => Promise<void>;
   beneficiary?: Beneficiary | null;
   isLoading?: boolean;
 }
@@ -70,7 +70,7 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
     },
   });
 
-  const handleFormSubmit = (data: FormData) => {
+  const handleFormSubmit = async (data: FormData) => {
     // Validate account number before submission
     const validation = validateAndFormatHungarianAccountNumber(data.account_number);
     if (!validation.isValid) {
@@ -87,9 +87,30 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
       description: data.description || '',
       remittance_information: data.remittance_information || ''
     };
-    onSubmit(submitData);
-    reset();
-    setAccountNumberValue('');
+
+    try {
+      await onSubmit(submitData);
+      reset();
+      setAccountNumberValue('');
+    } catch (error: any) {
+      // Handle backend validation errors
+      if (error.response?.status === 400 && error.response?.data) {
+        const backendErrors = error.response.data;
+        
+        // Set field-specific errors from backend
+        Object.keys(backendErrors).forEach(field => {
+          if (field === 'account_number' || field === 'name' || field === 'description' || field === 'remittance_information') {
+            const errorMessage = Array.isArray(backendErrors[field]) 
+              ? backendErrors[field][0] 
+              : backendErrors[field];
+            setError(field as keyof FormData, {
+              type: 'manual',
+              message: errorMessage
+            });
+          }
+        });
+      }
+    }
   };
 
   const handleClose = () => {

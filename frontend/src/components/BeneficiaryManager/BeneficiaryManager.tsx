@@ -80,14 +80,24 @@ const BeneficiaryManager: React.FC = () => {
   const totalPages = Math.ceil((beneficiariesData?.count || 0) / 20); // Assuming 20 per page
 
   const handleCreateBeneficiary = async (data: Omit<Beneficiary, 'id'>) => {
-    await createMutation.mutateAsync(data);
-    setShowForm(false);
-    refetch();
+    try {
+      await createMutation.mutateAsync(data);
+      setShowForm(false);
+      refetch();
+    } catch (error: any) {
+      // Error will be handled by the form component through React Hook Form
+      throw error;
+    }
   };
 
   const handleUpdateBeneficiary = async (id: number, data: Partial<Beneficiary>) => {
-    await updateMutation.mutateAsync({ id, data });
-    refetch();
+    try {
+      await updateMutation.mutateAsync({ id, data });
+      refetch();
+    } catch (error: any) {
+      // Error will be handled by the calling component
+      throw error;
+    }
   };
 
   const handleDeleteBeneficiary = async (id: number) => {

@@ -36,7 +36,7 @@ interface BeneficiaryTableProps {
   isLoading: boolean;
   onEdit: (beneficiary: Beneficiary) => void;
   onDelete: (id: number) => void;
-  onUpdate: (id: number, data: Partial<Beneficiary>) => void;
+  onUpdate: (id: number, data: Partial<Beneficiary>) => Promise<void>;
   onSort: (field: string, direction: 'asc' | 'desc') => void;
   sortField?: string;
   sortDirection?: 'asc' | 'desc';
@@ -54,6 +54,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
 }) => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editData, setEditData] = useState<Partial<Beneficiary>>({});
+  const [fieldErrors, setFieldErrors] = useState<{[key: string]: string}>({});
 
   const handleStartEdit = (beneficiary: Beneficiary) => {
     setEditingId(beneficiary.id);
@@ -100,19 +101,44 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
     </TableCell>
   );
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (editingId && editData) {
+      // Clear previous errors
+      setFieldErrors({});
+      
       // Format account number before saving
       const updatedData = { ...editData };
       if (editData.account_number) {
         const validation = validateAndFormatHungarianAccountNumber(editData.account_number);
         if (validation.isValid) {
           updatedData.account_number = validation.formatted;
+        } else {
+          setFieldErrors({ account_number: validation.error || 'Érvénytelen számlaszám' });
+          return;
         }
       }
-      onUpdate(editingId, updatedData);
-      setEditingId(null);
-      setEditData({});
+      
+      try {
+        await onUpdate(editingId, updatedData);
+        setEditingId(null);
+        setEditData({});
+        setFieldErrors({});
+      } catch (error: any) {
+        // Handle backend validation errors
+        if (error.response?.status === 400 && error.response?.data) {
+          const backendErrors = error.response.data;
+          const newFieldErrors: {[key: string]: string} = {};
+          
+          Object.keys(backendErrors).forEach(field => {
+            const errorMessage = Array.isArray(backendErrors[field]) 
+              ? backendErrors[field][0] 
+              : backendErrors[field];
+            newFieldErrors[field] = errorMessage;
+          });
+          
+          setFieldErrors(newFieldErrors);
+        }
+      }
     }
   };
 
@@ -124,6 +150,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
   const handleCancelEdit = () => {
     setEditingId(null);
     setEditData({});
+    setFieldErrors({});
   };
 
   if (isLoading) {
@@ -198,6 +225,8 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                     value={editData.name || ''}
                     onChange={(e) => setEditData({ ...editData, name: e.target.value })}
                     fullWidth
+                    error={!!fieldErrors.name}
+                    helperText={fieldErrors.name}
                   />
                 ) : (
                   <Stack direction="row" alignItems="center" spacing={1}>
@@ -233,10 +262,11 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                     onChange={(e) => handleAccountNumberChange(e.target.value)}
                     placeholder="12345678-12345678"
                     fullWidth
+                    error={!!fieldErrors.account_number}
+                    helperText={fieldErrors.account_number || "Automatikus formázás"}
                     InputProps={{
                       sx: { fontFamily: 'monospace', letterSpacing: '0.5px' }
                     }}
-                    helperText="Automatikus formázás"
                   />
                 ) : (
                   <Typography variant="body2" fontFamily="monospace">
