@@ -158,23 +158,45 @@ REDOC_SETTINGS = {
     'LAZY_RENDERING': False,
 }
 
-# SQL Server Database Configuration
-DATABASES = {
-    'default': {
-        'ENGINE': 'mssql',
-        'NAME': 'administration',
-        'USER': 'sa',
-        'PASSWORD': config('DB_PASSWORD', default='Almafa+123'),
-        'HOST': 'localhost',
-        'PORT': '1435',
-        'OPTIONS': {
-            'driver': 'ODBC Driver 17 for SQL Server',
-        },
-    }
-}
+# Database Configuration
+# Railway provides DATABASE_URL for PostgreSQL, fallback to SQL Server for local development
+import dj_database_url
 
+DATABASE_URL = config('DATABASE_URL', default=None)
+
+if DATABASE_URL:
+    # Production/Railway PostgreSQL configuration
+    DATABASES = {
+        'default': dj_database_url.parse(DATABASE_URL)
+    }
+else:
+    # Local development SQL Server configuration
+    DATABASES = {
+        'default': {
+            'ENGINE': 'mssql',
+            'NAME': config('DB_NAME', default='administration'),
+            'USER': config('DB_USER', default='sa'),
+            'PASSWORD': config('DB_PASSWORD', default='Almafa+123'),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='1435'),
+            'OPTIONS': {
+                'driver': 'ODBC Driver 17 for SQL Server',
+            },
+        }
+    }
+
+# Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
+
+# Enable WhiteNoise for static file serving in production
+MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
+
+# WhiteNoise configuration
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+WHITENOISE_USE_FINDERS = config('WHITENOISE_USE_FINDERS', default=False, cast=bool)
+WHITENOISE_AUTOREFRESH = DEBUG
 
 USE_TZ = True
 TIME_ZONE = 'Europe/Budapest'
