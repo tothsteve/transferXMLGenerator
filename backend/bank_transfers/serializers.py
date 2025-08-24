@@ -4,6 +4,7 @@ from .models import (
     BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch, Company,
     NavConfiguration, Invoice, InvoiceLineItem, InvoiceSyncLog
 )
+from .hungarian_account_validator import validate_and_format_hungarian_account_number
 
 class BankAccountSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.name', read_only=True)
@@ -12,6 +13,18 @@ class BankAccountSerializer(serializers.ModelSerializer):
         model = BankAccount
         fields = ['id', 'name', 'account_number', 'bank_name', 'is_default', 'company_name', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at', 'company', 'company_name']
+
+    def validate_account_number(self, value):
+        """Validate and format Hungarian bank account number"""
+        if not value:
+            raise serializers.ValidationError("Számlaszám megadása kötelező")
+        
+        validation = validate_and_format_hungarian_account_number(value)
+        if not validation.is_valid:
+            raise serializers.ValidationError(validation.error or "Érvénytelen számlaszám formátum")
+        
+        # Return the formatted account number for consistent storage
+        return validation.formatted
 
 class BeneficiarySerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.name', read_only=True)
@@ -24,6 +37,18 @@ class BeneficiarySerializer(serializers.ModelSerializer):
             'company_name', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at', 'company', 'company_name']
+
+    def validate_account_number(self, value):
+        """Validate and format Hungarian bank account number"""
+        if not value:
+            raise serializers.ValidationError("Számlaszám megadása kötelező")
+        
+        validation = validate_and_format_hungarian_account_number(value)
+        if not validation.is_valid:
+            raise serializers.ValidationError(validation.error or "Érvénytelen számlaszám formátum")
+        
+        # Return the formatted account number for consistent storage
+        return validation.formatted
 
 class TemplateBeneficiarySerializer(serializers.ModelSerializer):
     beneficiary = BeneficiarySerializer(read_only=True)
