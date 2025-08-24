@@ -213,16 +213,75 @@ class TransferBatch(models.Model):
 
 # NAV Online Invoice Synchronization Models
 
+class NavConfigurationManager(models.Manager):
+    """Enhanced manager for NavConfiguration with environment-aware queries."""
+    
+    def for_company_and_environment(self, company, environment='production'):
+        """
+        Get NAV configuration for a company and specific environment.
+        
+        Args:
+            company: Company instance or ID
+            environment: 'production' or 'test'
+            
+        Returns:
+            NavConfiguration instance or None
+        """
+        if isinstance(company, int):
+            company_id = company
+        else:
+            company_id = company.id
+            
+        return self.filter(
+            company_id=company_id,
+            api_environment=environment,
+            is_active=True
+        ).first()
+    
+    def get_active_config(self, company, prefer_production=True):
+        """
+        Get the best available NAV configuration for a company.
+        
+        Args:
+            company: Company instance or ID
+            prefer_production: If True, prefer production over test
+            
+        Returns:
+            NavConfiguration instance or None
+            
+        Logic:
+        - If prefer_production=True: production first, fallback to test
+        - If prefer_production=False: test first, fallback to production
+        """
+        primary_env = 'production' if prefer_production else 'test'
+        fallback_env = 'test' if prefer_production else 'production'
+        
+        # Try primary environment first
+        config = self.for_company_and_environment(company, primary_env)
+        if config:
+            return config
+            
+        # Fallback to secondary environment
+        return self.for_company_and_environment(company, fallback_env)
+
+
 class NavConfiguration(models.Model):
     """
     Company-specific NAV API credentials and synchronization settings.
     
-    Key Architecture Notes:
-    - Each company can have multiple NAV API configurations (one for test, one for production)
-    - All company credentials are encrypted using the application's master encryption key
-    - No company-specific keys are stored in environment variables
-    - Multi-tenant architecture with complete data isolation per company
+    Production Multi-Company Architecture:
+    - Each company can have MULTIPLE NAV configurations (test + production)
+    - Environment selection happens at runtime via configuration lookup
+    - All credentials encrypted with master key, no environment variables needed
+    - Complete data isolation per company with shared application logic
+    
+    Usage Examples:
+    - Company A: Test config only (for development/staging)
+    - Company B: Production config only (live operations)
+    - Company C: Both test AND production (full development lifecycle)
     """
+    
+    objects = NavConfigurationManager()
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='nav_configs')
     
     # Company-specific NAV credentials

@@ -53,6 +53,17 @@ class Command(BaseCommand):
             action='store_true',
             help='Disable file logging (production safe)'
         )
+        parser.add_argument(
+            '--environment',
+            type=str,
+            choices=['production', 'test'],
+            help='Force specific NAV environment (production or test)'
+        )
+        parser.add_argument(
+            '--prefer-test',
+            action='store_true',
+            help='Prefer test environment over production when auto-selecting'
+        )
 
     def handle(self, *args, **options):
         self.setup_logging(options)
@@ -102,12 +113,14 @@ class Command(BaseCommand):
             
             try:
                 if not options['dry_run']:
-                    # Sync INBOUND invoices for this month
+                    # Sync INBOUND invoices for this month with environment selection
                     result = sync_service.sync_company_invoices(
                         company=company,
                         date_from=month_start,
                         date_to=month_end,
-                        direction='INBOUND'
+                        direction='INBOUND',
+                        environment=options['environment'],
+                        prefer_production=not options['prefer_test']
                     )
                     
                     success_count = result.get('success_count', 0)

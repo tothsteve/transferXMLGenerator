@@ -52,10 +52,12 @@ class InvoiceSyncService:
         company: Company, 
         date_from: datetime = None, 
         date_to: datetime = None,
-        direction: str = 'OUTBOUND'
+        direction: str = 'OUTBOUND',
+        environment: str = None,
+        prefer_production: bool = True
     ) -> Dict:
         """
-        Synchronize invoices for a specific company.
+        Synchronize invoices for a specific company with environment selection.
         
         READ-ONLY OPERATION: Only queries data from NAV, never modifies NAV.
         
@@ -64,6 +66,8 @@ class InvoiceSyncService:
             date_from: Start date for invoice query (defaults to 30 days ago)
             date_to: End date for invoice query (defaults to today)
             direction: Invoice direction ('OUTBOUND' or 'INBOUND')
+            environment: Specific environment ('production'/'test') or None for auto-select
+            prefer_production: If True and environment=None, prefer production over test
             
         Returns:
             Dict with sync results: {
@@ -94,10 +98,13 @@ class InvoiceSyncService:
         )
         
         try:
-            # Get active NAV configuration for company
-            nav_config = self._get_nav_configuration(company)
+            # Smart NAV configuration selection with environment awareness
+            nav_config = self._get_nav_configuration(company, environment, prefer_production)
             if not nav_config:
-                raise ValueError(f"Nincs aktív NAV konfiguráció a {company.name} céghez")
+                env_msg = f" in {environment} environment" if environment else ""
+                raise ValueError(f"Nincs aktív NAV konfiguráció a {company.name} céghez{env_msg}")
+            
+            logger.info(f"🌍 Using {nav_config.api_environment} environment for {company.name}")
             
             # Initialize NAV client
             nav_client = self._initialize_nav_client(nav_config)
@@ -715,4 +722,55 @@ class InvoiceSyncService:
             results['companies_processed'] += 1
         
         logger.info(f"Teljes NAV szinkronizáció befejezve: {results}")
+        
         return results
+    
+    def _get_nav_configuration(self, company: Company, environment: str = None, prefer_production: bool = True) -> NavConfiguration:
+        """
+        Get NAV configuration for a company with intelligent environment selection.
+        
+        Args:
+            company: Company instance
+            environment: Specific environment ('production'/'test') or None for auto-select
+            prefer_production: If True and environment=None, prefer production over test
+            
+        Returns:
+            NavConfiguration instance or None
+            
+        Logic:
+        - If environment specified: Use exact environment
+        - If environment=None: Use get_active_config with preference
+        """
+        if environment:
+            # Specific environment requested
+            config = NavConfiguration.objects.for_company_and_environment(company, environment)
+            if not config:
+                logger.warning(f"No {environment} NAV config found for {company.name}")
+            return config
+        else:
+            # Auto-select best available configuration
+            config = NavConfiguration.objects.get_active_config(company, prefer_production)
+            if config:
+                selected_env = config.api_environment
+                logger.info(f"Auto-selected {selected_env} NAV config for {company.name}")
+            else:
+                logger.warning(f"No active NAV config found for {company.name}")
+            return config
+    
+    def _initialize_nav_client(self, nav_config: NavConfiguration):
+        """
+        Initialize NAV API client with the given configuration.
+        
+        Args:
+            nav_config: NavConfiguration instance
+            
+        Returns:
+            NavApiClient instance
+        """
+        try:
+            nav_client = NavApiClient(nav_config)
+            logger.info(f"NAV client initialized for {nav_config.api_environment} environment")
+            return nav_client
+        except Exception as e:
+            logger.error(f"Failed to initialize NAV client: {e}")
+            raise
