@@ -79,27 +79,6 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
     }
   };
 
-  const SortableHeader: React.FC<{ field: string; children: React.ReactNode }> = ({ field, children }) => (
-    <TableCell 
-      sx={{ 
-        cursor: 'pointer',
-        '&:hover': { backgroundColor: 'action.hover' },
-        fontWeight: 600
-      }}
-      onClick={() => handleSort(field)}
-    >
-      <Stack direction="row" alignItems="center" spacing={0.5}>
-        <Typography variant="body2" fontWeight="inherit">
-          {children}
-        </Typography>
-        {sortField === field && (
-          sortDirection === 'asc' ? 
-            <ArrowUpIcon fontSize="small" /> : 
-            <ArrowDownIcon fontSize="small" />
-        )}
-      </Stack>
-    </TableCell>
-  );
 
   const handleSaveEdit = async () => {
     if (editingId && editData) {
@@ -155,16 +134,16 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
 
   if (isLoading) {
     return (
-      <TableContainer>
-        <Table>
+      <TableContainer sx={{ flexGrow: 1, overflow: 'auto' }}>
+        <Table size="small" stickyHeader sx={{ minWidth: 1200 }}>
           <TableHead>
             <TableRow>
-              <TableCell>Név</TableCell>
-              <TableCell>Leírás</TableCell>
-              <TableCell>Számlaszám</TableCell>
-              <TableCell>Közlemény</TableCell>
-              <TableCell>Állapot</TableCell>
-              <TableCell align="right">Műveletek</TableCell>
+              <TableCell sx={{ width: '25%', minWidth: 200 }}>Név</TableCell>
+              <TableCell sx={{ width: '20%', minWidth: 180 }}>Leírás</TableCell>
+              <TableCell sx={{ width: '20%', minWidth: 180 }}>Számlaszám</TableCell>
+              <TableCell sx={{ width: '25%', minWidth: 200 }}>Közlemény</TableCell>
+              <TableCell sx={{ width: '10%', minWidth: 120 }}>Állapot</TableCell>
+              <TableCell align="right" sx={{ width: '10%', minWidth: 100 }}>Műveletek</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -186,8 +165,8 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
 
   if (beneficiaries.length === 0) {
     return (
-      <Box sx={{ p: 4, textAlign: 'center' }}>
-        <Typography variant="body1" color="text.secondary">
+      <Box sx={{ p: 2, textAlign: 'center' }}>
+        <Typography variant="body2" color="text.secondary">
           Nincsenek kedvezményezettek
         </Typography>
       </Box>
@@ -195,20 +174,100 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
   }
 
   return (
-    <TableContainer>
-      <Table>
+    <TableContainer sx={{ flexGrow: 1, overflow: 'auto' }}>
+      <Table size="small" stickyHeader sx={{ minWidth: 1200 }}>
         <TableHead>
           <TableRow>
-            <SortableHeader field="name">Név</SortableHeader>
-            <SortableHeader field="description">Leírás</SortableHeader>
-            <SortableHeader field="account_number">Számlaszám</SortableHeader>
-            <SortableHeader field="remittance_information">Közlemény</SortableHeader>
-            <TableCell sx={{ fontWeight: 600 }}>
+            <TableCell 
+              sx={{ 
+                cursor: 'pointer',
+                '&:hover': { backgroundColor: 'action.hover' },
+                fontWeight: 600,
+                width: '25%',
+                minWidth: 200
+              }}
+              onClick={() => handleSort('name')}
+            >
+              <Stack direction="row" alignItems="center" spacing={0.5}>
+                <Typography variant="body2" fontWeight="inherit">
+                  Név
+                </Typography>
+                {sortField === 'name' && (
+                  sortDirection === 'asc' ? 
+                    <ArrowUpIcon fontSize="small" /> : 
+                    <ArrowDownIcon fontSize="small" />
+                )}
+              </Stack>
+            </TableCell>
+            <TableCell 
+              sx={{ 
+                cursor: 'pointer',
+                '&:hover': { backgroundColor: 'action.hover' },
+                fontWeight: 600,
+                width: '20%',
+                minWidth: 180
+              }}
+              onClick={() => handleSort('description')}
+            >
+              <Stack direction="row" alignItems="center" spacing={0.5}>
+                <Typography variant="body2" fontWeight="inherit">
+                  Leírás
+                </Typography>
+                {sortField === 'description' && (
+                  sortDirection === 'asc' ? 
+                    <ArrowUpIcon fontSize="small" /> : 
+                    <ArrowDownIcon fontSize="small" />
+                )}
+              </Stack>
+            </TableCell>
+            <TableCell 
+              sx={{ 
+                cursor: 'pointer',
+                '&:hover': { backgroundColor: 'action.hover' },
+                fontWeight: 600,
+                width: '20%',
+                minWidth: 180
+              }}
+              onClick={() => handleSort('account_number')}
+            >
+              <Stack direction="row" alignItems="center" spacing={0.5}>
+                <Typography variant="body2" fontWeight="inherit">
+                  Számlaszám
+                </Typography>
+                {sortField === 'account_number' && (
+                  sortDirection === 'asc' ? 
+                    <ArrowUpIcon fontSize="small" /> : 
+                    <ArrowDownIcon fontSize="small" />
+                )}
+              </Stack>
+            </TableCell>
+            <TableCell 
+              sx={{ 
+                cursor: 'pointer',
+                '&:hover': { backgroundColor: 'action.hover' },
+                fontWeight: 600,
+                width: '25%',
+                minWidth: 200
+              }}
+              onClick={() => handleSort('remittance_information')}
+            >
+              <Stack direction="row" alignItems="center" spacing={0.5}>
+                <Typography variant="body2" fontWeight="inherit">
+                  Közlemény
+                </Typography>
+                {sortField === 'remittance_information' && (
+                  sortDirection === 'asc' ? 
+                    <ArrowUpIcon fontSize="small" /> : 
+                    <ArrowDownIcon fontSize="small" />
+                )}
+              </Stack>
+            </TableCell>
+            <TableCell sx={{ fontWeight: 600, width: '10%', minWidth: 120 }}>
               <Typography variant="body2" fontWeight="inherit">
                 Állapot
               </Typography>
             </TableCell>
-            <TableCell align="right" sx={{ fontWeight: 600 }}>
+            <TableCell align="right" sx={{ fontWeight: 600, width: '10%', minWidth: 100 }}>
               <Typography variant="body2" fontWeight="inherit">
                 Műveletek
               </Typography>
@@ -227,6 +286,9 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                     fullWidth
                     error={!!fieldErrors.name}
                     helperText={fieldErrors.name}
+                    sx={{ 
+                      '& .MuiInputBase-input': { fontSize: '0.875rem', py: '6px' }
+                    }}
                   />
                 ) : (
                   <Stack direction="row" alignItems="center" spacing={1}>
@@ -247,9 +309,12 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                     onChange={(e) => setEditData({ ...editData, description: e.target.value })}
                     placeholder="Leírás..."
                     fullWidth
+                    sx={{ 
+                      '& .MuiInputBase-input': { fontSize: '0.875rem', py: '6px' }
+                    }}
                   />
                 ) : (
-                  <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 150 }}>
+                  <Typography variant="body2" color="text.secondary">
                     {beneficiary.description || '-'}
                   </Typography>
                 )}
@@ -263,9 +328,16 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                     placeholder="12345678-12345678"
                     fullWidth
                     error={!!fieldErrors.account_number}
-                    helperText={fieldErrors.account_number || "Automatikus formázás"}
+                    helperText={fieldErrors.account_number}
                     InputProps={{
-                      sx: { fontFamily: 'monospace', letterSpacing: '0.5px' }
+                      sx: { 
+                        fontFamily: 'monospace', 
+                        letterSpacing: '0.5px',
+                        fontSize: '0.875rem'
+                      }
+                    }}
+                    sx={{
+                      '& .MuiInputBase-input': { py: '6px' }
                     }}
                   />
                 ) : (
@@ -278,22 +350,23 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 {editingId === beneficiary.id ? (
                   <TextField
                     size="small"
-                    multiline
-                    rows={2}
                     value={editData.remittance_information || ''}
                     onChange={(e) => setEditData({ ...editData, remittance_information: e.target.value })}
                     placeholder="Közlemény..."
                     fullWidth
+                    sx={{ 
+                      '& .MuiInputBase-input': { fontSize: '0.875rem', py: '6px' }
+                    }}
                   />
                 ) : (
-                  <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 200 }}>
+                  <Typography variant="body2" color="text.secondary">
                     {beneficiary.remittance_information || '-'}
                   </Typography>
                 )}
               </TableCell>
               <TableCell>
                 {editingId === beneficiary.id ? (
-                  <Stack spacing={0.5}>
+                  <Stack spacing={0.25}>
                     <FormControlLabel
                       control={
                         <Checkbox
@@ -302,8 +375,8 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                           onChange={(e) => setEditData({ ...editData, is_active: e.target.checked })}
                         />
                       }
-                      label={<Typography variant="caption">Aktív</Typography>}
-                      sx={{ m: 0 }}
+                      label={<Typography variant="caption" fontSize="0.75rem">Aktív</Typography>}
+                      sx={{ m: 0, '& .MuiFormControlLabel-label': { fontSize: '0.75rem' } }}
                     />
                     <FormControlLabel
                       control={
@@ -313,8 +386,8 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                           onChange={(e) => setEditData({ ...editData, is_frequent: e.target.checked })}
                         />
                       }
-                      label={<Typography variant="caption">Gyakori</Typography>}
-                      sx={{ m: 0 }}
+                      label={<Typography variant="caption" fontSize="0.75rem">Gyakori</Typography>}
+                      sx={{ m: 0, '& .MuiFormControlLabel-label': { fontSize: '0.75rem' } }}
                     />
                   </Stack>
                 ) : (

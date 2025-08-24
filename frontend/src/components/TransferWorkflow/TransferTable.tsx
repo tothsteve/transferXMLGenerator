@@ -464,7 +464,7 @@ const TransferTable: React.FC<TransferTableProps> = ({
         onDragEnd={handleDragEnd}
       >
         <TableContainer>
-          <Table>
+          <Table size="small">
             <TableHead>
               <TableRow>
                 <TableCell sx={{ width: 48 }}></TableCell>

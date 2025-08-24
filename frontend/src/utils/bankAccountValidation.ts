@@ -20,12 +20,12 @@ export interface AccountValidationResult {
 /**
  * Validates and formats a Hungarian bank account number
  * @param accountNumber - The input account number (with or without hyphens)
- * @param validateChecksum - Whether to validate checksum (default: true)
+ * @param validateChecksum - Whether to validate checksum (default: false)
  * @returns AccountValidationResult with validation status and formatted number
  */
 export const validateAndFormatHungarianAccountNumber = (
   accountNumber: string, 
-  validateChecksum: boolean = true
+  validateChecksum: boolean = false
 ): AccountValidationResult => {
   if (!accountNumber) {
     return {
@@ -63,7 +63,7 @@ export const validateAndFormatHungarianAccountNumber = (
     // 16 digits: XXXXXXXX-XXXXXXXX
     formatted = `${digitsOnly.slice(0, 8)}-${digitsOnly.slice(8, 16)}`;
   } else if (digitsOnly.length === 24) {
-    // 24 digits: XXXXXXXX-XXXXXXXX-XXXXXXXX
+    // True 24-digit BBAN: XXXXXXXX-XXXXXXXX-XXXXXXXX
     formatted = `${digitsOnly.slice(0, 8)}-${digitsOnly.slice(8, 16)}-${digitsOnly.slice(16, 24)}`;
   } else {
     return {
@@ -134,6 +134,7 @@ export const validateHungarianAccountChecksum = (accountNumber: string): boolean
     // Legacy 16-digit format - no specific checksum validation defined
     return true; // Accept for backwards compatibility
   } else if (digits.length === 24) {
+    // All 24-digit numbers are treated as BBAN with checksum validation
     return validateHungarianBBANChecksum(digits);
   }
   

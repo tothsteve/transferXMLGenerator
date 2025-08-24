@@ -148,15 +148,15 @@ const BeneficiaryManager: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: { xs: 0.5, sm: 0.5, md: 1 }, height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', pb: 3, mb: 4 }}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={3}>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', pb: 1, mb: 1 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={2}>
           <Box>
-            <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
+            <Typography variant="h5" component="h1" fontWeight="bold" sx={{ mb: 0.5 }}>
               Kedvezményezettek
             </Typography>
-            <Typography variant="body1" color="text.secondary">
+            <Typography variant="body2" color="text.secondary">
               Kedvezményezettek kezelése, hozzáadás, szerkesztés és törlés
             </Typography>
           </Box>
@@ -180,12 +180,12 @@ const BeneficiaryManager: React.FC = () => {
       </Box>
 
       {/* Search and Filters */}
-      <Box sx={{ mb: 4 }}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>
+      <Box sx={{ mb: 1 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 1 }}>
           {/* Search */}
           <TextField
             fullWidth
-            placeholder="Keresés név vagy számlaszám alapján..."
+            placeholder="Keresés név, számlaszám vagy leírás alapján..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{
@@ -282,12 +282,12 @@ const BeneficiaryManager: React.FC = () => {
       </Box>
 
       {/* Results count */}
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
         {beneficiariesData?.count} kedvezményezett találat
       </Typography>
 
       {/* Table */}
-      <Paper elevation={1}>
+      <Paper elevation={1} sx={{ flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <BeneficiaryTable
           beneficiaries={beneficiaries}
           isLoading={isLoading}
@@ -302,7 +302,7 @@ const BeneficiaryManager: React.FC = () => {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box sx={{ mt: 1, p: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="body2" color="text.secondary">
             Oldal {currentPage} / {totalPages}
           </Typography>

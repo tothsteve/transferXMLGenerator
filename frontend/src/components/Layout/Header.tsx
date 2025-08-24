@@ -70,7 +70,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         borderColor: 'divider',
       }}
     >
-      <Toolbar>
+      <Toolbar variant="dense">
         {isMobile && (
           <IconButton
             edge="start"

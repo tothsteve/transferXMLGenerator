@@ -56,7 +56,7 @@ const TransferWorkflow: React.FC = () => {
 
   const { data: templatesData } = useTemplates();
   const { data: defaultAccount } = useDefaultBankAccount();
-  const { data: beneficiariesData } = useBeneficiaries();
+  const { data: beneficiariesData, isLoading: beneficiariesLoading } = useBeneficiaries({ page: 1 });
   const loadTemplateMutation = useLoadTemplate();
   const bulkCreateMutation = useBulkCreateTransfers();
   const bulkUpdateMutation = useBulkUpdateTransfers();
@@ -65,25 +65,6 @@ const TransferWorkflow: React.FC = () => {
 
   const templates = templatesData?.results || [];
   const beneficiaries = beneficiariesData?.results || [];
-
-  // Handle template data passed from TemplateBuilder
-  useEffect(() => {
-    const state = location.state as { 
-      templateData?: LoadTemplateResponse; 
-      loadedFromTemplate?: boolean 
-    } | null;
-    
-    if (state?.templateData && state.loadedFromTemplate) {
-      setSelectedTemplate(state.templateData.template);
-      setTransfers(state.templateData.transfers.map((transfer, index) => ({
-        ...transfer,
-        tempId: `temp-${index}`,
-      })));
-      
-      // Clear the location state to prevent re-loading on refresh
-      window.history.replaceState({}, '');
-    }
-  }, [location.state]);
 
   const handleLoadTemplate = async (templateId: number) => {
     if (!defaultAccount) {
@@ -125,6 +106,40 @@ const TransferWorkflow: React.FC = () => {
       console.error('Failed to load template:', error);
     }
   };
+
+  // Handle template data passed from TemplateBuilder
+  useEffect(() => {
+    const state = location.state as { 
+      templateData?: LoadTemplateResponse; 
+      loadedFromTemplate?: boolean;
+      templateId?: number;
+      loadFromTemplate?: boolean;
+    } | null;
+    
+    // Handle direct template data (from previous workflow)
+    if (state?.templateData && state.loadedFromTemplate) {
+      setSelectedTemplate(state.templateData.template);
+      setTransfers(state.templateData.transfers.map((transfer, index) => ({
+        ...transfer,
+        tempId: `temp-${index}`,
+      })));
+      
+      // Clear the location state to prevent re-loading on refresh
+      window.history.replaceState({}, '');
+    }
+    // Handle template ID from TemplateBuilder "Betöltés" button
+    else if (state?.templateId && state.loadFromTemplate && templates.length > 0 && defaultAccount) {
+      const template = templates.find(t => t.id === state.templateId);
+      if (template) {
+        console.log('Auto-loading template from TemplateBuilder:', template);
+        setSelectedTemplate(template);
+        handleLoadTemplate(state.templateId);
+      }
+      
+      // Clear the location state to prevent re-loading on refresh
+      window.history.replaceState({}, '');
+    }
+  }, [location.state, templates, defaultAccount]);
 
   const handleUpdateTransfer = (index: number, updatedData: Partial<TransferData>) => {
     setTransfers(prev => prev.map((transfer, i) => 
