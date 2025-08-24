@@ -1,0 +1,34 @@
+<ns0:QueryInvoiceDigestRequest xmlns:ns0="http://schemas.nav.gov.hu/OSA/3.0/api" xmlns:ns1="http://schemas.nav.gov.hu/NTCA/1.0/common">
+  <ns1:header>
+    <ns1:requestId>REQ20250823211041333</ns1:requestId>
+    <ns1:timestamp>2025-08-23T21:10:41.333Z</ns1:timestamp>
+    <ns1:requestVersion>3.0</ns1:requestVersion>
+    <ns1:headerVersion>1.0</ns1:headerVersion>
+  </ns1:header>
+  <ns1:user>
+    <ns1:login>qndwebtqe9achhj</ns1:login>
+    <ns1:passwordHash cryptoType="SHA-512">9E40AE274A9E2BED3DCC205D6D9D426A5496922A9B311C1B11A94F8487DAF0AF386CC56995CCE65EC51083DB2FEF84E6B89E0FEA0A3414F8F361DF8AAAE49556</ns1:passwordHash>
+    <ns1:taxNumber>28778367</ns1:taxNumber>
+    <ns1:requestSignature cryptoType="SHA3-512">7B9B0F8001C65F1D05D96981DC0E5F1450708C9C186C9EF4DF0C3C9C74C797EAD3237850D9477439535D5A54C8C46199769C84A9E47484BB03595BB055481593</ns1:requestSignature>
+  </ns1:user>
+  <ns0:software>
+    <ns0:softwareId>HU28778367TXG00001</ns0:softwareId>
+    <ns0:softwareName>TransferXMLGenerator</ns0:softwareName>
+    <ns0:softwareOperation>LOCAL_SOFTWARE</ns0:softwareOperation>
+    <ns0:softwareMainVersion>1.0</ns0:softwareMainVersion>
+    <ns0:softwareDevName>IT Cardigan Kft.</ns0:softwareDevName>
+    <ns0:softwareDevContact>info@itcardigan.hu</ns0:softwareDevContact>
+    <ns0:softwareDevCountryCode>HU</ns0:softwareDevCountryCode>
+    <ns0:softwareDevTaxNumber>28778367-2-16</ns0:softwareDevTaxNumber>
+  </ns0:software>
+  <ns0:page>1</ns0:page>
+  <ns0:invoiceDirection>INBOUND</ns0:invoiceDirection>
+  <ns0:invoiceQueryParams>
+    <ns0:mandatoryQueryParams>
+      <ns0:insDate>
+        <ns0:dateTimeFrom>2025-08-14T00:00:00.000Z</ns0:dateTimeFrom>
+        <ns0:dateTimeTo>2025-08-14T23:59:59.999Z</ns0:dateTimeTo>
+      </ns0:insDate>
+    </ns0:mandatoryQueryParams>
+  </ns0:invoiceQueryParams>
+</ns0:QueryInvoiceDigestRequest>

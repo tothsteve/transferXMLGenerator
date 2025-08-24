@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+"""
+Decode the base64 invoice data from the NAV response
+"""
+
+import base64
+import xml.etree.ElementTree as ET
+
+def decode_invoice_data():
+    """Decode and display the invoice XML data."""
+    
+    # Base64 encoded invoice data from the response
+    invoice_data_b64 = """PEludm9pY2VEYXRhIHhtbG5zPSJodHRwOi8vc2NoZW1hcy5uYXYuZ292Lmh1L09TQS8zLjAvZGF0YSIgeG1sbnM6bnMyPSJodHRwOi8vc2NoZW1hcy5uYXYuZ292Lmh1L09TQS8zLjAvYmFzZSI+CiAgICA8aW52b2ljZU51bWJlcj5BL0EyODcwMDIwMC8xMTgwLzAwMDEzPC9pbnZvaWNlTnVtYmVyPgogICAgPGludm9pY2VJc3N1ZURhdGU+MjAyNS0wOC0xMzwvaW52b2ljZUlzc3VlRGF0ZT4KICAgIDxjb21wbGV0ZW5lc3NJbmRpY2F0b3I+ZmFsc2U8L2NvbXBsZXRlbmVzc0luZGljYXRvcj4KICAgIDxpbnZvaWNlTWFpbj4KICAgICAgICA8aW52b2ljZT4KICAgICAgICAgICAgPGludm9pY2VIZWFkPgogICAgICAgICAgICAgICAgPHN1cHBsaWVySW5mbz4KICAgICAgICAgICAgICAgICAgICA8c3VwcGxpZXJUYXhOdW1iZXI+CiAgICAgICAgICAgICAgICAgICAgICAgIDxuczI6dGF4cGF5ZXJJZD4xMDg5MTgxMDwvbnMyOnRheHBheWVySWQ+CiAgICAgICAgICAgICAgICAgICAgPC9zdXBwbGllclRheE51bWJlcj4KICAgICAgICAgICAgICAgICAgICA8c3VwcGxpZXJOYW1lPlNIRUxMIEhVTkdBUlkgS0VSRVNLRURFTE1JIFrDgVJUS8OWUsWwRU4gTcWwS8OWRMWQIFLDiVNaVsOJTllUw4FSU0FTw4FHPC9zdXBwbGllck5hbWU+CiAgICAgICAgICAgICAgICAgICAgPHN1cHBsaWVyQWRkcmVzcz4KICAgICAgICAgICAgICAgICAgICAgICAgPG5zMjpkZXRhaWxlZEFkZHJlc3M+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8bnMyOmNvdW50cnlDb2RlPkhVPC9uczI6Y291bnRyeUNvZGU+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8bnMyOnBvc3RhbENvZGU+MTExMzwvbnMyOnBvc3RhbENvZGU+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8bnMyOmNpdHk+QlVEQVBFU1Q8L25zMjpjaXR5PgogICAgICAgICAgICAgICAgICAgICAgICAgICAgPG5zMjpzdHJlZXROYW1lPkJPQ1NLQUk8L25zMjpzdHJlZXROYW1lPgogICAgICAgICAgICAgICAgICAgICAgICAgICAgPG5zMjpwdWJsaWNQbGFjZUNhdGVnb3J5PsOaVDwvbnMyOnB1YmxpY1BsYWNlQ2F0ZWdvcnk+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8bnMyOm51bWJlcj4xMzQtMTQ2LjwvbnMyOm51bWJlcj4KICAgICAgICAgICAgICAgICAgICAgICAgPC9uczI6ZGV0YWlsZWRBZGRyZXNzPgogICAgICAgICAgICAgICAgICAgIDwvc3VwcGxpZXJBZGRyZXNzPgogICAgICAgICAgICAgICAgPC9zdXBwbGllckluZm8+CiAgICAgICAgICAgICAgICA8Y3VzdG9tZXJJbmZvPgogICAgICAgICAgICAgICAgICAgIDxjdXN0b21lclZhdFN0YXR1cz5ET01FU1RJQzwvY3VzdG9tZXJWYXRTdGF0dXM+CiAgICAgICAgICAgICAgICAgICAgPGN1c3RvbWVyVmF0RGF0YT4KICAgICAgICAgICAgICAgICAgICAgICAgPGN1c3RvbWVyVGF4TnVtYmVyPgogICAgICAgICAgICAgICAgICAgICAgICAgICAgPG5zMjp0YXhwYXllcklkPjI4Nzc4MzY3PC9uczI6dGF4cGF5ZXJJZD4KICAgICAgICAgICAgICAgICAgICAgICAgPC9jdXN0b21lclRheE51bWJlcj4KICAgICAgICAgICAgICAgICAgICA8L2N1c3RvbWVyVmF0RGF0YT4KICAgICAgICAgICAgICAgICAgICA8Y3VzdG9tZXJOYW1lPklUIENBUkRJR0FOIEtGVC48L2N1c3RvbWVyTmFtZT4KICAgICAgICAgICAgICAgICAgICA8Y3VzdG9tZXJBZGRyZXNzPgogICAgICAgICAgICAgICAgICAgICAgICA8bnMyOmRldGFpbGVkQWRkcmVzcz4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxuczI6Y291bnRyeUNvZGU+SFU8L25zMjpjb3VudHJ5Q29kZT4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxuczI6cG9zdGFsQ29kZT41MDU0PC9uczI6cG9zdGFsQ29kZT4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxuczI6Y2l0eT5Kw4FTWkFMU8OTU1pFTlRHWcOWUkdZPC9uczI6Y2l0eT4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxuczI6c3RyZWV0TmFtZT5Kw4FTWiBVVENBIDI8L25zMjpzdHJlZXROYW1lPgogICAgICAgICAgICAgICAgICAgICAgICAgICAgPG5zMjpwdWJsaWNQbGFjZUNhdGVnb3J5Pk4vQTwvbnMyOnB1YmxpY1BsYWNlQ2F0ZWdvcnk+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8bnMyOm51bWJlcj5OL0E8L25zMjpudW1iZXI+CiAgICAgICAgICAgICAgICAgICAgICAgIDwvbnMyOmRldGFpbGVkQWRkcmVzcz4KICAgICAgICAgICAgICAgICAgICA8L2N1c3RvbWVyQWRkcmVzcz4KICAgICAgICAgICAgICAgIDwvY3VzdG9tZXJJbmZvPgogICAgICAgICAgICAgICAgPGludm9pY2VEZXRhaWw+CiAgICAgICAgICAgICAgICAgICAgPGludm9pY2VDYXRlZ29yeT5TSU1QTElGSUVEPC9pbnZvaWNlQ2F0ZWdvcnk+CiAgICAgICAgICAgICAgICAgICAgPGludm9pY2VEZWxpdmVyeURhdGU+MjAyNS0wOC0xMzwvaW52b2ljZURlbGl2ZXJ5RGF0ZT4KICAgICAgICAgICAgICAgICAgICA8Y3VycmVuY3lDb2RlPkhVRjwvY3VycmVuY3lDb2RlPgogICAgICAgICAgICAgICAgICAgIDxleGNoYW5nZVJhdGU+MTwvZXhjaGFuZ2VSYXRlPgogICAgICAgICAgICAgICAgICAgIDxpbnZvaWNlQXBwZWFyYW5jZT5QQVBFUjwvaW52b2ljZUFwcGVhcmFuY2U+CiAgICAgICAgICAgICAgICA8L2ludm9pY2VEZXRhaWw+CiAgICAgICAgICAgIDwvaW52b2ljZUhlYWQ+CiAgICAgICAgICAgIDxpbnZvaWNlTGluZXM+CiAgICAgICAgICAgICAgICA8bWVyZ2VkSXRlbUluZGljYXRvcj5mYWxzZTwvbWVyZ2VkSXRlbUluZGljYXRvcj4KICAgICAgICAgICAgICAgIDxsaW5lPgogICAgICAgICAgICAgICAgICAgIDxsaW5lTnVtYmVyPjE8L2xpbmVOdW1iZXI+CiAgICAgICAgICAgICAgICAgICAgPGxpbmVFeHByZXNzaW9uSW5kaWNhdG9yPnRydWU8L2xpbmVFeHByZXNzaW9uSW5kaWNhdG9yPgogICAgICAgICAgICAgICAgICAgIDxsaW5lRGVzY3JpcHRpb24+KjAxIFZQIFJhY2luZzwvbGluZURlc2NyaXB0aW9uPgogICAgICAgICAgICAgICAgICAgIDxxdWFudGl0eT4zNi40ODwvcXVhbnRpdHk+CiAgICAgICAgICAgICAgICAgICAgPHVuaXRPZk1lYXN1cmU+UElFQ0U8L3VuaXRPZk1lYXN1cmU+CiAgICAgICAgICAgICAgICAgICAgPHVuaXRQcmljZT42NTcuOTwvdW5pdFByaWNlPgogICAgICAgICAgICAgICAgICAgIDx1bml0UHJpY2VIVUY+NjU3Ljk8L3VuaXRQcmljZUhVRj4KICAgICAgICAgICAgICAgICAgICA8bGluZUFtb3VudHNTaW1wbGlmaWVkPgogICAgICAgICAgICAgICAgICAgICAgICA8bGluZVZhdFJhdGU+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8dmF0Q29udGVudD4wLjIxMjY8L3ZhdENvbnRlbnQ+CiAgICAgICAgICAgICAgICAgICAgICAgIDwvbGluZVZhdFJhdGU+CiAgICAgICAgICAgICAgICAgICAgICAgIDxsaW5lR3Jvc3NBbW91bnRTaW1wbGlmaWVkPjI0MDAwPC9saW5lR3Jvc3NBbW91bnRTaW1wbGlmaWVkPgogICAgICAgICAgICAgICAgICAgICAgICA8bGluZUdyb3NzQW1vdW50U2ltcGxpZmllZEhVRj4yNDAwMDwvbGluZUdyb3NzQW1vdW50U2ltcGxpZmllZEhVRj4KICAgICAgICAgICAgICAgICAgICA8L2xpbmVBbW91bnRzU2ltcGxpZmllZD4KICAgICAgICAgICAgICAgIDwvbGluZT4KICAgICAgICAgICAgPC9pbnZvaWNlTGluZXM+CiAgICAgICAgICAgIDxpbnZvaWNlU3VtbWFyeT4KICAgICAgICAgICAgICAgIDxzdW1tYXJ5U2ltcGxpZmllZD4KICAgICAgICAgICAgICAgICAgICA8dmF0UmF0ZT4KICAgICAgICAgICAgICAgICAgICAgICAgPHZhdENvbnRlbnQ+MC4yMTI2PC92YXRDb250ZW50PgogICAgICAgICAgICAgICAgICAgIDwvdmF0UmF0ZT4KICAgICAgICAgICAgICAgICAgICA8dmF0Q29udGVudEdyb3NzQW1vdW50PjI0MDAwPC92YXRDb250ZW50R3Jvc3NBbW91bnQ+CiAgICAgICAgICAgICAgICAgICAgPHZhdENvbnRlbnRHcm9zc0Ftb3VudEhVRj4yNDAwMDwvdmF0Q29udGVudEdyb3NzQW1vdW50SFVGPgogICAgICAgICAgICAgICAgPC9zdW1tYXJ5U2ltcGxpZmllZD4KICAgICAgICAgICAgICAgIDxzdW1tYXJ5R3Jvc3NEYXRhPgogICAgICAgICAgICAgICAgICAgIDxpbnZvaWNlR3Jvc3NBbW91bnQ+MjQwMDA8L2ludm9pY2VHcm9zc0Ftb3VudD4KICAgICAgICAgICAgICAgICAgICA8aW52b2ljZUdyb3NzQW1vdW50SFVGPjI0MDAwPC9pbnZvaWNlR3Jvc3NBbW91bnRIVUY+CiAgICAgICAgICAgICAgICA8L3N1bW1hcnlHcm9zc0RhdGE+CiAgICAgICAgICAgIDwvaW52b2ljZVN1bW1hcnk+CiAgICAgICAgPC9pbnZvaWNlPgogICAgPC9pbnZvaWNlTWFpbj4KPC9JbnZvaWNlRGF0YT4="""
+    
+    # Decode base64
+    decoded_bytes = base64.b64decode(invoice_data_b64)
+    decoded_xml = decoded_bytes.decode('utf-8')
+    
+    print("🎯 DECODED SHELL INVOICE XML DATA")
+    print("=" * 50)
+    
+    # Format and display XML
+    try:
+        root = ET.fromstring(decoded_xml)
+        ET.indent(root, space="  ")
+        formatted_xml = ET.tostring(root, encoding='unicode')
+        print(formatted_xml)
+    except:
+        print(decoded_xml)
+    
+    print("\n💰 KEY FINANCIAL DATA EXTRACTED:")
+    print("-" * 30)
+    
+    # Parse financial data
+    try:
+        root = ET.fromstring(decoded_xml)
+        
+        # Extract key amounts
+        line_gross = root.find('.//lineGrossAmountSimplified')
+        invoice_gross = root.find('.//invoiceGrossAmount') 
+        vat_rate = root.find('.//vatContent')
+        
+        if line_gross is not None:
+            print(f"Line Gross Amount: {line_gross.text} HUF")
+        if invoice_gross is not None:
+            print(f"Invoice Gross Amount: {invoice_gross.text} HUF")
+        if vat_rate is not None:
+            print(f"VAT Rate: {float(vat_rate.text)*100:.2f}%")
+            
+        # Extract product info
+        line_desc = root.find('.//lineDescription')
+        quantity = root.find('.//quantity')
+        unit_price = root.find('.//unitPrice')
+        
+        if line_desc is not None:
+            print(f"Product: {line_desc.text}")
+        if quantity is not None:
+            print(f"Quantity: {quantity.text} liters")
+        if unit_price is not None:
+            print(f"Unit Price: {unit_price.text} HUF/liter")
+            
+    except Exception as e:
+        print(f"Error parsing amounts: {e}")
+
+if __name__ == "__main__":
+    decode_invoice_data()

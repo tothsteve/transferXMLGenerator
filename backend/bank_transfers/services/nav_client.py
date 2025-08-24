@@ -536,6 +536,131 @@ class NavApiClient:
         
         return xml_request
     
+    def _create_query_invoice_chain_digest_xml(self, tax_number, invoice_number, direction):
+        """Create XML request for queryInvoiceChainDigest based on NAV 3.0 specification."""
+        
+        # Use the existing credential management methods
+        credentials = self._get_decrypted_credentials()
+        request_id = self._generate_request_id()
+        timestamp = self._generate_timestamp()
+        
+        # Create password hash and request signature using existing methods
+        password_hash = self._hash_password(credentials['technical_user_password'])
+        request_signature = self._generate_request_signature({
+            'requestId': request_id,
+            'timestamp': timestamp
+        })
+        
+        # Clean tax numbers for query requests (8 digits max, no dashes)
+        clean_tax_number = self._clean_tax_number_for_query(self.config.tax_number)
+        clean_supplier_tax_number = self._clean_tax_number_for_query(tax_number)
+        
+        # Create XML matching the NAV 3.0 specification
+        dev_tax_number = self.config.tax_number  # Keep full format for software block
+        software_id = f"HU{clean_tax_number}TXG00001"  # Match BIP's pattern
+        
+        xml_request = f"""<?xml version="1.0" encoding="UTF-8"?>
+<QueryInvoiceChainDigestRequest xmlns:common="http://schemas.nav.gov.hu/NTCA/1.0/common" xmlns="http://schemas.nav.gov.hu/OSA/3.0/api">
+\t<common:header>
+\t\t<common:requestId>{request_id}</common:requestId>
+\t\t<common:timestamp>{timestamp}</common:timestamp>
+\t\t<common:requestVersion>3.0</common:requestVersion>
+\t\t<common:headerVersion>1.0</common:headerVersion>
+\t</common:header>
+\t<common:user>
+\t\t<common:login>{credentials['technical_user_login']}</common:login>
+\t\t<common:passwordHash cryptoType="SHA-512">{password_hash}</common:passwordHash>
+\t\t<common:taxNumber>{clean_tax_number}</common:taxNumber>
+\t\t<common:requestSignature cryptoType="SHA3-512">{request_signature}</common:requestSignature>
+\t</common:user>
+\t<software>
+\t\t<softwareId>{software_id}</softwareId>
+\t\t<softwareName>TransferXMLGenerator</softwareName>
+\t\t<softwareOperation>LOCAL_SOFTWARE</softwareOperation>
+\t\t<softwareMainVersion>1.0</softwareMainVersion>
+\t\t<softwareDevName>IT Cardigan Kft.</softwareDevName>
+\t\t<softwareDevContact>info@itcardigan.hu</softwareDevContact>
+\t\t<softwareDevCountryCode>HU</softwareDevCountryCode>
+\t\t<softwareDevTaxNumber>{dev_tax_number}</softwareDevTaxNumber>
+\t</software>
+\t<page>1</page>
+\t<invoiceChainQuery>
+\t\t<invoiceNumber>{invoice_number}</invoiceNumber>
+\t\t<invoiceDirection>{direction}</invoiceDirection>
+\t\t<taxNumber>{clean_supplier_tax_number}</taxNumber>
+\t</invoiceChainQuery>
+</QueryInvoiceChainDigestRequest>"""
+        
+        return xml_request
+    
+    def _parse_invoice_chain_digest_response(self, xml_response):
+        """Parse XML response from queryInvoiceChainDigest."""
+        try:
+            root = ET.fromstring(xml_response)
+            
+            # Check for successful response first
+            result_elem = root.find('.//{http://schemas.nav.gov.hu/NTCA/1.0/common}result')
+            if result_elem is not None:
+                func_code_elem = result_elem.find('.//{http://schemas.nav.gov.hu/NTCA/1.0/common}funcCode')
+                if func_code_elem is not None and func_code_elem.text != 'OK':
+                    error_code = func_code_elem.text
+                    message_elem = result_elem.find('.//{http://schemas.nav.gov.hu/NTCA/1.0/common}message')
+                    message = message_elem.text if message_elem is not None else "Unknown error"
+                    raise Exception(f"NAV API error: {error_code} - {message}")
+            
+            # Extract invoice chain elements
+            chain_elements = []
+            
+            # Look for invoiceChainElement elements in the response
+            for chain_elem in root.findall('.//{http://schemas.nav.gov.hu/OSA/3.0/api}invoiceChainElement'):
+                element_data = {}
+                
+                # Helper function to extract text from element
+                def get_text(parent, tag_name):
+                    namespace = 'http://schemas.nav.gov.hu/OSA/3.0/api'
+                    elem = parent.find(f'.//{{{namespace}}}{tag_name}')
+                    return elem.text if elem is not None else None
+                
+                # Extract chain digest data
+                digest_elem = chain_elem.find('.//{http://schemas.nav.gov.hu/OSA/3.0/api}invoiceChainDigest')
+                if digest_elem is not None:
+                    element_data['invoiceNumber'] = get_text(digest_elem, 'invoiceNumber')
+                    element_data['invoiceOperation'] = get_text(digest_elem, 'invoiceOperation')
+                    element_data['supplierTaxNumber'] = get_text(digest_elem, 'supplierTaxNumber')
+                    element_data['customerTaxNumber'] = get_text(digest_elem, 'customerTaxNumber')
+                    element_data['insDate'] = get_text(digest_elem, 'insDate')
+                    element_data['originalRequestVersion'] = get_text(digest_elem, 'originalRequestVersion')
+                    
+                # Extract audit data if present
+                audit_elem = chain_elem.find('.//{http://schemas.nav.gov.hu/OSA/3.0/api}auditData')
+                if audit_elem is not None:
+                    element_data['transactionId'] = get_text(audit_elem, 'transactionId')
+                    element_data['index'] = get_text(audit_elem, 'index')
+                    element_data['source'] = get_text(audit_elem, 'source')
+                    element_data['originalRequestVersion'] = get_text(audit_elem, 'originalRequestVersion')
+                    element_data['insDate'] = get_text(audit_elem, 'insDate')
+                    element_data['insCusUser'] = get_text(audit_elem, 'insCusUser')
+                
+                # Extract invoice lines information
+                lines_elem = chain_elem.find('.//{http://schemas.nav.gov.hu/OSA/3.0/api}invoiceLines')
+                if lines_elem is not None:
+                    element_data['maxLineNumber'] = get_text(lines_elem, 'maxLineNumber')
+                    element_data['lineNumbers'] = []
+                    # Look for specific line numbers
+                    for line_elem in lines_elem.findall('.//{http://schemas.nav.gov.hu/OSA/3.0/api}lineNumber'):
+                        if line_elem.text:
+                            element_data['lineNumbers'].append(int(line_elem.text))
+                
+                chain_elements.append(element_data)
+            
+            return {
+                'chainElements': chain_elements,
+                'raw_response': xml_response[:1000]  # First 1000 chars for debugging
+            }
+            
+        except ET.ParseError as e:
+            raise Exception(f"Failed to parse invoice chain digest response: {str(e)}")
+    
     def _make_xml_request(self, endpoint, xml_data):
         """Make XML request to NAV API."""
         url = f"{self.base_url}/{endpoint}"
@@ -562,27 +687,41 @@ class NavApiClient:
             for invoice_elem in root.findall('.//{http://schemas.nav.gov.hu/OSA/3.0/api}invoiceDigest'):
                 invoice_data = {}
                 
-                # Extract basic invoice info
-                invoice_number_elem = invoice_elem.find('.//{http://schemas.nav.gov.hu/OSA/3.0/api}invoiceNumber')
-                if invoice_number_elem is not None:
-                    invoice_data['invoiceNumber'] = invoice_number_elem.text
+                # Helper function to extract text from element
+                def get_text(parent, tag_name):
+                    namespace = 'http://schemas.nav.gov.hu/OSA/3.0/api'
+                    elem = parent.find(f'.//{{{namespace}}}{tag_name}')
+                    return elem.text if elem is not None else None
                 
-                # Extract supplier tax number for detailed queries
-                supplier_tax_number_elem = invoice_elem.find('.//{http://schemas.nav.gov.hu/OSA/3.0/api}supplierTaxNumber')
-                if supplier_tax_number_elem is not None:
-                    invoice_data['supplierTaxNumber'] = supplier_tax_number_elem.text
+                # Extract ALL available fields from digest (following BIP's approach)
+                invoice_data['invoiceNumber'] = get_text(invoice_elem, 'invoiceNumber')
+                invoice_data['invoiceOperation'] = get_text(invoice_elem, 'invoiceOperation') 
+                invoice_data['invoiceCategory'] = get_text(invoice_elem, 'invoiceCategory')
+                invoice_data['invoiceIssueDate'] = get_text(invoice_elem, 'invoiceIssueDate')
+                invoice_data['supplierTaxNumber'] = get_text(invoice_elem, 'supplierTaxNumber')
+                invoice_data['supplierName'] = get_text(invoice_elem, 'supplierName')
+                invoice_data['customerTaxNumber'] = get_text(invoice_elem, 'customerTaxNumber')
+                invoice_data['customerName'] = get_text(invoice_elem, 'customerName')
+                invoice_data['paymentMethod'] = get_text(invoice_elem, 'paymentMethod')
+                invoice_data['paymentDate'] = get_text(invoice_elem, 'paymentDate')
+                invoice_data['invoiceAppearance'] = get_text(invoice_elem, 'invoiceAppearance')
+                invoice_data['source'] = get_text(invoice_elem, 'source')
+                invoice_data['invoiceDeliveryDate'] = get_text(invoice_elem, 'invoiceDeliveryDate')
+                invoice_data['currency'] = get_text(invoice_elem, 'currency')
+                invoice_data['invoiceNetAmount'] = get_text(invoice_elem, 'invoiceNetAmount')
+                invoice_data['invoiceNetAmountHUF'] = get_text(invoice_elem, 'invoiceNetAmountHUF')
+                invoice_data['invoiceVatAmount'] = get_text(invoice_elem, 'invoiceVatAmount')
+                invoice_data['invoiceVatAmountHUF'] = get_text(invoice_elem, 'invoiceVatAmountHUF')
+                invoice_data['transactionId'] = get_text(invoice_elem, 'transactionId')
+                invoice_data['index'] = get_text(invoice_elem, 'index')
+                invoice_data['insDate'] = get_text(invoice_elem, 'insDate')  # NAV creation date
+                invoice_data['completenessIndicator'] = get_text(invoice_elem, 'completenessIndicator')
+                invoice_data['modificationIndex'] = get_text(invoice_elem, 'modificationIndex')
+                invoice_data['originalInvoiceNumber'] = get_text(invoice_elem, 'originalInvoiceNumber')
                 
                 # Extract batch index if available
-                batch_index_elem = invoice_elem.find('.//{http://schemas.nav.gov.hu/OSA/3.0/api}batchIndex')
-                if batch_index_elem is not None:
-                    invoice_data['batchIndex'] = int(batch_index_elem.text)
-                else:
-                    invoice_data['batchIndex'] = 1  # Default
-                
-                # Extract other useful fields
-                supplier_name_elem = invoice_elem.find('.//{http://schemas.nav.gov.hu/OSA/3.0/api}supplierName')
-                if supplier_name_elem is not None:
-                    invoice_data['supplierName'] = supplier_name_elem.text
+                batch_index_text = get_text(invoice_elem, 'batchIndex')
+                invoice_data['batchIndex'] = int(batch_index_text) if batch_index_text else 1
                 
                 invoices.append(invoice_data)
             
@@ -591,18 +730,47 @@ class NavApiClient:
         except ET.ParseError as e:
             raise Exception(f"Failed to parse invoice digest response: {str(e)}")
     
-    def query_invoice_data(self, invoice_number, direction='INBOUND', supplier_tax_number=None, batch_index=1):
+    def query_invoice_chain_digest(self, tax_number, invoice_number, direction='INBOUND'):
+        """
+        Query invoice chain digest from NAV API - this must be called BEFORE queryInvoiceData.
+        
+        This method gets the invoice chain metadata including version, operation, and transaction ID
+        which are required for successful queryInvoiceData calls.
+        
+        Args:
+            tax_number: Tax number of the supplier/customer (8 digits)
+            invoice_number: NAV invoice number  
+            direction: 'INBOUND' or 'OUTBOUND'
+            
+        Returns:
+            Dictionary with chain data including version, operation, transactionId
+        """
+        self._ensure_valid_token()
+        
+        try:
+            xml_request = self._create_query_invoice_chain_digest_xml(tax_number, invoice_number, direction)
+            response = self._make_xml_request('queryInvoiceChainDigest', xml_request)
+            return self._parse_invoice_chain_digest_response(response)
+            
+        except Exception as e:
+            raise Exception(f"Query invoice chain digest failed: {str(e)}")
+
+    def query_invoice_data(self, invoice_number, direction='INBOUND', supplier_tax_number=None, batch_index=1, version=None, operation=None):
         """
         Query detailed invoice data from NAV API using XML format.
+        
+        IMPORTANT: This should be called AFTER queryInvoiceChainDigest to get version/operation metadata.
         
         Args:
             invoice_number: NAV invoice number
             direction: 'INBOUND' or 'OUTBOUND'
             supplier_tax_number: Tax number of the supplier (8 digits)
             batch_index: Batch index (default 1)
+            version: NAV API version from chain digest (optional)
+            operation: Invoice operation from chain digest (optional)
             
         Returns:
-            Dictionary with detailed invoice data
+            Dictionary with detailed invoice data including XML content
         """
         self._ensure_valid_token()
         
@@ -663,8 +831,7 @@ class NavApiClient:
 \t</software>
 \t<invoiceNumberQuery>
 \t\t<invoiceNumber>{invoice_number}</invoiceNumber>
-\t\t<invoiceDirection>{direction}</invoiceDirection>
-\t\t<batchIndex>{batch_index}</batchIndex>"""
+\t\t<invoiceDirection>{direction}</invoiceDirection>"""
         
         # Add supplier tax number if provided
         if clean_supplier_tax_number:
@@ -692,10 +859,96 @@ class NavApiClient:
                     message = message_elem.text if message_elem is not None else "Unknown error"
                     raise Exception(f"NAV API error: {error_code} - {message}")
             
-            # Extract invoice data from the response
+            # Check if we have invoiceDataResult (the new successful format)
+            data_result_elem = root.find('.//{http://schemas.nav.gov.hu/OSA/3.0/api}invoiceDataResult')
+            if data_result_elem is not None:
+                # Extract the base64 encoded invoice XML
+                invoice_data_elem = data_result_elem.find('.//{http://schemas.nav.gov.hu/OSA/3.0/api}invoiceData')
+                audit_data_elem = data_result_elem.find('.//{http://schemas.nav.gov.hu/OSA/3.0/api}auditData')
+                
+                invoice_data = {}
+                
+                if invoice_data_elem is not None:
+                    # Decode base64 invoice XML data
+                    import base64
+                    try:
+                        encoded_xml = invoice_data_elem.text
+                        decoded_xml_bytes = base64.b64decode(encoded_xml)
+                        decoded_xml = decoded_xml_bytes.decode('utf-8')
+                        
+                        # Store the raw XML data
+                        invoice_data['nav_invoice_xml'] = decoded_xml
+                        
+                        # Parse the decoded XML to extract financial data
+                        import xml.etree.ElementTree as XMLParser
+                        xml_root = XMLParser.fromstring(decoded_xml)
+                        
+                        # Extract amounts from the decoded XML
+                        gross_amount_elem = xml_root.find('.//{http://schemas.nav.gov.hu/OSA/3.0/data}invoiceGrossAmount')
+                        if gross_amount_elem is not None:
+                            invoice_data['gross_amount'] = float(gross_amount_elem.text)
+                        
+                        # Extract VAT content gross amount as fallback
+                        vat_gross_elem = xml_root.find('.//{http://schemas.nav.gov.hu/OSA/3.0/data}vatContentGrossAmount')
+                        if vat_gross_elem is not None and 'gross_amount' not in invoice_data:
+                            invoice_data['gross_amount'] = float(vat_gross_elem.text)
+                            
+                        # Extract line gross amount as another fallback
+                        line_gross_elem = xml_root.find('.//{http://schemas.nav.gov.hu/OSA/3.0/data}lineGrossAmountSimplified')
+                        if line_gross_elem is not None and 'gross_amount' not in invoice_data:
+                            invoice_data['gross_amount'] = float(line_gross_elem.text)
+                        
+                        # Extract invoice number
+                        inv_num_elem = xml_root.find('.//{http://schemas.nav.gov.hu/OSA/3.0/data}invoiceNumber')
+                        if inv_num_elem is not None:
+                            invoice_data['invoice_number'] = inv_num_elem.text
+                        
+                        # Extract issue date
+                        issue_date_elem = xml_root.find('.//{http://schemas.nav.gov.hu/OSA/3.0/data}invoiceIssueDate')
+                        if issue_date_elem is not None:
+                            invoice_data['issue_date'] = issue_date_elem.text
+                            
+                        # Extract supplier name
+                        supplier_name_elem = xml_root.find('.//{http://schemas.nav.gov.hu/OSA/3.0/data}supplierName')
+                        if supplier_name_elem is not None:
+                            invoice_data['supplier_name'] = supplier_name_elem.text
+                            
+                        # Extract customer name  
+                        customer_name_elem = xml_root.find('.//{http://schemas.nav.gov.hu/OSA/3.0/data}customerName')
+                        if customer_name_elem is not None:
+                            invoice_data['customer_name'] = customer_name_elem.text
+                            
+                        # Extract currency
+                        currency_elem = xml_root.find('.//{http://schemas.nav.gov.hu/OSA/3.0/data}currencyCode')
+                        if currency_elem is not None:
+                            invoice_data['currency'] = currency_elem.text
+                        else:
+                            invoice_data['currency'] = 'HUF'
+                            
+                    except Exception as e:
+                        logger.warning(f"Failed to decode invoice XML data: {str(e)}")
+                        invoice_data['nav_invoice_xml'] = encoded_xml  # Store encoded if decode fails
+                
+                # Extract audit data
+                if audit_data_elem is not None:
+                    def get_audit_text(tag_name):
+                        elem = audit_data_elem.find(f'.//{{{namespaces_api}}}{tag_name}')
+                        return elem.text if elem is not None else None
+                    
+                    namespaces_api = 'http://schemas.nav.gov.hu/OSA/3.0/api'
+                    invoice_data['transaction_id'] = get_audit_text('transactionId')
+                    invoice_data['nav_index'] = get_audit_text('index')
+                    invoice_data['nav_source'] = get_audit_text('source')
+                    invoice_data['original_request_version'] = get_audit_text('originalRequestVersion')
+                    invoice_data['nav_creation_date'] = get_audit_text('insdate')
+                    invoice_data['ins_cus_user'] = get_audit_text('insCusUser')
+                
+                return invoice_data
+            
+            # Fallback: try old parsing method for backwards compatibility
             invoice_data = {}
             
-            # Look for invoice elements in the response
+            # Look for invoice elements in the response  
             invoice_elem = root.find('.//{http://schemas.nav.gov.hu/OSA/3.0/data}invoiceData')
             if invoice_elem is None:
                 # Try alternative path

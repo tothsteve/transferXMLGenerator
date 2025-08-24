@@ -1,0 +1,7 @@
+NAV BatchIndex Test Summary
+========================================
+Date tested: 2025-08-23 22:59:11.134000
+Invoice tested: A/A28700200/1180/00013
+Batch indexes tested: 1-5
+
+Check individual response files for detailed results.

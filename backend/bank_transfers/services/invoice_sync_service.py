@@ -198,24 +198,78 @@ class InvoiceSyncService:
                 supplier_tax_number = digest_entry.get('supplierTaxNumber')
                 batch_index = digest_entry.get('batchIndex', 1)
                 
+                # Debug: Log what data is available in the digest
+                logger.info(f"📊 Digest data for {nav_invoice_number}: net={digest_entry.get('invoiceNetAmount', 'MISSING')}, vat={digest_entry.get('invoiceVatAmount', 'MISSING')}, gross={digest_entry.get('invoiceGrossAmount', 'MISSING')}, currency={digest_entry.get('currency', 'MISSING')}")
+                logger.info(f"📊 All digest keys: {list(digest_entry.keys())}")
+                
                 # Check if invoice already exists
                 existing_invoice = Invoice.objects.filter(
                     company=company,
                     nav_invoice_number=nav_invoice_number
                 ).first()
                 
-                # Query detailed invoice data from NAV (READ-ONLY)
-                # Pass the direction from the original query and supplier info from digest
+                # Modern NAV approach: Query invoice chain FIRST, then detailed data
+                # This follows the BIP pattern for proper invoice data retrieval
                 try:
+                    logger.info(f"Step 1: Querying chain digest for invoice: {nav_invoice_number} (direction={direction}, supplier={supplier_tax_number})")
+                    
+                    # Step 1: Query invoice chain digest to get metadata
+                    chain_data = nav_client.query_invoice_chain_digest(
+                        tax_number=supplier_tax_number,
+                        invoice_number=nav_invoice_number,
+                        direction=direction
+                    )
+                    
+                    # Extract version and operation from chain data
+                    version = None
+                    operation = None
+                    transaction_id = None
+                    
+                    if chain_data and 'chainElements' in chain_data:
+                        # Find matching invoice in chain
+                        for element in chain_data['chainElements']:
+                            if element.get('invoiceNumber') == nav_invoice_number:
+                                version = element.get('originalRequestVersion')
+                                operation = element.get('invoiceOperation')
+                                transaction_id = element.get('transactionId')
+                                logger.info(f"✅ Chain metadata found: version={version}, operation={operation}, transactionId={transaction_id}")
+                                break
+                        
+                        if not version:
+                            logger.warning(f"⚠️  No matching chain element found for {nav_invoice_number}")
+                    
+                    # Step 2: Query detailed invoice data with chain metadata
+                    logger.info(f"Step 2: Querying detailed data for invoice: {nav_invoice_number}")
                     detailed_invoice_data = nav_client.query_invoice_data(
                         nav_invoice_number, 
                         direction=direction, 
                         supplier_tax_number=supplier_tax_number,
-                        batch_index=batch_index
+                        batch_index=batch_index,
+                        version=version,
+                        operation=operation
                     )
+                    
+                    if detailed_invoice_data:
+                        logger.info(f"✅ Detailed data received for {nav_invoice_number}: {list(detailed_invoice_data.keys()) if isinstance(detailed_invoice_data, dict) else type(detailed_invoice_data)}")
+                        # Add chain metadata to detailed data
+                        if transaction_id:
+                            detailed_invoice_data['transaction_id'] = transaction_id
+                        if version:
+                            detailed_invoice_data['original_request_version'] = version
+                        if operation:
+                            detailed_invoice_data['invoice_operation'] = operation
+                            
+                        # Check if we got XML data
+                        if 'nav_invoice_xml' in detailed_invoice_data:
+                            logger.info(f"📄 XML data received for {nav_invoice_number} ({len(detailed_invoice_data['nav_invoice_xml'])} characters)")
+                        if 'gross_amount' in detailed_invoice_data:
+                            logger.info(f"💰 Gross amount from XML: {detailed_invoice_data['gross_amount']} {detailed_invoice_data.get('currency', 'HUF')}")
+                    else:
+                        logger.info(f"⚠️  No detailed data returned for {nav_invoice_number}")
+                        
                 except Exception as e:
-                    # If detailed query fails, continue with digest data only
-                    logger.warning(f"Detailed query failed for {nav_invoice_number}: {str(e)}")
+                    # If chain or detailed query fails, continue with digest data only
+                    logger.warning(f"❌ Advanced query failed for {nav_invoice_number}: {str(e)}")
                     detailed_invoice_data = None
                 
                 # Create invoice data from available information
@@ -227,10 +281,16 @@ class InvoiceSyncService:
                     # Update existing invoice
                     self._update_invoice_from_nav_data(existing_invoice, invoice_data)
                     invoices_updated += 1
+                    # Extract and save line items if we have XML data
+                    if detailed_invoice_data and 'nav_invoice_xml' in detailed_invoice_data:
+                        self._extract_and_save_line_items(existing_invoice, detailed_invoice_data['nav_invoice_xml'])
                 else:
                     # Create new invoice
-                    self._create_invoice_from_nav_data(company, invoice_data)
+                    new_invoice = self._create_invoice_from_nav_data(company, invoice_data)
                     invoices_created += 1
+                    # Extract and save line items if we have XML data
+                    if detailed_invoice_data and 'nav_invoice_xml' in detailed_invoice_data:
+                        self._extract_and_save_line_items(new_invoice, detailed_invoice_data['nav_invoice_xml'])
                 
                 invoices_processed += 1
                 
@@ -252,33 +312,209 @@ class InvoiceSyncService:
             'errors': []
         }
     
+    def _extract_and_save_line_items(self, invoice: Invoice, nav_invoice_xml: str):
+        """
+        Extract line items from NAV invoice XML and save to database.
+        
+        Args:
+            invoice: Invoice instance to attach line items to
+            nav_invoice_xml: Decoded NAV invoice XML string
+        """
+        try:
+            import xml.etree.ElementTree as ET
+            
+            # Parse the XML
+            root = ET.fromstring(nav_invoice_xml)
+            
+            # Clear existing line items for this invoice
+            invoice.line_items.all().delete()
+            
+            # Find all line elements
+            line_elements = root.findall('.//{http://schemas.nav.gov.hu/OSA/3.0/data}line')
+            
+            for line_elem in line_elements:
+                line_data = {}
+                
+                # Helper function to get text from element
+                def get_line_text(tag_name):
+                    namespace = "http://schemas.nav.gov.hu/OSA/3.0/data"
+                    elem = line_elem.find(f'.//{{{namespace}}}{tag_name}')
+                    return elem.text if elem is not None else None
+                
+                # Extract line information
+                line_number = get_line_text('lineNumber')
+                if line_number:
+                    line_data['line_number'] = int(line_number)
+                else:
+                    continue  # Skip if no line number
+                
+                line_data['line_description'] = get_line_text('lineDescription') or ''
+                
+                # Extract quantity and unit info
+                quantity_text = get_line_text('quantity')
+                if quantity_text:
+                    try:
+                        line_data['quantity'] = Decimal(quantity_text)
+                    except:
+                        line_data['quantity'] = None
+                else:
+                    line_data['quantity'] = None
+                
+                line_data['unit_of_measure'] = get_line_text('unitOfMeasure') or ''
+                
+                # Extract unit price
+                unit_price_text = get_line_text('unitPrice')
+                if unit_price_text:
+                    try:
+                        line_data['unit_price'] = Decimal(unit_price_text)
+                    except:
+                        line_data['unit_price'] = None
+                else:
+                    line_data['unit_price'] = None
+                
+                # Extract line net amount (required field)
+                line_net_text = get_line_text('lineNetAmount')
+                if line_net_text:
+                    try:
+                        line_data['line_net_amount'] = Decimal(line_net_text)
+                    except:
+                        line_data['line_net_amount'] = Decimal('0.00')
+                else:
+                    # Try to get from simplified amount structure
+                    line_gross_text = get_line_text('lineGrossAmountSimplified')
+                    if line_gross_text:
+                        try:
+                            # For simplified invoices, use gross amount as approximation
+                            line_data['line_net_amount'] = Decimal(line_gross_text)
+                        except:
+                            line_data['line_net_amount'] = Decimal('0.00')
+                    else:
+                        line_data['line_net_amount'] = Decimal('0.00')
+                
+                # Extract line VAT amount
+                line_vat_text = get_line_text('lineVatAmount')
+                if line_vat_text:
+                    try:
+                        line_data['line_vat_amount'] = Decimal(line_vat_text)
+                    except:
+                        line_data['line_vat_amount'] = Decimal('0.00')
+                else:
+                    line_data['line_vat_amount'] = Decimal('0.00')
+                
+                # Extract line gross amount
+                line_gross_text = get_line_text('lineGrossAmount') or get_line_text('lineGrossAmountSimplified')
+                if line_gross_text:
+                    try:
+                        line_data['line_gross_amount'] = Decimal(line_gross_text)
+                    except:
+                        line_data['line_gross_amount'] = Decimal('0.00')
+                else:
+                    line_data['line_gross_amount'] = Decimal('0.00')
+                
+                # Create the line item
+                InvoiceLineItem.objects.create(
+                    invoice=invoice,
+                    line_number=line_data['line_number'],
+                    line_description=line_data['line_description'],
+                    quantity=line_data['quantity'],
+                    unit_of_measure=line_data['unit_of_measure'],
+                    unit_price=line_data['unit_price'],
+                    line_net_amount=line_data['line_net_amount'],
+                    line_vat_amount=line_data['line_vat_amount'],
+                    line_gross_amount=line_data['line_gross_amount']
+                )
+            
+            # Log line items created
+            line_count = invoice.line_items.count()
+            logger.info(f"📝 Extracted {line_count} line items for invoice {invoice.nav_invoice_number}")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to extract line items for invoice {invoice.nav_invoice_number}: {str(e)}")
+    
     def _create_invoice_data_from_digest(self, digest_entry: Dict, direction: str, detailed_data: Dict = None) -> Dict:
         """Create comprehensive invoice data from digest and detailed information."""
-        from datetime import date
         from django.utils import timezone
+        from decimal import Decimal
         
-        # Start with digest data
+        # Extract ALL available data from digest (NAV provides complete business data here!)
         invoice_data = {
             'invoice_number': digest_entry.get('invoiceNumber', ''),
             'invoice_direction': direction,
             'supplier_name': digest_entry.get('supplierName', ''),
             'supplier_tax_number': digest_entry.get('supplierTaxNumber', ''),
+            'customer_name': digest_entry.get('customerName', ''),
+            'customer_tax_number': digest_entry.get('customerTaxNumber', ''),
             'batch_index': digest_entry.get('batchIndex', 1),
-            # Defaults for required fields
-            'issue_date': date.today().isoformat(),  # Use today as fallback
-            'currency': 'HUF',
-            'net_amount': 0.0,
-            'gross_amount': 0.0,
-            'customer_name': '',
-            'customer_tax_number': '',
-            'last_modified_date': timezone.now().isoformat(),  # Default to now
+            
+            # Real dates from NAV
+            'issue_date': digest_entry.get('invoiceIssueDate', ''),  # Real issue date
+            'payment_due_date': digest_entry.get('paymentDate', ''),
+            'fulfillment_date': digest_entry.get('invoiceDeliveryDate', ''),
+            'nav_creation_date': digest_entry.get('insDate', ''),  # When created in NAV
+            
+            # Real amounts from NAV
+            'currency': digest_entry.get('currency', 'HUF'),
+            'net_amount': self._safe_decimal(digest_entry.get('invoiceNetAmount', '0')),
+            'vat_amount': self._safe_decimal(digest_entry.get('invoiceVatAmount', '0')),
+            'gross_amount': self._calculate_gross_amount(digest_entry),
+            
+            # Additional NAV metadata (now stored in database!)
+            'invoice_operation': digest_entry.get('invoiceOperation', ''),
+            'invoice_category': digest_entry.get('invoiceCategory', ''),
+            'payment_method': digest_entry.get('paymentMethod', ''),
+            'payment_date': digest_entry.get('paymentDate', ''),
+            'invoice_appearance': digest_entry.get('invoiceAppearance', ''),
+            'nav_source': digest_entry.get('source', ''),
+            'completeness_indicator': self._parse_boolean(digest_entry.get('completenessIndicator', '')),
+            'modification_index': self._safe_integer(digest_entry.get('modificationIndex', '')),
+            'original_invoice_number': digest_entry.get('originalInvoiceNumber', ''),
+            'invoice_index': self._safe_integer(digest_entry.get('index', '')),
+            'nav_creation_date': digest_entry.get('insDate', ''),
+            'transaction_id': digest_entry.get('transactionId', ''),
+            
+            # HUF amounts for foreign currency invoices
+            'net_amount_huf': self._safe_decimal(digest_entry.get('invoiceNetAmountHUF', '')),
+            'vat_amount_huf': self._safe_decimal(digest_entry.get('invoiceVatAmountHUF', '')),
+            
+            # Default for required field
+            'last_modified_date': timezone.now().isoformat(),
         }
         
-        # Override with detailed data if available
+        # Override with detailed data if available (but digest has everything we need!)
         if detailed_data:
             invoice_data.update(detailed_data)
         
         return invoice_data
+    
+    def _safe_decimal(self, value: str) -> float:
+        """Safely convert string to decimal/float."""
+        if not value:
+            return 0.0
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return 0.0
+    
+    def _calculate_gross_amount(self, digest_entry: Dict) -> float:
+        """Calculate gross amount from net + VAT amounts."""
+        net = self._safe_decimal(digest_entry.get('invoiceNetAmount', '0'))
+        vat = self._safe_decimal(digest_entry.get('invoiceVatAmount', '0'))
+        return net + vat
+    
+    def _safe_integer(self, value: str) -> int:
+        """Safely convert string to integer."""
+        if not value:
+            return None
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return None
+    
+    def _parse_boolean(self, value: str) -> bool:
+        """Parse string to boolean."""
+        if not value:
+            return None
+        return str(value).lower() in ('true', '1', 'yes')
     
     @transaction.atomic
     def _create_invoice_from_nav_data(self, company: Company, nav_data: Dict) -> Invoice:
@@ -302,8 +538,35 @@ class InvoiceSyncService:
             original_request_version=nav_data.get('original_request_version', ''),
             completion_date=self._parse_nav_date(nav_data.get('completion_date')),
             source='NAV_SYNC',
-            nav_transaction_id=nav_data.get('transactionId', ''),
+            nav_transaction_id=nav_data.get('transaction_id', ''),
             last_modified_date=self._parse_nav_date(nav_data.get('last_modified_date')) or django_timezone.now(),
+            
+            # New NAV business fields
+            invoice_operation=nav_data.get('invoice_operation') or None,
+            invoice_category=nav_data.get('invoice_category') or None,
+            payment_method=nav_data.get('payment_method') or None,
+            payment_date=self._parse_nav_date(nav_data.get('payment_date')),
+            invoice_appearance=nav_data.get('invoice_appearance') or None,
+            nav_source=nav_data.get('nav_source') or None,
+            completeness_indicator=nav_data.get('completeness_indicator'),
+            modification_index=nav_data.get('modification_index'),
+            original_invoice_number=nav_data.get('original_invoice_number') or None,
+            invoice_index=nav_data.get('invoice_index'),
+            batch_index=nav_data.get('batch_index'),
+            nav_creation_date=self._parse_nav_date(nav_data.get('nav_creation_date')),
+            
+            # HUF amounts for foreign currency invoices
+            invoice_net_amount_huf=self._parse_decimal(nav_data.get('net_amount_huf', '0')) if nav_data.get('net_amount_huf') else None,
+            invoice_vat_amount_huf=self._parse_decimal(nav_data.get('vat_amount_huf', '0')) if nav_data.get('vat_amount_huf') else None,
+            invoice_gross_amount_huf=(
+                self._parse_decimal(nav_data.get('net_amount_huf', '0')) + 
+                self._parse_decimal(nav_data.get('vat_amount_huf', '0'))
+            ) if nav_data.get('net_amount_huf') and nav_data.get('vat_amount_huf') else None,
+            
+            # XML Data Storage
+            nav_invoice_xml=nav_data.get('nav_invoice_xml'),
+            nav_invoice_hash=nav_data.get('nav_invoice_hash'),
+            
             sync_status='SYNCED'
         )
         
@@ -327,6 +590,13 @@ class InvoiceSyncService:
         invoice.invoice_vat_amount = self._parse_decimal(nav_data.get('vat_amount', str(invoice.invoice_vat_amount)))
         invoice.invoice_gross_amount = self._parse_decimal(nav_data.get('gross_amount', str(invoice.invoice_gross_amount)))
         invoice.last_modified_date = self._parse_nav_date(nav_data.get('last_modified_date')) or invoice.last_modified_date or django_timezone.now()
+        
+        # Update XML data if available
+        if nav_data.get('nav_invoice_xml'):
+            invoice.nav_invoice_xml = nav_data.get('nav_invoice_xml')
+        if nav_data.get('nav_invoice_hash'):
+            invoice.nav_invoice_hash = nav_data.get('nav_invoice_hash')
+            
         invoice.sync_status = 'SYNCED'
         
         invoice.save()

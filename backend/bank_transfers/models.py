@@ -369,6 +369,29 @@ class Invoice(models.Model):
     nav_transaction_id = models.CharField(max_length=100, blank=True, verbose_name="NAV tranzakció azonosító")
     last_modified_date = models.DateTimeField(verbose_name="Utolsó módosítás (NAV)")
     
+    # Additional NAV business fields
+    invoice_operation = models.CharField(max_length=20, null=True, blank=True, verbose_name="Számla művelet (CREATE/STORNO/MODIFY)")
+    invoice_category = models.CharField(max_length=20, null=True, blank=True, verbose_name="Számla kategória (NORMAL/SIMPLIFIED)")
+    payment_method = models.CharField(max_length=20, null=True, blank=True, verbose_name="Fizetési mód (TRANSFER/CASH/CARD)")
+    payment_date = models.DateField(null=True, blank=True, verbose_name="Fizetési dátum")
+    invoice_appearance = models.CharField(max_length=20, null=True, blank=True, verbose_name="Számla megjelenés (PAPER/ELECTRONIC)")
+    nav_source = models.CharField(max_length=10, null=True, blank=True, verbose_name="NAV forrás (OSZ/XML)")
+    completeness_indicator = models.BooleanField(null=True, blank=True, verbose_name="Teljesség jelző")
+    modification_index = models.IntegerField(null=True, blank=True, verbose_name="Módosítási index")
+    original_invoice_number = models.CharField(max_length=100, null=True, blank=True, verbose_name="Eredeti számla száma (storno esetén)")
+    invoice_index = models.IntegerField(null=True, blank=True, verbose_name="Számla index")
+    batch_index = models.IntegerField(null=True, blank=True, verbose_name="Köteg index")
+    nav_creation_date = models.DateTimeField(null=True, blank=True, verbose_name="NAV létrehozási dátum")
+    
+    # HUF amounts for foreign currency invoices
+    invoice_net_amount_huf = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True, verbose_name="Nettó összeg (HUF)")
+    invoice_vat_amount_huf = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True, verbose_name="ÁFA összeg (HUF)")
+    invoice_gross_amount_huf = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True, verbose_name="Bruttó összeg (HUF)")
+    
+    # XML Data Storage
+    nav_invoice_xml = models.TextField(null=True, blank=True, verbose_name="NAV számla XML")
+    nav_invoice_hash = models.CharField(max_length=200, null=True, blank=True, verbose_name="NAV számla hash")
+    
     # Sync metadata
     sync_status = models.CharField(max_length=10, choices=SYNC_STATUS_CHOICES, default='SUCCESS')
     
