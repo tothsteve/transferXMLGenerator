@@ -52,9 +52,12 @@ const Layout: React.FC = () => {
           component="main" 
           sx={{ 
             flexGrow: 1, 
-            p: 3,
+            p: { xs: 0.5, sm: 0.5, md: 1 },
             bgcolor: 'background.default',
-            overflow: 'auto'
+            overflow: 'auto',
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column'
           }}
         >
           <Routes>

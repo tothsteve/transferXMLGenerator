@@ -9,6 +9,7 @@ This is the base settings file. For specific environments, use:
 import os
 from pathlib import Path
 from decouple import config
+from cryptography.fernet import Fernet
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -208,3 +209,13 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_LIFETIME': timedelta(minutes=60),
     'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=7),
 }
+
+# NAV API Configuration (Global Settings)
+NAV_API_TIMEOUT = config('NAV_API_TIMEOUT', default=30, cast=int)
+NAV_SYNC_BATCH_SIZE = config('NAV_SYNC_BATCH_SIZE', default=100, cast=int)
+
+# Master encryption key for application-level encryption
+# This is used to encrypt/decrypt company-specific NAV credentials
+# IMPORTANT: In production, set MASTER_ENCRYPTION_KEY environment variable
+# For development, using a fixed key to avoid decryption issues
+MASTER_ENCRYPTION_KEY = config('MASTER_ENCRYPTION_KEY', default='xzHCWpmz42ogX-qf_3gSYR85YU4hlbWxx8t8bSVMgJ8=')

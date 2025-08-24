@@ -62,18 +62,23 @@ const BatchManager: React.FC = () => {
       setDownloadingBatchId(batch.id);
       const response = await downloadMutation.mutateAsync(batch.id);
       
+      // Determine file type based on batch name
+      const isKHExport = batch.name.includes('KH Export');
+      const mimeType = isKHExport ? 'text/csv; charset=utf-8' : 'application/xml';
+      const fileExtension = isKHExport ? 'csv' : 'xml';
+      
       // Create download link
-      const blob = new Blob([response.data], { type: 'application/xml' });
+      const blob = new Blob([response.data], { type: mimeType });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = batch.xml_filename || `batch_${batch.id}.xml`;
+      link.download = batch.xml_filename || `batch_${batch.id}.${fileExtension}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Error downloading XML:', error);
+      console.error('Error downloading file:', error);
     } finally {
       setDownloadingBatchId(null);
     }
@@ -125,11 +130,11 @@ const BatchManager: React.FC = () => {
         <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
           <DescriptionIcon sx={{ fontSize: 32, color: 'primary.main' }} />
           <Typography variant="h4" component="h1" fontWeight="bold">
-            XML Kötegek Kezelése
+            Kötegek kezelése
           </Typography>
         </Stack>
         <Typography variant="body1" color="text.secondary">
-          Itt kezelheted a generált XML fájlokat, letöltheted őket, és jelölheted, hogy fel lettek-e töltve az internetbankba.
+          Itt kezelheted a generált kötegeket, letöltheted őket, és jelölheted, hogy fel lettek-e töltve az internetbankba.
         </Typography>
       </Box>
 
@@ -138,10 +143,10 @@ const BatchManager: React.FC = () => {
           <CardContent sx={{ textAlign: 'center', py: 6 }}>
             <SwapHorizIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
             <Typography variant="h6" color="text.secondary" gutterBottom>
-              Nincs még generált XML köteg
+              Nincs még generált köteg
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Az első XML generálás után itt jelennek meg a kötegek.
+              Az első fájl generálás után itt jelennek meg a kötegek.
             </Typography>
           </CardContent>
         </Card>
@@ -214,7 +219,7 @@ const BatchManager: React.FC = () => {
                     </TableCell>
                     <TableCell>
                       <Stack direction="row" spacing={1} alignItems="center">
-                        <Tooltip title="XML letöltése">
+                        <Tooltip title="Letöltés">
                           <span>
                             <IconButton
                               size="small"

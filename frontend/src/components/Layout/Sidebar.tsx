@@ -47,7 +47,7 @@ const navigation = [
   { name: 'Sablonok', href: '/templates', icon: DescriptionIcon },
   { name: 'PDF Importálás', href: '/pdf-import', icon: CloudUploadIcon },
   { name: 'Átutalások', href: '/transfers', icon: SwapHorizIcon },
-  { name: 'XML Kötegek', href: '/batches', icon: FolderIcon },
+  { name: 'Kötegek kezelése', href: '/batches', icon: FolderIcon },
   { name: 'Beállítások', href: '/settings', icon: SettingsIcon },
 ];
 

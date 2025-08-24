@@ -1,0 +1,1 @@
+# Management package for NAV invoice synchronization

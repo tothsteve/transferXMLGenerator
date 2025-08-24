@@ -25,14 +25,14 @@ class AccountValidationResult:
 
 def validate_and_format_hungarian_account_number(
     account_number: str, 
-    validate_checksum: bool = True
+    validate_checksum: bool = False
 ) -> AccountValidationResult:
     """
     Validates and formats a Hungarian bank account number
     
     Args:
         account_number: The input account number (with or without hyphens)
-        validate_checksum: Whether to validate checksum (default: True)
+        validate_checksum: Whether to validate checksum (default: False)
         
     Returns:
         AccountValidationResult with validation status and formatted number
@@ -68,7 +68,7 @@ def validate_and_format_hungarian_account_number(
         # 16 digits: XXXXXXXX-XXXXXXXX
         formatted = f"{digits_only[:8]}-{digits_only[8:16]}"
     elif len(digits_only) == 24:
-        # 24 digits: XXXXXXXX-XXXXXXXX-XXXXXXXX
+        # True 24-digit BBAN: XXXXXXXX-XXXXXXXX-XXXXXXXX
         formatted = f"{digits_only[:8]}-{digits_only[8:16]}-{digits_only[16:24]}"
     else:
         return AccountValidationResult(
@@ -121,7 +121,13 @@ def validate_hungarian_account_checksum(account_number: str) -> bool:
         # Legacy 16-digit format - no specific checksum validation defined
         return True  # Accept for backwards compatibility
     elif len(digits) == 24:
-        return validate_hungarian_bban_checksum(digits)
+        # Check if this is a 16-digit account padded with 8 trailing zeros
+        if digits.endswith('00000000'):
+            # Treat as 16-digit account - take first 16 digits
+            return True  # 16-digit accounts don't have checksum validation
+        else:
+            # True 24-digit BBAN with checksum
+            return validate_hungarian_bban_checksum(digits)
     
     return False
 

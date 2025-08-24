@@ -151,12 +151,32 @@ const customTheme = createTheme({
       styleOverrides: {
         root: {
           borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+          padding: '4px 8px',
+          fontSize: '0.8125rem',
+          lineHeight: 1.3,
         },
         head: {
           backgroundColor: 'rgba(248, 250, 252, 0.8)',
           fontWeight: 600,
-          fontSize: '0.875rem',
+          fontSize: '0.8125rem',
           color: '#374151',
+          padding: '6px 8px',
+        },
+        sizeSmall: {
+          padding: '2px 6px',
+          fontSize: '0.75rem',
+          lineHeight: 1.2,
+        },
+      },
+    },
+    MuiTable: {
+      styleOverrides: {
+        root: {
+          '& .MuiTableRow-root': {
+            '&:hover': {
+              backgroundColor: 'rgba(0, 0, 0, 0.02)',
+            },
+          },
         },
       },
     },

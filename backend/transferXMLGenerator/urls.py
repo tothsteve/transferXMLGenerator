@@ -9,7 +9,7 @@ from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
 # Health check import
-from bank_transfers.api_views import health_check, cors_debug
+from bank_transfers.api_views import health_check
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -43,9 +43,6 @@ urlpatterns = [
     
     # Health check for Railway
     path('api/health/', health_check, name='health-check'),
-    
-    # CORS debug endpoint
-    path('api/cors-debug/', cors_debug, name='cors-debug'),
     
     # API endpoints
     path('api/', include('bank_transfers.api_urls')),
