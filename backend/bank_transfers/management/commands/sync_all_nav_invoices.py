@@ -64,6 +64,16 @@ class Command(BaseCommand):
             action='store_true',
             help='Prefer test environment over production when auto-selecting'
         )
+        parser.add_argument(
+            '--company-id',
+            type=int,
+            help='Specific company ID to sync (omit for first company)'
+        )
+        parser.add_argument(
+            '--company-name',
+            type=str,
+            help='Company name to sync (alternative to company-id)'
+        )
 
     def handle(self, *args, **options):
         self.setup_logging(options)
@@ -91,7 +101,7 @@ class Command(BaseCommand):
         # Initialize sync service and get company
         try:
             sync_service = InvoiceSyncService()
-            company = Company.objects.first()  # Use first company (can be made configurable)
+            company = self.get_target_company(options)
             if not company:
                 raise CommandError("No companies found. Please create a company first.")
         except Exception as e:
@@ -229,3 +239,27 @@ class Command(BaseCommand):
             handlers=handlers,
             force=True  # Reset existing loggers
         )
+
+    def get_target_company(self, options):
+        """Get target company based on options."""
+        if options['company_id']:
+            # Specific company by ID
+            try:
+                return Company.objects.get(id=options['company_id'])
+            except Company.DoesNotExist:
+                raise CommandError(f"Company with ID {options['company_id']} not found")
+        
+        elif options['company_name']:
+            # Specific company by name (case-insensitive partial match)
+            try:
+                return Company.objects.get(name__icontains=options['company_name'])
+            except Company.DoesNotExist:
+                raise CommandError(f"No company found matching '{options['company_name']}'")
+            except Company.MultipleObjectsReturned:
+                companies = Company.objects.filter(name__icontains=options['company_name'])
+                names = [c.name for c in companies]
+                raise CommandError(f"Multiple companies found: {names}. Use --company-id instead.")
+        
+        else:
+            # Default: first company (backward compatibility)
+            return Company.objects.first()
