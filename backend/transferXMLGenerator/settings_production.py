@@ -191,6 +191,11 @@ def get_or_create_master_key():
     return master_key
 
 MASTER_ENCRYPTION_KEY = get_or_create_master_key()
+
+# NAV API Configuration
+NAV_API_TIMEOUT = config('NAV_API_TIMEOUT', default=30, cast=int)  # 30 second timeout
+NAV_MAX_RETRIES = config('NAV_MAX_RETRIES', default=3, cast=int)   # 3 retry attempts
+
 SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = 'DENY'
 
