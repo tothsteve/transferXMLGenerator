@@ -2,12 +2,15 @@ import requests
 import hashlib
 import hmac
 import base64
+import logging
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 from django.conf import settings
 from .credential_manager import CredentialManager
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
+
+logger = logging.getLogger(__name__)
 
 
 class NavApiClient:
