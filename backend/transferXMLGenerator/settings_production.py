@@ -177,6 +177,20 @@ SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# NAV encryption key for credential management
+def get_or_create_master_key():
+    """Generate or retrieve master encryption key for NAV credentials"""
+    from cryptography.fernet import Fernet
+    master_key = config('MASTER_ENCRYPTION_KEY', default=None)
+    if not master_key:
+        # Generate a new key if none exists
+        key = Fernet.generate_key()
+        master_key = key.decode()
+        print(f"Generated new MASTER encryption key. Add this to Railway variables: MASTER_ENCRYPTION_KEY={master_key}")
+    return master_key
+
+MASTER_ENCRYPTION_KEY = get_or_create_master_key()
 SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = 'DENY'
 
