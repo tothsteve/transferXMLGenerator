@@ -68,11 +68,38 @@ npm run build
 
 ## Database Configuration
 
-The backend connects to SQL Server:
+### ⚠️ CRITICAL: Settings Architecture
+
+**DO NOT MODIFY** the environment detection system in `backend/transferXMLGenerator/settings.py`:
+
+```python
+# This structure is REQUIRED for Railway deployment
+ENVIRONMENT = config('ENVIRONMENT', default='local')
+
+if ENVIRONMENT == 'production':
+    from .settings_production import *  # PostgreSQL with connection pooling
+else:
+    from .settings_local import *       # SQL Server for local development
+```
+
+**Why this matters:**
+- Railway deployment **requires** `settings_production.py` for PostgreSQL connection pooling
+- Local development uses `settings_local.py` for SQL Server 
+- **Never put database config directly in main `settings.py`** - this breaks Railway deployment
+- **Never set `DJANGO_SETTINGS_MODULE` in Railway** - let environment detection work
+
+### Environment-Specific Database Config
+
+**Local Development (SQL Server):**
 - Host: localhost:1435
 - Database: administration
-- Uses `python-decouple` for environment variables
+- Uses `settings_local.py`
 - Set `DB_PASSWORD` and `SECRET_KEY` in environment or `.env` file
+
+**Production (Railway PostgreSQL):**
+- Uses `settings_production.py` with connection pooling
+- Railway provides `DATABASE_URL` automatically
+- Requires `ENVIRONMENT=production` in Railway variables
 
 ## API Architecture
 

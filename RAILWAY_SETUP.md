@@ -51,6 +51,22 @@ The PostgreSQL service will be automatically configured by Railway with the foll
 
 In your Railway project dashboard, go to **Variables** tab and add the following environment variables:
 
+### ⚠️ CRITICAL CONFIGURATION
+
+**IMPORTANT**: Railway deployment requires these specific environment variables for proper database connection:
+
+```bash
+# CRITICAL: This triggers environment-based settings detection
+ENVIRONMENT=production
+
+# DO NOT SET: DJANGO_SETTINGS_MODULE - let settings.py handle environment detection automatically
+```
+
+**Why this matters:**
+- `ENVIRONMENT=production` triggers `settings.py` to import from `settings_production.py`
+- `settings_production.py` has proper PostgreSQL connection pooling (`conn_max_age=600`, `conn_health_checks=True`)
+- Without this, Railway will use basic database config and connection will fail with `psycopg2.OperationalError`
+
 ### Required Variables
 
 ```bash
@@ -58,7 +74,7 @@ In your Railway project dashboard, go to **Variables** tab and add the following
 SECRET_KEY=your_64_character_secret_key_for_django_security
 DEBUG=False
 ALLOWED_HOSTS=your-app-name.railway.app,your-custom-domain.com
-DJANGO_SETTINGS_MODULE=transferXMLGenerator.settings
+ENVIRONMENT=production
 
 # Database (Railway automatically provides DATABASE_URL)
 # No need to set individual DB variables when using DATABASE_URL
@@ -387,6 +403,26 @@ jobs:
 
 ## Troubleshooting
 
+### 🚨 CRITICAL: PostgreSQL Connection Errors
+
+**Problem:** `psycopg2.OperationalError: connection to server... failed: server closed the connection unexpectedly`
+
+**Root Cause:** Missing or incorrect environment variable configuration
+
+**Solution (Railway Dashboard → Variables):**
+```bash
+# ✅ REQUIRED: Add this variable
+ENVIRONMENT=production
+
+# ❌ REMOVE: These interfere with environment detection
+DJANGO_SETTINGS_MODULE=transferXMLGenerator.settings  # Delete this if present
+```
+
+**Why This Happens:**
+- Without `ENVIRONMENT=production`, Django uses `settings_local.py` (SQL Server config)
+- Railway needs `settings_production.py` with PostgreSQL connection pooling
+- The `settings.py` file auto-detects environment but needs the `ENVIRONMENT` variable
+
 ### Common Issues
 
 1. **Build Failures:**
@@ -394,7 +430,7 @@ jobs:
    - Verify all dependencies in requirements.txt
    - Ensure Node.js and Python versions are compatible
 
-2. **Database Connection Issues:**
+2. **Database Connection Issues (General):**
    - Verify DATABASE_URL is properly set
    - Check PostgreSQL service is running
    - Review connection logs
