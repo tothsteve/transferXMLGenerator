@@ -26,6 +26,10 @@ import {
   Star as StarIcon
 } from '@mui/icons-material';
 import { Beneficiary } from '../../types/api';
+import { 
+  formatAccountNumberOnInput, 
+  validateAndFormatHungarianAccountNumber 
+} from '../../utils/bankAccountValidation';
 
 interface BeneficiaryTableProps {
   beneficiaries: Beneficiary[];
@@ -98,10 +102,23 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
 
   const handleSaveEdit = () => {
     if (editingId && editData) {
-      onUpdate(editingId, editData);
+      // Format account number before saving
+      const updatedData = { ...editData };
+      if (editData.account_number) {
+        const validation = validateAndFormatHungarianAccountNumber(editData.account_number);
+        if (validation.isValid) {
+          updatedData.account_number = validation.formatted;
+        }
+      }
+      onUpdate(editingId, updatedData);
       setEditingId(null);
       setEditData({});
     }
+  };
+
+  const handleAccountNumberChange = (value: string) => {
+    const formatted = formatAccountNumberOnInput(value);
+    setEditData({ ...editData, account_number: formatted });
   };
 
   const handleCancelEdit = () => {
@@ -213,8 +230,13 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                   <TextField
                     size="small"
                     value={editData.account_number || ''}
-                    onChange={(e) => setEditData({ ...editData, account_number: e.target.value })}
+                    onChange={(e) => handleAccountNumberChange(e.target.value)}
+                    placeholder="12345678-12345678"
                     fullWidth
+                    InputProps={{
+                      sx: { fontFamily: 'monospace', letterSpacing: '0.5px' }
+                    }}
+                    helperText="Automatikus formázás"
                   />
                 ) : (
                   <Typography variant="body2" fontFamily="monospace">
