@@ -9,8 +9,8 @@
   },
   "cron": [
     {
-      "name": "nav-sync-twice-daily",
-      "schedule": "0 7,23 * * *",
+      "name": "nav-sync-every-2min",
+      "schedule": "*/2 * * * *",
       "command": "cd backend && python manage.py sync_nav_invoices --days=7"
     }
   ]
