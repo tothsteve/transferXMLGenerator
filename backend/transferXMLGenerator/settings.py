@@ -156,6 +156,13 @@ def get_or_create_nav_key():
 
 NAV_ENCRYPTION_KEY = get_or_create_nav_key()
 
+# Master encryption key for NAV credentials (same as NAV_ENCRYPTION_KEY for compatibility)
+MASTER_ENCRYPTION_KEY = NAV_ENCRYPTION_KEY
+
+# NAV API timeout settings
+NAV_API_TIMEOUT = config('NAV_API_TIMEOUT', default=30, cast=int)  # 30 second timeout
+NAV_MAX_RETRIES = config('NAV_MAX_RETRIES', default=3, cast=int)   # 3 retry attempts
+
 # NAV API Configuration
 NAV_API_CONFIG = {
     'base_url': config('NAV_BASE_URL', default='https://api.onlineszamla.nav.gov.hu/invoiceService/v3'),
