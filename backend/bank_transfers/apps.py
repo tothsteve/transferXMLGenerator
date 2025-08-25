@@ -12,9 +12,9 @@ class BankTransfersConfig(AppConfig):
     name = 'bank_transfers'
 
     def ready(self):
-        # Only start scheduler in production and avoid starting multiple times
-        if (hasattr(settings, 'ENVIRONMENT') and 
-            getattr(settings, 'ENVIRONMENT', 'local') == 'production' and
+        # Only start scheduler on Railway (production) and avoid starting multiple times
+        railway_env = os.environ.get('RAILWAY_ENVIRONMENT_NAME')
+        if (railway_env == 'production' and
             os.environ.get('RUN_MAIN') != 'true'):  # Avoid double startup in development
             
             self.start_nav_scheduler()
