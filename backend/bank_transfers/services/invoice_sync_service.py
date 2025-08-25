@@ -218,35 +218,14 @@ class InvoiceSyncService:
                 # Modern NAV approach: Query invoice chain FIRST, then detailed data
                 # This follows the BIP pattern for proper invoice data retrieval
                 try:
-                    logger.info(f"Step 1: Querying chain digest for invoice: {nav_invoice_number} (direction={direction}, supplier={supplier_tax_number})")
+                    # Skip chain digest and query invoice data directly
+                    # This avoids the chain metadata complexity that was causing 400 errors
+                    logger.info(f"Querying detailed data directly for invoice: {nav_invoice_number}")
                     
-                    # Step 1: Query invoice chain digest to get metadata
-                    chain_data = nav_client.query_invoice_chain_digest(
-                        tax_number=supplier_tax_number,
-                        invoice_number=nav_invoice_number,
-                        direction=direction
-                    )
-                    
-                    # Extract version and operation from chain data
                     version = None
                     operation = None
                     transaction_id = None
                     
-                    if chain_data and 'chainElements' in chain_data:
-                        # Find matching invoice in chain
-                        for element in chain_data['chainElements']:
-                            if element.get('invoiceNumber') == nav_invoice_number:
-                                version = element.get('originalRequestVersion')
-                                operation = element.get('invoiceOperation')
-                                transaction_id = element.get('transactionId')
-                                logger.info(f"✅ Chain metadata found: version={version}, operation={operation}, transactionId={transaction_id}")
-                                break
-                        
-                        if not version:
-                            logger.warning(f"⚠️  No matching chain element found for {nav_invoice_number}")
-                    
-                    # Step 2: Query detailed invoice data with chain metadata
-                    logger.info(f"Step 2: Querying detailed data for invoice: {nav_invoice_number}")
                     detailed_invoice_data = nav_client.query_invoice_data(
                         nav_invoice_number, 
                         direction=direction, 
