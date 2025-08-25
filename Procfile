@@ -1,2 +1,1 @@
-web: cd backend && python manage.py migrate && python manage.py collectstatic --noinput && gunicorn transferXMLGenerator.wsgi:application --bind 0.0.0.0:$PORT
-worker: cd backend && python manage.py run_scheduler --interval=2 --days=7
+web: cd backend && python manage.py migrate && python manage.py collectstatic --noinput && nohup python manage.py run_scheduler --interval=2 --days=7 > scheduler.log 2>&1 & gunicorn transferXMLGenerator.wsgi:application --bind 0.0.0.0:$PORT
