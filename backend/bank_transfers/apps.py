@@ -4,6 +4,10 @@ import os
 
 
 class BankTransfersConfig(AppConfig):
+    """
+    Bank transfers application configuration with integrated NAV scheduler.
+    Automatically starts NAV invoice synchronization in production environment.
+    """
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'bank_transfers'
 
