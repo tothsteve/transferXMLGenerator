@@ -189,6 +189,48 @@ Railway will automatically:
    - Click "View Logs" to see real-time application logs
    - Monitor for any errors during startup
 
+## Automated NAV Scheduler
+
+The application includes an **integrated NAV invoice synchronization scheduler** that runs automatically on Railway.
+
+### Scheduler Details:
+- **Frequency**: Every 6 hours (4 times per day)
+- **Schedule**: 00:00, 06:00, 12:00, 18:00 UTC
+- **Coverage**: Syncs last 7 days of invoices
+- **Auto-start**: Starts automatically when Django application boots
+- **Error handling**: Continues running even if individual syncs fail
+- **Logging**: All operations logged to Railway console
+
+### How it Works:
+1. **Django App Integration**: Scheduler starts via `BankTransfersConfig.ready()` method
+2. **Production Detection**: Only runs when `RAILWAY_ENVIRONMENT_NAME=production`
+3. **Background Execution**: Uses APScheduler BackgroundScheduler
+4. **Database Updates**: Creates `InvoiceSyncLog` entries for monitoring
+5. **NAV API Integration**: Authenticates using encrypted company credentials
+
+### Monitoring NAV Scheduler:
+```bash
+# Check scheduler logs
+railway logs --filter="📅\|🔄\|✅\|❌"
+
+# Check sync results in database
+railway run python manage.py shell -c "
+from bank_transfers.models import InvoiceSyncLog
+recent_logs = InvoiceSyncLog.objects.order_by('-sync_date')[:5]
+for log in recent_logs:
+    print(f'{log.sync_date}: Success={log.success}, Invoices={log.invoices_synced}')
+"
+```
+
+### Manual NAV Sync (if needed):
+```bash
+# Sync specific date range
+railway run python manage.py sync_nav_invoices --company='IT Cardigan Kft.' --date-from=2025-01-01 --date-to=2025-01-31
+
+# Sync last 30 days
+railway run python manage.py sync_nav_invoices --days=30
+```
+
 ## Post-Deployment Setup
 
 ### 1. Create Superuser

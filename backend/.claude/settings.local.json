@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Read(//Users/tothi/Workspace/ITCardigan/git/transferXMLGenerator/**)"
     ],
     "deny": [],
     "ask": []
