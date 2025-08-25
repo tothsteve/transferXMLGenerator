@@ -198,4 +198,24 @@ export const userManagementApi = {
     apiClient.delete(`/company/users/${userId}/`),
 };
 
+// NAV Invoices API
+export const navInvoicesApi = {
+  getAll: (params?: { 
+    search?: string; 
+    direction?: string; 
+    currency?: string; 
+    page?: number; 
+    page_size?: number; 
+    ordering?: string;
+    hide_storno_invoices?: boolean;
+  }) =>
+    apiClient.get('/nav/invoices/', { params }),
+  
+  getById: (id: number) =>
+    apiClient.get(`/nav/invoices/${id}/`),
+  
+  getStats: () =>
+    apiClient.get('/nav/invoices/stats/'),
+};
+
 export default apiClient;

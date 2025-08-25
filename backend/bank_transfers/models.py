@@ -420,6 +420,18 @@ class Invoice(TimestampedModel):
     completeness_indicator = models.BooleanField(null=True, blank=True, verbose_name="Teljesség jelző")
     modification_index = models.IntegerField(null=True, blank=True, verbose_name="Módosítási index")
     original_invoice_number = models.CharField(max_length=100, null=True, blank=True, verbose_name="Eredeti számla száma (storno esetén)")
+    
+    # STORNO relationship - ForeignKey to the original invoice that this STORNO cancels
+    storno_of = models.ForeignKey(
+        'self', 
+        null=True, 
+        blank=True, 
+        on_delete=models.CASCADE,
+        related_name='storno_invoices',
+        verbose_name="Eredeti számla (amit ez a storno érvénytelenít)",
+        help_text="A STORNO számla által érvénytelenített eredeti számla"
+    )
+    
     invoice_index = models.IntegerField(null=True, blank=True, verbose_name="Számla index")
     batch_index = models.IntegerField(null=True, blank=True, verbose_name="Köteg index")
     nav_creation_date = models.DateTimeField(null=True, blank=True, verbose_name="NAV létrehozási dátum")
@@ -448,6 +460,19 @@ class Invoice(TimestampedModel):
             models.Index(fields=['customer_tax_number']),
             models.Index(fields=['nav_invoice_number']),
         ]
+    
+    @property
+    def is_active(self):
+        """
+        Invoice is active if:
+        1. It's not a STORNO invoice itself
+        2. It hasn't been canceled by a STORNO invoice
+        """
+        if self.invoice_operation == 'STORNO':
+            return False
+        
+        # Check if this invoice has been storno'd
+        return not self.storno_invoices.exists()
     
     def __str__(self):
         return f"{self.nav_invoice_number} - {self.supplier_name} ({self.invoice_direction})"

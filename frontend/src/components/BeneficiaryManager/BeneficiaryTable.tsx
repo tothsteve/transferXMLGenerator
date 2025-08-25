@@ -137,13 +137,19 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
       <TableContainer sx={{ flexGrow: 1, overflow: 'auto' }}>
         <Table size="small" stickyHeader sx={{ minWidth: 1200 }}>
           <TableHead>
-            <TableRow>
-              <TableCell sx={{ width: '25%', minWidth: 200 }}>Név</TableCell>
-              <TableCell sx={{ width: '20%', minWidth: 180 }}>Leírás</TableCell>
-              <TableCell sx={{ width: '20%', minWidth: 180 }}>Számlaszám</TableCell>
-              <TableCell sx={{ width: '25%', minWidth: 200 }}>Közlemény</TableCell>
-              <TableCell sx={{ width: '10%', minWidth: 120 }}>Állapot</TableCell>
-              <TableCell align="right" sx={{ width: '10%', minWidth: 100 }}>Műveletek</TableCell>
+            <TableRow sx={{
+              '& .MuiTableCell-head': {
+                backgroundColor: 'background.paper',
+                borderBottom: '2px solid',
+                borderBottomColor: 'divider',
+              }
+            }}>
+              <TableCell sx={{ width: '25%', minWidth: 200, backgroundColor: 'background.paper' }}>Név</TableCell>
+              <TableCell sx={{ width: '20%', minWidth: 180, backgroundColor: 'background.paper' }}>Leírás</TableCell>
+              <TableCell sx={{ width: '20%', minWidth: 180, backgroundColor: 'background.paper' }}>Számlaszám</TableCell>
+              <TableCell sx={{ width: '25%', minWidth: 200, backgroundColor: 'background.paper' }}>Közlemény</TableCell>
+              <TableCell sx={{ width: '10%', minWidth: 120, backgroundColor: 'background.paper' }}>Állapot</TableCell>
+              <TableCell align="right" sx={{ width: '10%', minWidth: 100, backgroundColor: 'background.paper' }}>Műveletek</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -177,12 +183,19 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
     <TableContainer sx={{ flexGrow: 1, overflow: 'auto' }}>
       <Table size="small" stickyHeader sx={{ minWidth: 1200 }}>
         <TableHead>
-          <TableRow>
+          <TableRow sx={{
+            '& .MuiTableCell-head': {
+              backgroundColor: 'background.paper',
+              borderBottom: '2px solid',
+              borderBottomColor: 'divider',
+            }
+          }}>
             <TableCell 
               sx={{ 
                 cursor: 'pointer',
                 '&:hover': { backgroundColor: 'action.hover' },
                 fontWeight: 600,
+                backgroundColor: 'background.paper',
                 width: '25%',
                 minWidth: 200
               }}
@@ -204,6 +217,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 cursor: 'pointer',
                 '&:hover': { backgroundColor: 'action.hover' },
                 fontWeight: 600,
+                backgroundColor: 'background.paper',
                 width: '20%',
                 minWidth: 180
               }}
@@ -225,6 +239,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 cursor: 'pointer',
                 '&:hover': { backgroundColor: 'action.hover' },
                 fontWeight: 600,
+                backgroundColor: 'background.paper',
                 width: '20%',
                 minWidth: 180
               }}
@@ -246,6 +261,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 cursor: 'pointer',
                 '&:hover': { backgroundColor: 'action.hover' },
                 fontWeight: 600,
+                backgroundColor: 'background.paper',
                 width: '25%',
                 minWidth: 200
               }}
@@ -262,12 +278,12 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 )}
               </Stack>
             </TableCell>
-            <TableCell sx={{ fontWeight: 600, width: '10%', minWidth: 120 }}>
+            <TableCell sx={{ fontWeight: 600, width: '10%', minWidth: 120, backgroundColor: 'background.paper' }}>
               <Typography variant="body2" fontWeight="inherit">
                 Állapot
               </Typography>
             </TableCell>
-            <TableCell align="right" sx={{ fontWeight: 600, width: '10%', minWidth: 100 }}>
+            <TableCell align="right" sx={{ fontWeight: 600, width: '10%', minWidth: 100, backgroundColor: 'background.paper' }}>
               <Typography variant="body2" fontWeight="inherit">
                 Műveletek
               </Typography>

@@ -4,11 +4,11 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from .api_views import (
     BankAccountViewSet, BeneficiaryViewSet, TransferTemplateViewSet,
     TransferViewSet, TransferBatchViewSet, ExcelImportView,
-    CompanyUsersView, CompanyUserDetailView
+    CompanyUsersView, CompanyUserDetailView, InvoiceViewSet, InvoiceSyncLogViewSet
 )
 from .authentication import AuthenticationViewSet
 from .views.nav_views import (
-    NavConfigurationViewSet, InvoiceViewSet, InvoiceLineItemViewSet, InvoiceSyncLogViewSet
+    NavConfigurationViewSet, InvoiceLineItemViewSet
 )
 
 router = DefaultRouter()

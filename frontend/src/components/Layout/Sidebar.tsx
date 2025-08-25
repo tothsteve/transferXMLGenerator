@@ -23,6 +23,7 @@ import {
   CloudUpload as CloudUploadIcon,
   AdminPanelSettings as AdminIcon,
   Settings as SettingsIcon,
+  Receipt as ReceiptIcon,
 } from '@mui/icons-material';
 import { useIsCompanyAdmin } from '../../hooks/useAuth';
 
@@ -48,6 +49,7 @@ const navigation = [
   { name: 'PDF Importálás', href: '/pdf-import', icon: CloudUploadIcon },
   { name: 'Átutalások', href: '/transfers', icon: SwapHorizIcon },
   { name: 'Kötegek kezelése', href: '/batches', icon: FolderIcon },
+  { name: 'NAV Számlák', href: '/nav-invoices', icon: ReceiptIcon },
   { name: 'Beállítások', href: '/settings', icon: SettingsIcon },
 ];
 
