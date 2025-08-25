@@ -785,6 +785,16 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
                 models.Q(original_invoice_number__icontains=search)
             )
         
+        # STORNO filtering - hide both STORNO invoices and invoices that have been storno'd
+        hide_storno_invoices = self.request.query_params.get('hide_storno_invoices', 'true').lower() == 'true'
+        if hide_storno_invoices:
+            # Exclude STORNO invoices and invoices that have been storno'd
+            # This uses the ForeignKey relationship for better performance and accuracy
+            queryset = queryset.exclude(
+                models.Q(invoice_operation='STORNO') |  # Exclude STORNO invoices themselves
+                models.Q(storno_invoices__isnull=False)  # Exclude invoices that have been storno'd
+            )
+        
         # Ordering
         ordering = self.request.query_params.get('ordering', '-issue_date')
         if ordering:
@@ -820,6 +830,7 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
             openapi.Parameter('currency', openapi.IN_QUERY, description="Filter by currency code", type=openapi.TYPE_STRING),
             openapi.Parameter('operation', openapi.IN_QUERY, description="Filter by operation (CREATE/STORNO/MODIFY)", type=openapi.TYPE_STRING),
             openapi.Parameter('payment_method', openapi.IN_QUERY, description="Filter by payment method (TRANSFER/CASH/CARD)", type=openapi.TYPE_STRING),
+            openapi.Parameter('hide_storno_invoices', openapi.IN_QUERY, description="Hide both STORNO invoices and invoices that have been canceled by STORNO (true/false, default: true)", type=openapi.TYPE_BOOLEAN, default=True),
             openapi.Parameter('search', openapi.IN_QUERY, description="Search in invoice number, names, tax numbers, original invoice", type=openapi.TYPE_STRING),
             openapi.Parameter('ordering', openapi.IN_QUERY, description="Order by field (prefix with - for descending)", type=openapi.TYPE_STRING),
         ]

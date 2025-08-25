@@ -25,8 +25,8 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  CircularProgress,
 } from '@mui/material';
-import { Grid } from '@mui/material';
 import {
   Search as SearchIcon,
   FilterList as FilterIcon,
@@ -34,7 +34,7 @@ import {
   Visibility as ViewIcon,
 } from '@mui/icons-material';
 import { useToast } from '../../hooks/useToast';
-import { apiClient as api } from '../../services/api';
+import { navInvoicesApi } from '../../services/api';
 import NAVInvoiceTable from './NAVInvoiceTable';
 
 interface Invoice {
@@ -54,6 +54,8 @@ interface Invoice {
   payment_due_date_formatted: string | null;
   payment_date: string | null;
   payment_date_formatted: string | null;
+  completion_date?: string | null;
+  last_modified_date?: string | null;
   
   // Financial
   currency_code: string;
@@ -66,6 +68,8 @@ interface Invoice {
   
   // Business
   invoice_operation: string | null;
+  invoice_category?: string | null;
+  invoice_appearance?: string | null;
   payment_method: string | null;
   original_invoice_number: string | null;
   payment_status: string;
@@ -75,11 +79,17 @@ interface Invoice {
   sync_status: string;
   created_at: string;
   
-  // Additional fields for detail view
+  // NAV metadata (available in detail view)
+  nav_source?: string | null;
+  original_request_version?: string | null;
+  
+  // Partners (available in detail view)
   supplier_name?: string;
   customer_name?: string;
   supplier_tax_number?: string;
   customer_tax_number?: string;
+  
+  // Line items (available in detail view)
   line_items?: InvoiceLineItem[];
 }
 
@@ -104,6 +114,7 @@ const NAVInvoices: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [directionFilter, setDirectionFilter] = useState<string | undefined>(undefined);
   const [currencyFilter, setCurrencyFilter] = useState<string | undefined>(undefined);
+  const [hideStornoInvoices, setHideStornoInvoices] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [sortField, setSortField] = useState<string>('issue_date');
@@ -113,39 +124,42 @@ const NAVInvoices: React.FC = () => {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [invoiceDetailsOpen, setInvoiceDetailsOpen] = useState(false);
   const [invoiceLineItems, setInvoiceLineItems] = useState<InvoiceLineItem[]>([]);
+  const [invoiceDetailsLoading, setInvoiceDetailsLoading] = useState(false);
   
   const { success: showSuccess, error: showError } = useToast();
-
-  const queryParams = {
-    search: searchTerm || undefined,
-    direction: directionFilter,
-    currency: currencyFilter,
-    page: currentPage,
-    ordering: `${sortDirection === 'desc' ? '-' : ''}${sortField}`,
-  };
 
   // Load invoices
   const loadInvoices = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams();
       
-      // Add pagination
-      params.append('page', currentPage.toString());
-      params.append('page_size', '20');
-      
-      // Add filters
-      if (searchTerm) params.append('search', searchTerm);
-      if (directionFilter) params.append('direction', directionFilter);
-      if (currencyFilter) params.append('currency', currencyFilter);
-      
-      // Add sorting
-      const ordering = `${sortDirection === 'desc' ? '-' : ''}${sortField}`;
-      params.append('ordering', ordering);
+      const params = {
+        page: currentPage,
+        page_size: 20,
+        search: searchTerm || undefined,
+        direction: directionFilter,
+        currency: currencyFilter,
+        ordering: `${sortDirection === 'desc' ? '-' : ''}${sortField}`,
+        hide_storno_invoices: hideStornoInvoices,
+      };
 
-      const response = await api.get(`/api/nav/invoices/?${params}`);
-      setInvoices(response.data.results || []);
-      setTotalCount(response.data.count || 0);
+      const response = await navInvoicesApi.getAll(params);
+      console.log('API Response:', response.data); // Debug log
+      
+      // Handle both paginated and non-paginated responses
+      if (Array.isArray(response.data)) {
+        // Non-paginated response (direct array)
+        setInvoices(response.data);
+        setTotalCount(response.data.length);
+      } else if (response.data.results) {
+        // Paginated response with results array
+        setInvoices(response.data.results);
+        setTotalCount(response.data.count || 0);
+      } else {
+        // Fallback
+        setInvoices([]);
+        setTotalCount(0);
+      }
     } catch (error) {
       console.error('Error loading invoices:', error);
       showError('Hiba a számlák betöltése során');
@@ -154,31 +168,36 @@ const NAVInvoices: React.FC = () => {
     }
   };
 
-  // Load invoice line items for detail view
-  const loadInvoiceLineItems = async (invoiceId: number) => {
+  // Load invoice details with line items
+  const loadInvoiceDetails = async (invoiceId: number) => {
     try {
-      const response = await api.get(`/api/nav/invoices/${invoiceId}/line_items/`);
-      setInvoiceLineItems(response.data);
+      setInvoiceDetailsLoading(true);
+      const response = await navInvoicesApi.getById(invoiceId);
+      console.log('Invoice detail response:', response.data); // Debug log
+      setSelectedInvoice(response.data);
+      setInvoiceLineItems(response.data.line_items || []);
     } catch (error) {
-      console.error('Error loading invoice line items:', error);
-      showError('Hiba a számla tételek betöltése során');
+      console.error('Error loading invoice details:', error);
+      showError('Hiba a számla részletek betöltése során');
+    } finally {
+      setInvoiceDetailsLoading(false);
     }
   };
 
   useEffect(() => {
     loadInvoices();
-  }, [searchTerm, directionFilter, currencyFilter, currentPage, sortField, sortDirection]);
+  }, [searchTerm, directionFilter, currencyFilter, currentPage, sortField, sortDirection, hideStornoInvoices]);
 
   const handleViewInvoice = async (invoice: Invoice) => {
-    setSelectedInvoice(invoice);
     setInvoiceDetailsOpen(true);
-    await loadInvoiceLineItems(invoice.id);
+    await loadInvoiceDetails(invoice.id);
   };
 
   const handleCloseInvoiceDetails = () => {
     setInvoiceDetailsOpen(false);
     setSelectedInvoice(null);
     setInvoiceLineItems([]);
+    setInvoiceDetailsLoading(false);
   };
 
   const handleSort = (field: string, direction: 'asc' | 'desc') => {
@@ -191,6 +210,7 @@ const NAVInvoices: React.FC = () => {
     setSearchTerm('');
     setDirectionFilter(undefined);
     setCurrencyFilter(undefined);
+    setHideStornoInvoices(true); // Reset to default (hide STORNO invoices)
     setCurrentPage(1);
     setSortField('issue_date');
     setSortDirection('desc');
@@ -322,6 +342,20 @@ const NAVInvoices: React.FC = () => {
               />
             </MenuItem>
             <Divider />
+            <MenuItem disableRipple sx={{ '&:hover': { backgroundColor: 'transparent' } }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={hideStornoInvoices}
+                    onChange={(e) => setHideStornoInvoices(e.target.checked)}
+                    size="small"
+                  />
+                }
+                label="Sztornózott számlák elrejtése"
+                sx={{ m: 0 }}
+              />
+            </MenuItem>
+            <Divider />
             <MenuItem onClick={() => { clearFilters(); handleFilterClose(); }}>
               Szűrők törlése
             </MenuItem>
@@ -329,7 +363,7 @@ const NAVInvoices: React.FC = () => {
         </Stack>
 
         {/* Active filters display - Same pattern as BeneficiaryManager */}
-        {(searchTerm || directionFilter || currencyFilter) && (
+        {(searchTerm || directionFilter || currencyFilter || !hideStornoInvoices) && (
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
             <Typography variant="body2" color="text.secondary">
               Aktív szűrők:
@@ -358,6 +392,14 @@ const NAVInvoices: React.FC = () => {
                 variant="outlined"
               />
             )}
+            {!hideStornoInvoices && (
+              <Chip
+                label="Sztornózott számlák láthatóak"
+                size="small"
+                color="error"
+                variant="outlined"
+              />
+            )}
           </Stack>
         )}
       </Box>
@@ -376,6 +418,7 @@ const NAVInvoices: React.FC = () => {
           onSort={handleSort}
           sortField={sortField}
           sortDirection={sortDirection}
+          showStornoColumn={!hideStornoInvoices}
         />
       </Paper>
 
@@ -403,49 +446,145 @@ const NAVInvoices: React.FC = () => {
         fullWidth
       >
         <DialogTitle>
-          Számla részletei: {selectedInvoice?.nav_invoice_number}
+          Számla részletei: {selectedInvoice?.nav_invoice_number || 'Betöltés...'}
         </DialogTitle>
         <DialogContent>
-          {selectedInvoice && (
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
-                  Alapadatok
-                </Typography>
-                <Typography variant="body2" sx={{ mb: 0.5 }}>
-                  <strong>Irány:</strong> {selectedInvoice.invoice_direction_display}
-                </Typography>
-                <Typography variant="body2" sx={{ mb: 0.5 }}>
-                  <strong>Partner:</strong> {selectedInvoice.partner_name}
-                </Typography>
-                <Typography variant="body2" sx={{ mb: 0.5 }}>
-                  <strong>Kiállítás dátuma:</strong> {selectedInvoice.issue_date_formatted}
-                </Typography>
-                <Typography variant="body2" sx={{ mb: 0.5 }}>
-                  <strong>Pénznem:</strong> {selectedInvoice.currency_code}
-                </Typography>
-              </Grid>
-              
-              <Grid item xs={12} sm={6}>
-                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
-                  Összegek
-                </Typography>
-                {selectedInvoice.invoice_net_amount && (
-                  <Typography variant="body2" sx={{ mb: 0.5 }}>
-                    <strong>Nettó összeg:</strong> {formatAmount(selectedInvoice.invoice_net_amount, selectedInvoice.currency_code)}
+          {invoiceDetailsLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : selectedInvoice && (
+            <Box>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} sx={{ mb: 3 }}>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
+                    Alapadatok
                   </Typography>
-                )}
-                {selectedInvoice.invoice_vat_amount && (
                   <Typography variant="body2" sx={{ mb: 0.5 }}>
-                    <strong>ÁFA összeg:</strong> {formatAmount(selectedInvoice.invoice_vat_amount, selectedInvoice.currency_code)}
+                    <strong>Irány:</strong> {selectedInvoice.invoice_direction_display}
                   </Typography>
-                )}
-                <Typography variant="body2" sx={{ mb: 0.5 }}>
-                  <strong>Bruttó összeg:</strong> {formatAmount(selectedInvoice.invoice_gross_amount, selectedInvoice.currency_code)}
-                </Typography>
-              </Grid>
+                  <Typography variant="body2" sx={{ mb: 0.5 }}>
+                    <strong>Kategória:</strong> {selectedInvoice.invoice_category || 'N/A'}
+                  </Typography>
+                  {selectedInvoice.invoice_operation === 'STORNO' && (
+                    <Typography variant="body2" sx={{ mb: 0.5 }}>
+                      <strong>Művelet:</strong> <Chip label="Stornó" color="error" size="small" variant="filled" />
+                    </Typography>
+                  )}
+                  <Typography variant="body2" sx={{ mb: 0.5 }}>
+                    <strong>Pénznem:</strong> {selectedInvoice.currency_code}
+                  </Typography>
+                  {selectedInvoice.original_invoice_number && (
+                    <Typography variant="body2" sx={{ mb: 0.5 }}>
+                      <strong>Eredeti szám:</strong> {selectedInvoice.original_invoice_number}
+                    </Typography>
+                  )}
+                </Box>
+                
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
+                    Partnerek
+                  </Typography>
+                  {selectedInvoice.supplier_name && (
+                    <>
+                      <Typography variant="body2" sx={{ mb: 0.5 }}>
+                        <strong>Eladó:</strong> {selectedInvoice.supplier_name}
+                      </Typography>
+                      {selectedInvoice.supplier_tax_number && (
+                        <Typography variant="body2" sx={{ mb: 0.5 }}>
+                          <strong>Eladó adószám:</strong> {selectedInvoice.supplier_tax_number}
+                        </Typography>
+                      )}
+                    </>
+                  )}
+                  {selectedInvoice.customer_name && (
+                    <>
+                      <Typography variant="body2" sx={{ mb: 0.5 }}>
+                        <strong>Vevő:</strong> {selectedInvoice.customer_name}
+                      </Typography>
+                      {selectedInvoice.customer_tax_number && (
+                        <Typography variant="body2" sx={{ mb: 0.5 }}>
+                          <strong>Vevő adószám:</strong> {selectedInvoice.customer_tax_number}
+                        </Typography>
+                      )}
+                    </>
+                  )}
+                </Box>
+                
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
+                    Összegek
+                  </Typography>
+                  {selectedInvoice.invoice_net_amount && (
+                    <Typography variant="body2" sx={{ mb: 0.5 }}>
+                      <strong>Nettó:</strong> {selectedInvoice.invoice_net_amount_formatted}
+                    </Typography>
+                  )}
+                  {selectedInvoice.invoice_vat_amount && (
+                    <Typography variant="body2" sx={{ mb: 0.5 }}>
+                      <strong>ÁFA:</strong> {selectedInvoice.invoice_vat_amount_formatted}
+                    </Typography>
+                  )}
+                  <Typography variant="body2" sx={{ mb: 0.5 }}>
+                    <strong>Bruttó:</strong> {selectedInvoice.invoice_gross_amount_formatted}
+                  </Typography>
+                </Box>
+              </Stack>
 
-              <Grid item xs={12}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} sx={{ mb: 3 }}>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
+                    Dátumok
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 0.5 }}>
+                    <strong>Kiállítás:</strong> {selectedInvoice.issue_date_formatted}
+                  </Typography>
+                  {selectedInvoice.fulfillment_date_formatted && (
+                    <Typography variant="body2" sx={{ mb: 0.5 }}>
+                      <strong>Teljesítés:</strong> {selectedInvoice.fulfillment_date_formatted}
+                    </Typography>
+                  )}
+                  {selectedInvoice.payment_due_date_formatted && (
+                    <Typography variant="body2" sx={{ mb: 0.5 }}>
+                      <strong>Fizetési határidő:</strong> {selectedInvoice.payment_due_date_formatted}
+                    </Typography>
+                  )}
+                </Box>
+
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
+                    Fizetés
+                  </Typography>
+                  {selectedInvoice.payment_date_formatted && (
+                    <Typography variant="body2" sx={{ mb: 0.5 }}>
+                      <strong>Fizetés dátuma:</strong> {selectedInvoice.payment_date_formatted}
+                    </Typography>
+                  )}
+                  {selectedInvoice.payment_method && (
+                    <Typography variant="body2" sx={{ mb: 0.5 }}>
+                      <strong>Fizetési mód:</strong> {selectedInvoice.payment_method}
+                    </Typography>
+                  )}
+                </Box>
+
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
+                    NAV adatok
+                  </Typography>
+                  {selectedInvoice.nav_source && (
+                    <Typography variant="body2" sx={{ mb: 0.5 }}>
+                      <strong>Forrás:</strong> {selectedInvoice.nav_source}
+                    </Typography>
+                  )}
+                  {selectedInvoice.completion_date && (
+                    <Typography variant="body2" sx={{ mb: 0.5 }}>
+                      <strong>Befejezés:</strong> {selectedInvoice.completion_date}
+                    </Typography>
+                  )}
+                </Box>
+              </Stack>
+
+              <Box>
                 <Typography variant="subtitle1" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
                   Számla tételek
                 </Typography>
@@ -495,8 +634,8 @@ const NAVInvoices: React.FC = () => {
                 ) : (
                   <Alert severity="info">Nincsenek részletes tételek</Alert>
                 )}
-              </Grid>
-            </Grid>
+              </Box>
+            </Box>
           )}
         </DialogContent>
         <DialogActions>

@@ -67,6 +67,7 @@ interface NAVInvoiceTableProps {
   onSort: (field: string, direction: 'asc' | 'desc') => void;
   sortField?: string;
   sortDirection?: 'asc' | 'desc';
+  showStornoColumn?: boolean; // Show Sztornó column when STORNO invoices are visible
 }
 
 const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
@@ -76,6 +77,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
   onSort,
   sortField,
   sortDirection,
+  showStornoColumn = false,
 }) => {
 
   const handleSort = (field: string) => {
@@ -120,7 +122,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
         userSelect: 'none',
         '&:hover': { backgroundColor: 'action.hover' },
         fontWeight: 'bold',
-        backgroundColor: sortField === field ? 'action.selected' : 'transparent'
+        backgroundColor: sortField === field ? 'action.selected' : 'background.paper'
       }}
       onClick={() => handleSort(field)}
     >
@@ -131,73 +133,51 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
     </TableCell>
   );
 
-  const getOperationChip = (operation: string | null) => {
-    if (!operation) return null;
-    
-    const colorMap = {
-      'CREATE': 'success' as const,
-      'STORNO': 'error' as const,
-      'MODIFY': 'warning' as const,
-    };
-    
-    const labelMap = {
-      'CREATE': 'Létrehozás',
-      'STORNO': 'Stornó',
-      'MODIFY': 'Módosítás',
-    };
-    
-    return (
-      <Chip
-        label={labelMap[operation as keyof typeof labelMap] || operation}
-        color={colorMap[operation as keyof typeof colorMap] || 'default'}
-        size="small"
-        variant="outlined"
-      />
-    );
+  const getStornoIndicator = (operation: string | null) => {
+    // Show "Igen" for STORNO invoices, empty for others
+    if (operation === 'STORNO') {
+      return (
+        <Chip
+          label="Igen"
+          color="error"
+          size="small"
+          variant="filled"
+        />
+      );
+    }
+    return null;
   };
 
-  const getPaymentStatusChip = (status: string, isPaid: boolean) => {
-    const colorMap = {
-      'Fizetve': 'success' as const,
-      'Fizetendő': 'info' as const,
-      'Lejárt': 'error' as const,
-      'Nincs határidő': 'default' as const,
-    };
-    
-    return (
-      <Chip
-        label={status}
-        color={colorMap[status as keyof typeof colorMap] || 'default'}
-        size="small"
-        variant={isPaid ? 'filled' : 'outlined'}
-      />
-    );
-  };
 
   if (isLoading) {
     return (
       <TableContainer sx={{ flexGrow: 1 }}>
         <Table stickyHeader>
           <TableHead>
-            <TableRow>
-              <TableCell>Számlaszám</TableCell>
-              <TableCell>Irány</TableCell>
-              <TableCell>Partner</TableCell>
-              <TableCell>Kiállítás</TableCell>
-              <TableCell>Teljesítés</TableCell>
-              <TableCell>Fizetési határidő</TableCell>
-              <TableCell align="right">Nettó</TableCell>
-              <TableCell align="right">ÁFA</TableCell>
-              <TableCell align="right">Bruttó</TableCell>
-              <TableCell>Fizetési státusz</TableCell>
-              <TableCell>Művelet</TableCell>
-              <TableCell>Műveletek</TableCell>
+            <TableRow sx={{
+              '& .MuiTableCell-head': {
+                backgroundColor: 'background.paper',
+                borderBottom: '2px solid',
+                borderBottomColor: 'divider',
+              }
+            }}>
+              <TableCell sx={{ backgroundColor: 'background.paper' }}>Számlaszám</TableCell>
+              <TableCell sx={{ backgroundColor: 'background.paper' }}>Irány</TableCell>
+              <TableCell sx={{ backgroundColor: 'background.paper' }}>Partner</TableCell>
+              <TableCell sx={{ backgroundColor: 'background.paper' }}>Kiállítás</TableCell>
+              <TableCell sx={{ backgroundColor: 'background.paper' }}>Teljesítés</TableCell>
+              <TableCell sx={{ backgroundColor: 'background.paper' }}>Fizetési határidő</TableCell>
+              <TableCell align="right" sx={{ backgroundColor: 'background.paper' }}>Nettó</TableCell>
+              <TableCell align="right" sx={{ backgroundColor: 'background.paper' }}>ÁFA</TableCell>
+              <TableCell align="right" sx={{ backgroundColor: 'background.paper' }}>Bruttó</TableCell>
+              {showStornoColumn && <TableCell sx={{ backgroundColor: 'background.paper' }}>Sztornó</TableCell>}
+              <TableCell sx={{ backgroundColor: 'background.paper' }}>Műveletek</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {Array.from({ length: 10 }).map((_, index) => (
               <TableRow key={index}>
-                {Array.from({ length: 12 }).map((_, cellIndex) => (
+                {Array.from({ length: showStornoColumn ? 11 : 10 }).map((_, cellIndex) => (
                   <TableCell key={cellIndex}><Skeleton /></TableCell>
                 ))}
               </TableRow>
@@ -230,19 +210,24 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
     <TableContainer sx={{ flexGrow: 1 }}>
       <Table stickyHeader size="small">
         <TableHead>
-          <TableRow>
+          <TableRow sx={{
+            '& .MuiTableCell-head': {
+              backgroundColor: 'background.paper',
+              borderBottom: '2px solid',
+              borderBottomColor: 'divider',
+            }
+          }}>
             {renderHeaderCell('nav_invoice_number', 'Számlaszám')}
             {renderHeaderCell('invoice_direction', 'Irány')}
-            <TableCell sx={{ fontWeight: 'bold' }}>Partner</TableCell>
+            <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'background.paper' }}>Partner</TableCell>
             {renderHeaderCell('issue_date', 'Kiállítás')}
             {renderHeaderCell('fulfillment_date', 'Teljesítés')}
             {renderHeaderCell('payment_due_date', 'Fizetési határidő')}
             {renderHeaderCell('invoice_net_amount', 'Nettó', 'right')}
             {renderHeaderCell('invoice_vat_amount', 'ÁFA', 'right')}
             {renderHeaderCell('invoice_gross_amount', 'Bruttó', 'right')}
-            <TableCell sx={{ fontWeight: 'bold' }}>Fizetési státusz</TableCell>
-            <TableCell sx={{ fontWeight: 'bold' }}>Művelet</TableCell>
-            <TableCell sx={{ fontWeight: 'bold' }}>Műveletek</TableCell>
+            {showStornoColumn && <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'background.paper' }}>Sztornó</TableCell>}
+            <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'background.paper' }}>Műveletek</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -314,12 +299,11 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
                   {invoice.invoice_gross_amount_formatted}
                 </Typography>
               </TableCell>
-              <TableCell>
-                {getPaymentStatusChip(invoice.payment_status, invoice.is_paid)}
-              </TableCell>
-              <TableCell>
-                {getOperationChip(invoice.invoice_operation)}
-              </TableCell>
+              {showStornoColumn && (
+                <TableCell>
+                  {getStornoIndicator(invoice.invoice_operation)}
+                </TableCell>
+              )}
               <TableCell onClick={(e) => e.stopPropagation()}>
                 <Tooltip title="Számla részletei és tételek">
                   <IconButton
