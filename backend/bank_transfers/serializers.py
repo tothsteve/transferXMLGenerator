@@ -282,6 +282,226 @@ class InvoiceSummarySerializer(serializers.ModelSerializer):
             return obj.supplier_name
 
 
+class InvoiceListSerializer(serializers.ModelSerializer):
+    """READ-ONLY serializer for invoice list with all required table fields."""
+    
+    company_name = serializers.CharField(source='company.name', read_only=True)
+    invoice_direction_display = serializers.SerializerMethodField()
+    partner_name = serializers.SerializerMethodField()
+    partner_tax_number = serializers.SerializerMethodField()
+    
+    # Formatted date fields
+    issue_date_formatted = serializers.SerializerMethodField()
+    fulfillment_date_formatted = serializers.SerializerMethodField()
+    payment_due_date_formatted = serializers.SerializerMethodField()
+    payment_date_formatted = serializers.SerializerMethodField()
+    
+    # Formatted financial fields
+    invoice_net_amount_formatted = serializers.SerializerMethodField()
+    invoice_vat_amount_formatted = serializers.SerializerMethodField()
+    invoice_gross_amount_formatted = serializers.SerializerMethodField()
+    
+    # Payment status
+    payment_status = serializers.SerializerMethodField()
+    is_paid = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Invoice
+        fields = [
+            # Basic info
+            'id', 'company', 'company_name', 'nav_invoice_number', 'invoice_direction',
+            'invoice_direction_display', 'partner_name', 'partner_tax_number',
+            
+            # Dates
+            'issue_date', 'issue_date_formatted',
+            'fulfillment_date', 'fulfillment_date_formatted',
+            'payment_due_date', 'payment_due_date_formatted',
+            'payment_date', 'payment_date_formatted',
+            
+            # Financial
+            'currency_code', 
+            'invoice_net_amount', 'invoice_net_amount_formatted',
+            'invoice_vat_amount', 'invoice_vat_amount_formatted',
+            'invoice_gross_amount', 'invoice_gross_amount_formatted',
+            
+            # Business
+            'invoice_operation', 'payment_method', 'original_invoice_number',
+            'payment_status', 'is_paid',
+            
+            # System
+            'sync_status', 'created_at'
+        ]
+        read_only_fields = ['__all__']
+    
+    def get_invoice_direction_display(self, obj):
+        return 'Kimenő' if obj.invoice_direction == 'OUTBOUND' else 'Bejövő'
+    
+    def get_partner_name(self, obj):
+        if obj.invoice_direction == 'OUTBOUND':
+            return obj.customer_name
+        else:
+            return obj.supplier_name
+    
+    def get_partner_tax_number(self, obj):
+        if obj.invoice_direction == 'OUTBOUND':
+            return obj.customer_tax_number
+        else:
+            return obj.supplier_tax_number
+    
+    def get_issue_date_formatted(self, obj):
+        return obj.issue_date.strftime('%Y-%m-%d') if obj.issue_date else None
+    
+    def get_fulfillment_date_formatted(self, obj):
+        return obj.fulfillment_date.strftime('%Y-%m-%d') if obj.fulfillment_date else None
+    
+    def get_payment_due_date_formatted(self, obj):
+        return obj.payment_due_date.strftime('%Y-%m-%d') if obj.payment_due_date else None
+    
+    def get_payment_date_formatted(self, obj):
+        return obj.payment_date.strftime('%Y-%m-%d') if obj.payment_date else None
+    
+    def get_invoice_net_amount_formatted(self, obj):
+        if obj.currency_code == 'HUF':
+            return f"{obj.invoice_net_amount:,.0f} Ft"
+        else:
+            return f"{obj.invoice_net_amount:,.2f} {obj.currency_code}"
+    
+    def get_invoice_vat_amount_formatted(self, obj):
+        if obj.currency_code == 'HUF':
+            return f"{obj.invoice_vat_amount:,.0f} Ft"
+        else:
+            return f"{obj.invoice_vat_amount:,.2f} {obj.currency_code}"
+    
+    def get_invoice_gross_amount_formatted(self, obj):
+        if obj.currency_code == 'HUF':
+            return f"{obj.invoice_gross_amount:,.0f} Ft"
+        else:
+            return f"{obj.invoice_gross_amount:,.2f} {obj.currency_code}"
+    
+    def get_payment_status(self, obj):
+        if obj.payment_date:
+            return 'Fizetve'
+        elif obj.payment_due_date:
+            from datetime import date
+            if obj.payment_due_date < date.today():
+                return 'Lejárt'
+            else:
+                return 'Fizetendő'
+        else:
+            return 'Nincs határidő'
+    
+    def get_is_paid(self, obj):
+        return obj.payment_date is not None
+
+
+class InvoiceDetailSerializer(serializers.ModelSerializer):
+    """READ-ONLY detailed serializer for individual invoice view with line items."""
+    
+    company_name = serializers.CharField(source='company.name', read_only=True)
+    line_items = InvoiceLineItemSerializer(many=True, read_only=True)
+    invoice_direction_display = serializers.SerializerMethodField()
+    
+    # All formatted fields from list serializer
+    partner_name = serializers.SerializerMethodField()
+    partner_tax_number = serializers.SerializerMethodField()
+    issue_date_formatted = serializers.SerializerMethodField()
+    fulfillment_date_formatted = serializers.SerializerMethodField()
+    payment_due_date_formatted = serializers.SerializerMethodField()
+    payment_date_formatted = serializers.SerializerMethodField()
+    invoice_net_amount_formatted = serializers.SerializerMethodField()
+    invoice_vat_amount_formatted = serializers.SerializerMethodField()
+    invoice_gross_amount_formatted = serializers.SerializerMethodField()
+    payment_status = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Invoice
+        fields = [
+            # Basic info
+            'id', 'company', 'company_name', 'nav_invoice_number', 'invoice_direction',
+            'invoice_direction_display', 'partner_name', 'partner_tax_number',
+            'supplier_name', 'supplier_tax_number', 'customer_name', 'customer_tax_number',
+            
+            # Dates
+            'issue_date', 'issue_date_formatted',
+            'fulfillment_date', 'fulfillment_date_formatted',
+            'payment_due_date', 'payment_due_date_formatted',
+            'payment_date', 'payment_date_formatted',
+            
+            # Financial
+            'currency_code', 
+            'invoice_net_amount', 'invoice_net_amount_formatted',
+            'invoice_vat_amount', 'invoice_vat_amount_formatted',
+            'invoice_gross_amount', 'invoice_gross_amount_formatted',
+            'invoice_net_amount_huf', 'invoice_vat_amount_huf', 'invoice_gross_amount_huf',
+            
+            # Business
+            'invoice_operation', 'invoice_category', 'payment_method', 'invoice_appearance',
+            'original_invoice_number', 'payment_status',
+            
+            # NAV metadata
+            'nav_source', 'original_request_version', 'completion_date', 'last_modified_date',
+            
+            # Line items
+            'line_items',
+            
+            # System
+            'sync_status', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['__all__']
+    
+    # Reuse methods from InvoiceListSerializer
+    def get_invoice_direction_display(self, obj):
+        return 'Kimenő számla' if obj.invoice_direction == 'OUTBOUND' else 'Bejövő számla'
+    
+    def get_partner_name(self, obj):
+        return obj.customer_name if obj.invoice_direction == 'OUTBOUND' else obj.supplier_name
+    
+    def get_partner_tax_number(self, obj):
+        return obj.customer_tax_number if obj.invoice_direction == 'OUTBOUND' else obj.supplier_tax_number
+    
+    def get_issue_date_formatted(self, obj):
+        return obj.issue_date.strftime('%Y-%m-%d') if obj.issue_date else None
+    
+    def get_fulfillment_date_formatted(self, obj):
+        return obj.fulfillment_date.strftime('%Y-%m-%d') if obj.fulfillment_date else None
+    
+    def get_payment_due_date_formatted(self, obj):
+        return obj.payment_due_date.strftime('%Y-%m-%d') if obj.payment_due_date else None
+    
+    def get_payment_date_formatted(self, obj):
+        return obj.payment_date.strftime('%Y-%m-%d') if obj.payment_date else None
+    
+    def get_invoice_net_amount_formatted(self, obj):
+        if obj.currency_code == 'HUF':
+            return f"{obj.invoice_net_amount:,.0f} Ft"
+        else:
+            return f"{obj.invoice_net_amount:,.2f} {obj.currency_code}"
+    
+    def get_invoice_vat_amount_formatted(self, obj):
+        if obj.currency_code == 'HUF':
+            return f"{obj.invoice_vat_amount:,.0f} Ft"
+        else:
+            return f"{obj.invoice_vat_amount:,.2f} {obj.currency_code}"
+    
+    def get_invoice_gross_amount_formatted(self, obj):
+        if obj.currency_code == 'HUF':
+            return f"{obj.invoice_gross_amount:,.0f} Ft"
+        else:
+            return f"{obj.invoice_gross_amount:,.2f} {obj.currency_code}"
+    
+    def get_payment_status(self, obj):
+        if obj.payment_date:
+            return 'Fizetve'
+        elif obj.payment_due_date:
+            from datetime import date
+            if obj.payment_due_date < date.today():
+                return 'Lejárt'
+            else:
+                return 'Fizetendő'
+        else:
+            return 'Nincs határidő'
+
+
 class InvoiceSyncLogSerializer(serializers.ModelSerializer):
     """READ-ONLY serializer for invoice synchronization logs."""
     

@@ -13,12 +13,13 @@ from drf_yasg import openapi
 import json
 from datetime import date
 
-from .models import BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch, CompanyUser
+from .models import BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch, CompanyUser, Invoice, InvoiceLineItem, InvoiceSyncLog
 from .serializers import (
     BankAccountSerializer, BeneficiarySerializer, TransferTemplateSerializer,
     TemplateBeneficiarySerializer, TransferSerializer, TransferBatchSerializer,
     TransferCreateFromTemplateSerializer, BulkTransferSerializer,
-    ExcelImportSerializer, XMLGenerateSerializer
+    ExcelImportSerializer, XMLGenerateSerializer, InvoiceListSerializer, 
+    InvoiceDetailSerializer, InvoiceSyncLogSerializer
 )
 from .utils import generate_xml
 from .pdf_processor import PDFTransactionProcessor
@@ -685,3 +686,195 @@ class CompanyUserDetailView(APIView):
         company_user.save()
         
         return Response({'message': 'Felhasználó eltávolítva a cégből'})
+
+
+class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    NAV számlák megtekintése és keresése
+    
+    list: Az összes NAV számla listája (szűréssel és keresés)
+    retrieve: Egy konkrét NAV számla részletes adatai tételekkel együtt
+    """
+    permission_classes = [IsAuthenticated, IsCompanyMember]
+    
+    def get_serializer_class(self):
+        """Use different serializers for list vs detail view"""
+        if self.action == 'retrieve':
+            return InvoiceDetailSerializer
+        return InvoiceListSerializer
+    
+    def get_queryset(self):
+        """Company-scoped queryset with comprehensive filtering support"""
+        queryset = Invoice.objects.filter(company=self.request.company).select_related('company')
+        
+        # For detail view, prefetch line items
+        if self.action == 'retrieve':
+            queryset = queryset.prefetch_related('line_items')
+        
+        # Filter by direction (INBOUND/OUTBOUND)
+        direction = self.request.query_params.get('direction', None)
+        if direction and direction in ['INBOUND', 'OUTBOUND']:
+            queryset = queryset.filter(invoice_direction=direction)
+        
+        # Date range filtering for issue date
+        issue_date_from = self.request.query_params.get('issue_date_from', None)
+        issue_date_to = self.request.query_params.get('issue_date_to', None)
+        if issue_date_from:
+            queryset = queryset.filter(issue_date__gte=issue_date_from)
+        if issue_date_to:
+            queryset = queryset.filter(issue_date__lte=issue_date_to)
+        
+        # Date range filtering for fulfillment date
+        fulfillment_date_from = self.request.query_params.get('fulfillment_date_from', None)
+        fulfillment_date_to = self.request.query_params.get('fulfillment_date_to', None)
+        if fulfillment_date_from:
+            queryset = queryset.filter(fulfillment_date__gte=fulfillment_date_from)
+        if fulfillment_date_to:
+            queryset = queryset.filter(fulfillment_date__lte=fulfillment_date_to)
+        
+        # Date range filtering for payment due date
+        payment_due_from = self.request.query_params.get('payment_due_from', None)
+        payment_due_to = self.request.query_params.get('payment_due_to', None)
+        if payment_due_from:
+            queryset = queryset.filter(payment_due_date__gte=payment_due_from)
+        if payment_due_to:
+            queryset = queryset.filter(payment_due_date__lte=payment_due_to)
+        
+        # Payment status filtering
+        payment_status = self.request.query_params.get('payment_status', None)
+        if payment_status == 'paid':
+            queryset = queryset.filter(payment_date__isnull=False)
+        elif payment_status == 'unpaid':
+            queryset = queryset.filter(payment_date__isnull=True)
+        elif payment_status == 'overdue':
+            from datetime import date
+            queryset = queryset.filter(payment_date__isnull=True, payment_due_date__lt=date.today())
+        
+        # Amount range filtering
+        amount_from = self.request.query_params.get('amount_from', None)
+        amount_to = self.request.query_params.get('amount_to', None)
+        if amount_from:
+            queryset = queryset.filter(invoice_gross_amount__gte=amount_from)
+        if amount_to:
+            queryset = queryset.filter(invoice_gross_amount__lte=amount_to)
+        
+        # Currency filter
+        currency = self.request.query_params.get('currency', None)
+        if currency:
+            queryset = queryset.filter(currency_code=currency)
+        
+        # Invoice operation filter (CREATE, STORNO, MODIFY)
+        operation = self.request.query_params.get('operation', None)
+        if operation:
+            queryset = queryset.filter(invoice_operation=operation)
+        
+        # Payment method filter
+        payment_method = self.request.query_params.get('payment_method', None)
+        if payment_method:
+            queryset = queryset.filter(payment_method=payment_method)
+        
+        # Search by invoice number, names, tax numbers, original invoice number
+        search = self.request.query_params.get('search', None)
+        if search:
+            queryset = queryset.filter(
+                models.Q(nav_invoice_number__icontains=search) |
+                models.Q(supplier_name__icontains=search) |
+                models.Q(customer_name__icontains=search) |
+                models.Q(supplier_tax_number__icontains=search) |
+                models.Q(customer_tax_number__icontains=search) |
+                models.Q(original_invoice_number__icontains=search)
+            )
+        
+        # Ordering
+        ordering = self.request.query_params.get('ordering', '-issue_date')
+        if ordering:
+            # Validate ordering fields
+            allowed_fields = [
+                'issue_date', 'fulfillment_date', 'payment_due_date', 'payment_date',
+                'nav_invoice_number', 'invoice_gross_amount', 'invoice_net_amount',
+                'supplier_name', 'customer_name', 'created_at'
+            ]
+            # Remove - prefix for validation
+            field = ordering.lstrip('-')
+            if field in allowed_fields:
+                queryset = queryset.order_by(ordering)
+            else:
+                queryset = queryset.order_by('-issue_date')
+        
+        return queryset
+    
+    @swagger_auto_schema(
+        operation_summary="NAV számlák listája",
+        operation_description="Company-scoped NAV invoice list with comprehensive filtering and search",
+        manual_parameters=[
+            openapi.Parameter('direction', openapi.IN_QUERY, description="Filter by direction (INBOUND/OUTBOUND)", type=openapi.TYPE_STRING),
+            openapi.Parameter('issue_date_from', openapi.IN_QUERY, description="Filter from issue date (YYYY-MM-DD)", type=openapi.TYPE_STRING, format=openapi.FORMAT_DATE),
+            openapi.Parameter('issue_date_to', openapi.IN_QUERY, description="Filter to issue date (YYYY-MM-DD)", type=openapi.TYPE_STRING, format=openapi.FORMAT_DATE),
+            openapi.Parameter('fulfillment_date_from', openapi.IN_QUERY, description="Filter from fulfillment date (YYYY-MM-DD)", type=openapi.TYPE_STRING, format=openapi.FORMAT_DATE),
+            openapi.Parameter('fulfillment_date_to', openapi.IN_QUERY, description="Filter to fulfillment date (YYYY-MM-DD)", type=openapi.TYPE_STRING, format=openapi.FORMAT_DATE),
+            openapi.Parameter('payment_due_from', openapi.IN_QUERY, description="Filter from payment due date (YYYY-MM-DD)", type=openapi.TYPE_STRING, format=openapi.FORMAT_DATE),
+            openapi.Parameter('payment_due_to', openapi.IN_QUERY, description="Filter to payment due date (YYYY-MM-DD)", type=openapi.TYPE_STRING, format=openapi.FORMAT_DATE),
+            openapi.Parameter('payment_status', openapi.IN_QUERY, description="Filter by payment status (paid/unpaid/overdue)", type=openapi.TYPE_STRING),
+            openapi.Parameter('amount_from', openapi.IN_QUERY, description="Filter from amount", type=openapi.TYPE_NUMBER),
+            openapi.Parameter('amount_to', openapi.IN_QUERY, description="Filter to amount", type=openapi.TYPE_NUMBER),
+            openapi.Parameter('currency', openapi.IN_QUERY, description="Filter by currency code", type=openapi.TYPE_STRING),
+            openapi.Parameter('operation', openapi.IN_QUERY, description="Filter by operation (CREATE/STORNO/MODIFY)", type=openapi.TYPE_STRING),
+            openapi.Parameter('payment_method', openapi.IN_QUERY, description="Filter by payment method (TRANSFER/CASH/CARD)", type=openapi.TYPE_STRING),
+            openapi.Parameter('search', openapi.IN_QUERY, description="Search in invoice number, names, tax numbers, original invoice", type=openapi.TYPE_STRING),
+            openapi.Parameter('ordering', openapi.IN_QUERY, description="Order by field (prefix with - for descending)", type=openapi.TYPE_STRING),
+        ]
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+    
+    @swagger_auto_schema(
+        operation_summary="NAV számla részletei",
+        operation_description="Get detailed information about a specific NAV invoice including line items"
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+    
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Get invoice statistics for the company"""
+        queryset = self.get_queryset()
+        
+        stats = {
+            'total_count': queryset.count(),
+            'inbound_count': queryset.filter(invoice_direction='INBOUND').count(),
+            'outbound_count': queryset.filter(invoice_direction='OUTBOUND').count(),
+            'total_gross_amount': queryset.aggregate(total=models.Sum('invoice_gross_amount'))['total'] or 0,
+            'currencies': list(queryset.values_list('currency_code', flat=True).distinct()),
+            'recent_sync_date': queryset.aggregate(latest=models.Max('created_at'))['latest'],
+        }
+        
+        return Response(stats)
+
+
+class InvoiceSyncLogViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    NAV szinkronizáció naplók megtekintése
+    
+    list: Az összes szinkronizáció napló listája
+    retrieve: Egy konkrét szinkronizáció napló részletei
+    """
+    serializer_class = InvoiceSyncLogSerializer
+    permission_classes = [IsAuthenticated, IsCompanyMember]
+    
+    def get_queryset(self):
+        """Company-scoped queryset"""
+        return InvoiceSyncLog.objects.filter(company=self.request.company).select_related('company')
+    
+    @swagger_auto_schema(
+        operation_summary="NAV szinkronizáció naplók",
+        operation_description="List of NAV synchronization logs for the company"
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+    
+    @swagger_auto_schema(
+        operation_summary="Szinkronizáció napló részletei",
+        operation_description="Detailed information about a specific synchronization log"
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
