@@ -841,11 +841,8 @@ class NavApiClient:
             xml_request += f"""
 \t\t<supplierTaxNumber>{clean_supplier_tax_number}</supplierTaxNumber>"""
         
-        # Add batch index if provided (required for invoices that have batch information)
-        # Include batch index even if it's 1, as NAV might require it for consistency
-        if batch_index:
-            xml_request += f"""
-\t\t<batchIndex>{batch_index}</batchIndex>"""
+        # Don't include batchIndex in queryInvoiceData - it was causing issues previously
+        # The batchIndex is used for digest queries, not detailed data queries
         
         xml_request += """
 \t</invoiceNumberQuery>
