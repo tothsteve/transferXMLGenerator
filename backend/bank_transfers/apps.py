@@ -39,17 +39,17 @@ class BankTransfersConfig(AppConfig):
                 except Exception as e:
                     logger.error(f"❌ NAV sync failed: {str(e)}")
             
-            # Schedule every 2 minutes for testing
+            # Schedule every 6 hours for production
             scheduler.add_job(
                 func=sync_nav_invoices,
-                trigger=CronTrigger(minute="*/2"),
+                trigger=CronTrigger(hour="*/6"),
                 id='nav_sync_job',
                 name='NAV Invoice Sync',
                 replace_existing=True
             )
             
             scheduler.start()
-            logger.info("📅 NAV scheduler started (every 2 minutes)")
+            logger.info("📅 NAV scheduler started (every 6 hours)")
             
         except Exception as e:
             import logging
