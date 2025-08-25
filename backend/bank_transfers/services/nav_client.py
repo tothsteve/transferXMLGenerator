@@ -779,10 +779,16 @@ class NavApiClient:
         
         try:
             xml_request = self._create_query_invoice_data_xml(invoice_number, direction, supplier_tax_number, batch_index)
+            
+            # Log the actual XML request for debugging
+            logger.info(f"🔍 Sending queryInvoiceData XML request for {invoice_number}")
+            logger.debug(f"XML Request: {xml_request}")
+            
             response = self._make_xml_request('queryInvoiceData', xml_request)
             return self._parse_invoice_data_response(response)
             
         except Exception as e:
+            logger.error(f"❌ queryInvoiceData failed for {invoice_number}: {str(e)}")
             raise Exception(f"Query invoice data failed: NAV API request failed: {str(e)}")
     
     def _create_query_invoice_data_xml(self, invoice_number, direction, supplier_tax_number, batch_index):
@@ -836,10 +842,15 @@ class NavApiClient:
 \t\t<invoiceNumber>{invoice_number}</invoiceNumber>
 \t\t<invoiceDirection>{direction}</invoiceDirection>"""
         
-        # Add supplier tax number if provided
-        if clean_supplier_tax_number:
+        # Only add supplier tax number for INBOUND invoices
+        # For OUTBOUND invoices, NAV already knows we are the supplier
+        if direction == 'INBOUND' and clean_supplier_tax_number and len(clean_supplier_tax_number) == 8:
             xml_request += f"""
 \t\t<supplierTaxNumber>{clean_supplier_tax_number}</supplierTaxNumber>"""
+        elif direction == 'OUTBOUND':
+            logger.info(f"💡 Skipping supplierTaxNumber for OUTBOUND invoice {invoice_number}")
+        elif clean_supplier_tax_number:
+            logger.warning(f"⚠️  Invalid supplier tax number format: {clean_supplier_tax_number} for {invoice_number}")
         
         # Don't include batchIndex in queryInvoiceData - it was causing issues previously
         # The batchIndex is used for digest queries, not detailed data queries
