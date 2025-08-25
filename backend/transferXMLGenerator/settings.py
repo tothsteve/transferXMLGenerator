@@ -35,7 +35,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_extensions',
     'drf_yasg',  # ← Swagger hozzáadása
-    'bank_transfers',
+    'bank_transfers.apps.BankTransfersConfig',
 ]
 
 MIDDLEWARE = [
