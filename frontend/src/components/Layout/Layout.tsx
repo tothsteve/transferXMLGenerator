@@ -40,7 +40,6 @@ const Layout: React.FC = () => {
           flexGrow: 1, 
           display: 'flex', 
           flexDirection: 'column',
-          ml: { lg: `${SIDEBAR_WIDTH}px` },
           transition: theme.transitions.create('margin', {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.leavingScreen,
