@@ -146,7 +146,8 @@ class TransferService:
                 company=company,
                 xml_generated_at=timezone.now(),
                 total_amount=sum(t.amount for t in transfers),
-                order=max_order + 1
+                order=max_order + 1,
+                batch_format='KH_CSV'
             )
             batch.transfers.set(transfers)
         

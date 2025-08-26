@@ -165,14 +165,20 @@ class Transfer(TimestampedModel):
         return self.originator_account.company
 
 class TransferBatch(CompanyOwnedTimestampedModel):
+    BATCH_FORMAT_CHOICES = [
+        ('XML', 'SEPA XML'),
+        ('KH_CSV', 'KH Bank CSV'),
+    ]
+    
     name = models.CharField(max_length=200, verbose_name="Köteg neve")
     description = models.TextField(blank=True, verbose_name="Leírás")
     transfers = models.ManyToManyField(Transfer, verbose_name="Utalások")
     total_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Összeg")
-    used_in_bank = models.BooleanField(default=False, verbose_name="Felhasználva a bankban", help_text="Jelzi, hogy az XML fájl fel lett-e töltve az internetbankba")
+    used_in_bank = models.BooleanField(default=False, verbose_name="Felhasználva a bankban", help_text="Jelzi, hogy a fájl fel lett-e töltve az internetbankba")
     bank_usage_date = models.DateTimeField(null=True, blank=True, verbose_name="Bank felhasználás dátuma")
     order = models.IntegerField(default=0, verbose_name="Sorrend", help_text="Kötegek sorrendje a listázáshoz és letöltéshez")
-    xml_generated_at = models.DateTimeField(null=True, blank=True, verbose_name="XML generálás ideje")
+    xml_generated_at = models.DateTimeField(null=True, blank=True, verbose_name="Fájl generálás ideje")
+    batch_format = models.CharField(max_length=10, choices=BATCH_FORMAT_CHOICES, default='XML', verbose_name="Fájlformátum")
     
     class Meta:
         verbose_name = "Utalási köteg"
@@ -183,14 +189,28 @@ class TransferBatch(CompanyOwnedTimestampedModel):
         return f"{self.name} ({self.transfers.count()} utalás)"
     
     @property
-    def xml_filename(self):
-        """Generate XML filename based on batch name and date"""
+    def filename(self):
+        """Generate filename based on batch format, name and date"""
         if self.xml_generated_at:
             date_str = self.xml_generated_at.strftime('%Y%m%d_%H%M%S')
             safe_name = "".join(c for c in self.name if c.isalnum() or c in (' ', '_', '-')).strip()
             safe_name = safe_name.replace(' ', '_')
-            return f"{safe_name}_{date_str}.xml"
-        return f"{self.name.replace(' ', '_')}.xml"
+            
+            if self.batch_format == 'KH_CSV':
+                return f"{safe_name}_{date_str}.HUF.CSV"
+            else:
+                return f"{safe_name}_{date_str}.xml"
+        else:
+            safe_name = self.name.replace(' ', '_')
+            if self.batch_format == 'KH_CSV':
+                return f"{safe_name}.HUF.CSV"
+            else:
+                return f"{safe_name}.xml"
+    
+    @property
+    def xml_filename(self):
+        """Legacy property for backwards compatibility"""
+        return self.filename
 
 
 # NAV Online Invoice Synchronization Models

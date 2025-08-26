@@ -501,13 +501,23 @@ class TransferBatchViewSet(viewsets.ReadOnlyModelViewSet):
     )
     @action(detail=True, methods=['get'])
     def download_xml(self, request, pk=None):
-        """XML fájl letöltése - regenerálja az XML-t a mentett adatokból"""
+        """Fájl letöltése - regenerálja a fájlt a mentett adatokból (XML vagy CSV formátumban)"""
         batch = self.get_object()
         
         try:
-            xml_content = TransferBatchService.regenerate_xml_for_batch(batch)
-            response = HttpResponse(xml_content, content_type='application/xml')
-            response['Content-Disposition'] = f'attachment; filename="{batch.xml_filename}"'
+            if batch.batch_format == 'KH_CSV':
+                # Generate KH Bank CSV content
+                from ..kh_export import KHBankExporter
+                transfers = batch.transfers.all().select_related('beneficiary', 'originator_account').order_by('order', 'execution_date')
+                exporter = KHBankExporter()
+                content = exporter.generate_kh_export(transfers)
+                response = HttpResponse(content, content_type='text/csv; charset=utf-8')
+            else:
+                # Generate SEPA XML content
+                content = TransferBatchService.regenerate_xml_for_batch(batch)
+                response = HttpResponse(content, content_type='application/xml')
+            
+            response['Content-Disposition'] = f'attachment; filename="{batch.filename}"'
             return response
         except ValueError as e:
             return Response({'detail': str(e)}, status=404)

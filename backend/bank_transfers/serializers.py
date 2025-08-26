@@ -98,18 +98,20 @@ class TransferSerializer(serializers.ModelSerializer):
 class TransferBatchSerializer(serializers.ModelSerializer):
     transfers = TransferSerializer(many=True, read_only=True)
     transfer_count = serializers.SerializerMethodField()
-    xml_filename = serializers.ReadOnlyField()
+    filename = serializers.ReadOnlyField()
+    xml_filename = serializers.ReadOnlyField()  # Keep for backwards compatibility
     company_name = serializers.CharField(source='company.name', read_only=True)
+    batch_format_display = serializers.CharField(source='get_batch_format_display', read_only=True)
     
     class Meta:
         model = TransferBatch
         fields = [
             'id', 'name', 'description', 'transfers',
             'total_amount', 'transfer_count', 'order',
-            'used_in_bank', 'bank_usage_date', 'xml_filename',
-            'company_name', 'created_at', 'xml_generated_at'
+            'used_in_bank', 'bank_usage_date', 'batch_format', 'batch_format_display',
+            'filename', 'xml_filename', 'company_name', 'created_at', 'xml_generated_at'
         ]
-        read_only_fields = ['created_at', 'xml_generated_at', 'total_amount', 'xml_filename', 'company', 'company_name']
+        read_only_fields = ['created_at', 'xml_generated_at', 'total_amount', 'filename', 'xml_filename', 'company', 'company_name', 'batch_format_display']
     
     def get_transfer_count(self, obj):
         return obj.transfers.count()
