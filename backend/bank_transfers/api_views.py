@@ -507,7 +507,7 @@ class TransferBatchViewSet(viewsets.ReadOnlyModelViewSet):
         try:
             if batch.batch_format == 'KH_CSV':
                 # Generate KH Bank CSV content
-                from ..kh_export import KHBankExporter
+                from bank_transfers.kh_export import KHBankExporter
                 transfers = batch.transfers.all().select_related('beneficiary', 'originator_account').order_by('order', 'execution_date')
                 exporter = KHBankExporter()
                 content = exporter.generate_kh_export(transfers)
