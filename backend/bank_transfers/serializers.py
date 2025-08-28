@@ -329,6 +329,7 @@ class InvoiceListSerializer(serializers.ModelSerializer):
             # Business
             'invoice_operation', 'payment_method', 'original_invoice_number',
             'payment_status', 'is_paid', 'invoice_category',
+            'supplier_bank_account_number', 'customer_bank_account_number',
             
             # System
             'sync_status', 'created_at'

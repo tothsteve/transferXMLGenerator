@@ -436,6 +436,10 @@ class Invoice(TimestampedModel):
     payment_method = models.CharField(max_length=20, null=True, blank=True, verbose_name="Fizetési mód (TRANSFER/CASH/CARD)")
     payment_date = models.DateField(null=True, blank=True, verbose_name="Fizetési dátum")
     invoice_appearance = models.CharField(max_length=20, null=True, blank=True, verbose_name="Számla megjelenés (PAPER/ELECTRONIC)")
+    
+    # Bank account information (extracted from XML)
+    supplier_bank_account_number = models.CharField(max_length=50, null=True, blank=True, verbose_name="Szállító bankszámlaszáma")
+    customer_bank_account_number = models.CharField(max_length=50, null=True, blank=True, verbose_name="Vevő bankszámlaszáma")
     nav_source = models.CharField(max_length=10, null=True, blank=True, verbose_name="NAV forrás (OSZ/XML)")
     completeness_indicator = models.BooleanField(null=True, blank=True, verbose_name="Teljesség jelző")
     modification_index = models.IntegerField(null=True, blank=True, verbose_name="Módosítási index")

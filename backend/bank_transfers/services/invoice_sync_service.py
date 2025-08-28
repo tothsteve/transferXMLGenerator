@@ -312,6 +312,9 @@ class InvoiceSyncService:
             # Parse the XML
             root = ET.fromstring(nav_invoice_xml)
             
+            # Extract bank account numbers from XML
+            self._extract_bank_account_numbers(invoice, root)
+            
             # Clear existing line items for this invoice
             invoice.line_items.all().delete()
             
@@ -416,6 +419,80 @@ class InvoiceSyncService:
             
         except Exception as e:
             logger.error(f"❌ Failed to extract line items for invoice {invoice.nav_invoice_number}: {str(e)}")
+    
+    def _extract_bank_account_numbers(self, invoice: Invoice, root):
+        """
+        Extract bank account numbers from NAV invoice XML.
+        
+        Args:
+            invoice: Invoice instance to update
+            root: XML root element
+        """
+        try:
+            # Import account validator
+            from ..hungarian_account_validator import validate_and_format_hungarian_account_number
+            
+            # Define the NAV XML namespace
+            namespace = "http://schemas.nav.gov.hu/OSA/3.0/data"
+            
+            # Look for supplier bank account number in the correct XML path
+            supplier_account_elem = root.find(f'.//{{{namespace}}}supplierBankAccountNumber')
+            if supplier_account_elem is not None and supplier_account_elem.text:
+                raw_supplier_account = supplier_account_elem.text.strip()
+                
+                # Check if it's Hungarian IBAN format and extract BBAN
+                account_to_validate = raw_supplier_account
+                is_hungarian_iban = False
+                
+                if raw_supplier_account.upper().startswith('HU') and len(raw_supplier_account) >= 28:
+                    # Hungarian IBAN: extract the BBAN part (skip first 4 characters)
+                    account_to_validate = raw_supplier_account[4:]
+                    is_hungarian_iban = True
+                    logger.info(f"🏦 Detected Hungarian IBAN, extracting BBAN: {account_to_validate}")
+                
+                # Validate and format the account number (skip checksum for NAV data)
+                validation_result = validate_and_format_hungarian_account_number(account_to_validate, validate_checksum=False)
+                
+                if validation_result.is_valid:
+                    invoice.supplier_bank_account_number = validation_result.formatted
+                    logger.info(f"🏦 Extracted & validated supplier account: {validation_result.formatted} {'(from IBAN)' if is_hungarian_iban else ''} for invoice {invoice.nav_invoice_number}")
+                else:
+                    # Store raw value if validation fails (might be non-Hungarian IBAN or invalid format)
+                    invoice.supplier_bank_account_number = raw_supplier_account
+                    logger.warning(f"⚠️ Supplier account validation failed for {invoice.nav_invoice_number}: {validation_result.error}, stored raw: {raw_supplier_account}")
+            
+            # Look for customer bank account number (less common, mainly for OUTBOUND invoices)
+            customer_account_elem = root.find(f'.//{{{namespace}}}customerBankAccountNumber')
+            if customer_account_elem is not None and customer_account_elem.text:
+                raw_customer_account = customer_account_elem.text.strip()
+                
+                # Check if it's Hungarian IBAN format and extract BBAN
+                account_to_validate = raw_customer_account
+                is_hungarian_iban = False
+                
+                if raw_customer_account.upper().startswith('HU') and len(raw_customer_account) >= 28:
+                    # Hungarian IBAN: extract the BBAN part (skip first 4 characters)
+                    account_to_validate = raw_customer_account[4:]
+                    is_hungarian_iban = True
+                    logger.info(f"🏦 Detected Hungarian IBAN, extracting BBAN: {account_to_validate}")
+                
+                # Validate and format the account number (skip checksum for NAV data)
+                validation_result = validate_and_format_hungarian_account_number(account_to_validate, validate_checksum=False)
+                
+                if validation_result.is_valid:
+                    invoice.customer_bank_account_number = validation_result.formatted
+                    logger.info(f"🏦 Extracted & validated customer account: {validation_result.formatted} {'(from IBAN)' if is_hungarian_iban else ''} for invoice {invoice.nav_invoice_number}")
+                else:
+                    # Store raw value if validation fails (might be non-Hungarian IBAN or invalid format)
+                    invoice.customer_bank_account_number = raw_customer_account
+                    logger.warning(f"⚠️ Customer account validation failed for {invoice.nav_invoice_number}: {validation_result.error}, stored raw: {raw_customer_account}")
+            
+            # Save the invoice with updated account numbers
+            if (supplier_account_elem is not None and supplier_account_elem.text) or (customer_account_elem is not None and customer_account_elem.text):
+                invoice.save(update_fields=['supplier_bank_account_number', 'customer_bank_account_number'])
+                
+        except Exception as e:
+            logger.warning(f"⚠️ Could not extract bank account numbers for invoice {invoice.nav_invoice_number}: {str(e)}")
     
     def _create_invoice_data_from_digest(self, digest_entry: Dict, direction: str, detailed_data: Dict = None) -> Dict:
         """Create comprehensive invoice data from digest and detailed information."""
