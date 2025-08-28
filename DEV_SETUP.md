@@ -22,8 +22,8 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Install local development dependencies
 pip install -r requirements-local.txt
 
-# Copy local environment variables
-cp ../.env.local .env
+# Set NAV encryption key for local development
+export NAV_ENCRYPTION_KEY=CwXdT2YfsLuEea1FciHRBuLCjLK_a19cWdJVtlhZTYE=
 
 # Run database migrations
 python manage.py migrate --settings=transferXMLGenerator.settings_local
@@ -78,6 +78,10 @@ npm start
 ```bash
 cd backend
 source venv/bin/activate
+
+# Set NAV encryption key (required for each terminal session)
+export NAV_ENCRYPTION_KEY=CwXdT2YfsLuEea1FciHRBuLCjLK_a19cWdJVtlhZTYE=
+
 python manage.py runserver --settings=transferXMLGenerator.settings_local
 ```
 
@@ -135,6 +139,17 @@ python manage.py check --deploy
 1. Verify SQL Server is running on port 1435
 2. Check database name is 'administration'
 3. Update password in `.env` file if needed
+
+### NAV API Encryption Issues
+If you get `InvalidToken` errors with NAV sync:
+1. **Set the encryption key**: `export NAV_ENCRYPTION_KEY=CwXdT2YfsLuEea1FciHRBuLCjLK_a19cWdJVtlhZTYE=`
+2. **Re-enter NAV credentials** in Django admin (http://localhost:8000/admin/)
+3. **Test NAV connection**: `python manage.py sync_nav_invoices --test`
+4. **For permanent setup**, add to your shell profile:
+   ```bash
+   echo 'export NAV_ENCRYPTION_KEY=CwXdT2YfsLuEea1FciHRBuLCjLK_a19cWdJVtlhZTYE=' >> ~/.bashrc
+   # or ~/.zshrc if using zsh
+   ```
 
 ### CORS Issues
 Local development uses permissive CORS settings in `settings_local.py`

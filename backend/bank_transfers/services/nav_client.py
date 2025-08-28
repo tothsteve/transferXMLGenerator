@@ -674,6 +674,7 @@ class NavApiClient:
         }
         
         response = self.session.post(url, data=xml_data, headers=headers)
+        
         response.raise_for_status()
         
         return response.text
