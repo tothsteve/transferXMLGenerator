@@ -32,6 +32,7 @@ import {
   FilterList as FilterIcon,
   Refresh as RefreshIcon,
   Visibility as ViewIcon,
+  SwapHoriz,
 } from '@mui/icons-material';
 import { useToast } from '../../hooks/useToast';
 import { navInvoicesApi } from '../../services/api';
@@ -119,6 +120,7 @@ const NAVInvoices: React.FC = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [sortField, setSortField] = useState<string>('issue_date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [inboundTransferFilter, setInboundTransferFilter] = useState(false);
   
   // Modal states
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -137,8 +139,9 @@ const NAVInvoices: React.FC = () => {
         page: currentPage,
         page_size: 20,
         search: searchTerm || undefined,
-        direction: directionFilter,
+        direction: inboundTransferFilter ? 'INBOUND' : directionFilter,
         currency: currencyFilter,
+        payment_method: inboundTransferFilter ? 'TRANSFER' : undefined,
         ordering: `${sortDirection === 'desc' ? '-' : ''}${sortField}`,
         hide_storno_invoices: hideStornoInvoices,
       };
@@ -186,7 +189,7 @@ const NAVInvoices: React.FC = () => {
 
   useEffect(() => {
     loadInvoices();
-  }, [searchTerm, directionFilter, currencyFilter, currentPage, sortField, sortDirection, hideStornoInvoices]);
+  }, [searchTerm, directionFilter, currencyFilter, currentPage, sortField, sortDirection, hideStornoInvoices, inboundTransferFilter]);
 
   const handleViewInvoice = async (invoice: Invoice) => {
     setInvoiceDetailsOpen(true);
@@ -210,6 +213,7 @@ const NAVInvoices: React.FC = () => {
     setSearchTerm('');
     setDirectionFilter(undefined);
     setCurrencyFilter(undefined);
+    setInboundTransferFilter(false);
     setHideStornoInvoices(true); // Reset to default (hide STORNO invoices)
     setCurrentPage(1);
     setSortField('issue_date');
@@ -362,8 +366,27 @@ const NAVInvoices: React.FC = () => {
           </Menu>
         </Stack>
 
+        {/* Quick Filter Buttons */}
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1 }}>
+          <Button
+            variant={inboundTransferFilter ? "contained" : "outlined"}
+            color="primary"
+            size="small"
+            onClick={() => {
+              setInboundTransferFilter(!inboundTransferFilter);
+              // Clear other direction filters when this is active
+              if (!inboundTransferFilter) {
+                setDirectionFilter(undefined);
+              }
+            }}
+            startIcon={<SwapHoriz />}
+          >
+            Bejövő átutalások
+          </Button>
+        </Stack>
+
         {/* Active filters display - Same pattern as BeneficiaryManager */}
-        {(searchTerm || directionFilter || currencyFilter || !hideStornoInvoices) && (
+        {(searchTerm || directionFilter || currencyFilter || !hideStornoInvoices || inboundTransferFilter) && (
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
             <Typography variant="body2" color="text.secondary">
               Aktív szűrők:
@@ -389,6 +412,14 @@ const NAVInvoices: React.FC = () => {
                 label={`Pénznem: ${currencyFilter}`}
                 size="small"
                 color="warning"
+                variant="outlined"
+              />
+            )}
+            {inboundTransferFilter && (
+              <Chip
+                label="Bejövő átutalások"
+                size="small"
+                color="primary"
                 variant="outlined"
               />
             )}

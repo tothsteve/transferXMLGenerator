@@ -19,6 +19,10 @@ import {
   KeyboardArrowDown as ArrowDownIcon,
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
+  SwapHoriz as TransferIcon,
+  CreditCard as CardIcon,
+  Receipt as ReceiptIcon,
+  AttachMoney as CashIcon,
 } from '@mui/icons-material';
 
 interface Invoice {
@@ -54,6 +58,7 @@ interface Invoice {
   original_invoice_number: string | null;
   payment_status: string;
   is_paid: boolean;
+  invoice_category?: string | null;
   
   // System
   sync_status: string;
@@ -126,7 +131,11 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
       }}
       onClick={() => handleSort(field)}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: align === 'right' ? 'flex-end' : 'flex-start' }}>
+      <Box sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start' 
+      }}>
         {label}
         {getSortIcon(field)}
       </Box>
@@ -148,6 +157,60 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
     return null;
   };
 
+  const getPaymentMethodIcon = (paymentMethod: string | null, invoiceCategory?: string | null) => {
+    // Show Receipt icon for SIMPLIFIED invoices when payment_method is null
+    if (!paymentMethod && invoiceCategory?.toUpperCase() === 'SIMPLIFIED') {
+      return (
+        <Tooltip title="Egyszerűsített">
+          <ReceiptIcon color="success" fontSize="small" />
+        </Tooltip>
+      );
+    }
+    
+    // Show Card icon for NORMAL invoices when payment_method is null
+    if (!paymentMethod && invoiceCategory?.toUpperCase() === 'NORMAL') {
+      return (
+        <Tooltip title="Bankkártya (feltételezett)">
+          <CardIcon color="secondary" fontSize="small" />
+        </Tooltip>
+      );
+    }
+    
+    if (!paymentMethod) return '-';
+    
+    const method = paymentMethod.toUpperCase().trim();
+    
+    switch (method) {
+      case 'TRANSFER':
+        return (
+          <Tooltip title="Átutalás">
+            <TransferIcon color="primary" fontSize="small" />
+          </Tooltip>
+        );
+      case 'CARD':
+        return (
+          <Tooltip title="Kártya">
+            <CardIcon color="secondary" fontSize="small" />
+          </Tooltip>
+        );
+      case 'CASH':
+        return (
+          <Tooltip title="Készpénz">
+            <CashIcon color="warning" fontSize="small" />
+          </Tooltip>
+        );
+      default:
+        console.log('Unknown payment method:', paymentMethod); // Debug log
+        return (
+          <Tooltip title={paymentMethod}>
+            <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
+              {paymentMethod}
+            </Typography>
+          </Tooltip>
+        );
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -162,22 +225,23 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
               }
             }}>
               <TableCell sx={{ backgroundColor: 'background.paper' }}>Számlaszám</TableCell>
-              <TableCell sx={{ backgroundColor: 'background.paper' }}>Irány</TableCell>
+              <TableCell align="center" sx={{ backgroundColor: 'background.paper' }}>Irány</TableCell>
               <TableCell sx={{ backgroundColor: 'background.paper' }}>Partner</TableCell>
               <TableCell sx={{ backgroundColor: 'background.paper' }}>Kiállítás</TableCell>
               <TableCell sx={{ backgroundColor: 'background.paper' }}>Teljesítés</TableCell>
               <TableCell sx={{ backgroundColor: 'background.paper' }}>Fizetési határidő</TableCell>
+              <TableCell align="center" sx={{ backgroundColor: 'background.paper' }}>Fizetési mód</TableCell>
               <TableCell align="right" sx={{ backgroundColor: 'background.paper' }}>Nettó</TableCell>
               <TableCell align="right" sx={{ backgroundColor: 'background.paper' }}>ÁFA</TableCell>
               <TableCell align="right" sx={{ backgroundColor: 'background.paper' }}>Bruttó</TableCell>
               {showStornoColumn && <TableCell sx={{ backgroundColor: 'background.paper' }}>Sztornó</TableCell>}
-              <TableCell sx={{ backgroundColor: 'background.paper' }}>Műveletek</TableCell>
+              <TableCell align="center" sx={{ backgroundColor: 'background.paper' }}>Részletek</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {Array.from({ length: 10 }).map((_, index) => (
               <TableRow key={index}>
-                {Array.from({ length: showStornoColumn ? 11 : 10 }).map((_, cellIndex) => (
+                {Array.from({ length: showStornoColumn ? 12 : 11 }).map((_, cellIndex) => (
                   <TableCell key={cellIndex}><Skeleton /></TableCell>
                 ))}
               </TableRow>
@@ -218,16 +282,17 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
             }
           }}>
             {renderHeaderCell('nav_invoice_number', 'Számlaszám')}
-            {renderHeaderCell('invoice_direction', 'Irány')}
+            {renderHeaderCell('invoice_direction', 'Irány', 'center')}
             <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'background.paper' }}>Partner</TableCell>
             {renderHeaderCell('issue_date', 'Kiállítás')}
             {renderHeaderCell('fulfillment_date', 'Teljesítés')}
             {renderHeaderCell('payment_due_date', 'Fizetési határidő')}
+            {renderHeaderCell('payment_method', 'Fizetési mód', 'center')}
             {renderHeaderCell('invoice_net_amount', 'Nettó', 'right')}
             {renderHeaderCell('invoice_vat_amount', 'ÁFA', 'right')}
             {renderHeaderCell('invoice_gross_amount', 'Bruttó', 'right')}
             {showStornoColumn && <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'background.paper' }}>Sztornó</TableCell>}
-            <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'background.paper' }}>Műveletek</TableCell>
+            <TableCell align="center" sx={{ fontWeight: 'bold', backgroundColor: 'background.paper' }}>Részletek</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -248,7 +313,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
                   {invoice.nav_invoice_number}
                 </Typography>
               </TableCell>
-              <TableCell>
+              <TableCell align="center">
                 {getDirectionChip(invoice.invoice_direction, invoice.invoice_direction_display)}
               </TableCell>
               <TableCell>
@@ -284,6 +349,9 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
                   {invoice.payment_due_date_formatted || '-'}
                 </Typography>
               </TableCell>
+              <TableCell align="center">
+                {getPaymentMethodIcon(invoice.payment_method, invoice.invoice_category)}
+              </TableCell>
               <TableCell align="right">
                 <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
                   {invoice.invoice_net_amount_formatted}
@@ -304,7 +372,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
                   {getStornoIndicator(invoice.invoice_operation)}
                 </TableCell>
               )}
-              <TableCell onClick={(e) => e.stopPropagation()}>
+              <TableCell align="center" onClick={(e) => e.stopPropagation()}>
                 <Tooltip title="Számla részletei és tételek">
                   <IconButton
                     onClick={() => onView(invoice)}
