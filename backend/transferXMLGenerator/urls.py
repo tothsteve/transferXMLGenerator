@@ -39,7 +39,7 @@ schema_view = get_schema_view(
 )
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path('django-admin/', admin.site.urls),  # Changed to avoid frontend route conflict
     
     # Health check for Railway
     path('api/health/', health_check, name='health-check'),
