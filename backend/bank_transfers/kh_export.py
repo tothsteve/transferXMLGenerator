@@ -68,14 +68,14 @@ class KHBankExporter:
             execution_date = transfer.execution_date.strftime('%Y.%m.%d')
             
             # Clean text fields (ensure proper character encoding)
-            partner_name = self._clean_text_field(transfer.beneficiary.name, 75)
+            partner_name = self._clean_text_field(transfer.beneficiary.name, 70)
             remittance = self._clean_text_field(transfer.remittance_info, 140)
             
             # Generate unique ID (optional) - use transfer ID or sequential number
             unique_id = str(transfer.id) if transfer.id else str(i)
             
             # Apply KH Bank field padding requirements
-            partner_name_padded = partner_name.ljust(75)                    # Right pad with spaces to 75
+            partner_name_padded = partner_name.ljust(70)                    # Right pad with spaces to 70
             amount_padded = str(amount).zfill(18)                          # Left pad with zeros to 18
             remittance_padded = remittance.ljust(140)                      # Right pad with spaces to 140
             unique_id_padded = unique_id.zfill(35)                         # Left pad with zeros to 35
@@ -84,7 +84,7 @@ class KHBankExporter:
             row = [
                 source_account,           # Forrás számlaszám (28)
                 partner_account,          # Partner számlaszáma (28)  
-                partner_name_padded,      # Partner neve (75) - right padded
+                partner_name_padded,      # Partner neve (70) - right padded
                 amount_padded,            # Átutalandó összeg (18) - left padded with zeros
                 "HUF",                    # Átutalandó deviza (3)
                 remittance_padded,        # Közlemény (140) - right padded
