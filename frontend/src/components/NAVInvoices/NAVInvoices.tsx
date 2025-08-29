@@ -117,8 +117,8 @@ const NAVInvoices: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [directionFilter, setDirectionFilter] = useState<string | undefined>(undefined);
-  const [currencyFilter, setCurrencyFilter] = useState<string | undefined>(undefined);
+  const [directionFilter, setDirectionFilter] = useState<string>('');
+  const [currencyFilter, setCurrencyFilter] = useState<string>('');
   const [hideStornoInvoices, setHideStornoInvoices] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -147,8 +147,8 @@ const NAVInvoices: React.FC = () => {
         page: currentPage,
         page_size: 20,
         search: searchTerm || undefined,
-        direction: inboundTransferFilter ? 'INBOUND' : directionFilter,
-        currency: currencyFilter,
+        direction: inboundTransferFilter ? 'INBOUND' : (directionFilter || undefined),
+        currency: currencyFilter || undefined,
         payment_method: inboundTransferFilter ? 'TRANSFER' : undefined,
         ordering: `${sortDirection === 'desc' ? '-' : ''}${sortField}`,
         hide_storno_invoices: hideStornoInvoices,
@@ -221,8 +221,8 @@ const NAVInvoices: React.FC = () => {
 
   const clearFilters = () => {
     setSearchTerm('');
-    setDirectionFilter(undefined);
-    setCurrencyFilter(undefined);
+    setDirectionFilter('');
+    setCurrencyFilter('');
     setInboundTransferFilter(false);
     setHideStornoInvoices(true); // Reset to default (hide STORNO invoices)
     setCurrentPage(1);
@@ -411,7 +411,7 @@ const NAVInvoices: React.FC = () => {
                 control={
                   <Checkbox
                     checked={Boolean(directionFilter === 'INBOUND')}
-                    onChange={(e) => setDirectionFilter(e.target.checked ? 'INBOUND' : undefined)}
+                    onChange={(e) => setDirectionFilter(e.target.checked ? 'INBOUND' : '')}
                     size="small"
                   />
                 }
@@ -424,7 +424,7 @@ const NAVInvoices: React.FC = () => {
                 control={
                   <Checkbox
                     checked={Boolean(directionFilter === 'OUTBOUND')}
-                    onChange={(e) => setDirectionFilter(e.target.checked ? 'OUTBOUND' : undefined)}
+                    onChange={(e) => setDirectionFilter(e.target.checked ? 'OUTBOUND' : '')}
                     size="small"
                   />
                 }
@@ -437,7 +437,7 @@ const NAVInvoices: React.FC = () => {
                 control={
                   <Checkbox
                     checked={Boolean(currencyFilter === 'HUF')}
-                    onChange={(e) => setCurrencyFilter(e.target.checked ? 'HUF' : undefined)}
+                    onChange={(e) => setCurrencyFilter(e.target.checked ? 'HUF' : '')}
                     size="small"
                   />
                 }
@@ -476,7 +476,7 @@ const NAVInvoices: React.FC = () => {
               setInboundTransferFilter(!inboundTransferFilter);
               // Clear other direction filters when this is active
               if (!inboundTransferFilter) {
-                setDirectionFilter(undefined);
+                setDirectionFilter('');
               }
             }}
             startIcon={<SwapHoriz />}
