@@ -109,6 +109,8 @@ export interface ExcelImportResponse {
 export interface GenerateKHExportResponse {
   content: string;
   filename: string;
+  encoding: string;
+  content_encoding?: string;  // Optional field for base64 encoding indicator
   transfer_count: number;
   total_amount: string;
 }

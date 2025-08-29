@@ -430,8 +430,20 @@ const TransferWorkflow: React.FC = () => {
       
       console.log('KH export result:', khResult);
       
-      // Automatically download the file
-      const blob = new Blob([khResult.data.content], { type: 'text/csv; charset=utf-8' });
+      // Automatically download the file with proper ISO-8859-2 encoding
+      let blob;
+      if (khResult.data.content_encoding === 'base64') {
+        // Decode base64 content to get ISO-8859-2 encoded bytes
+        const binaryString = atob(khResult.data.content);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        blob = new Blob([bytes], { type: 'text/csv' });
+      } else {
+        // Fallback for non-base64 content
+        blob = new Blob([khResult.data.content], { type: 'text/csv; charset=utf-8' });
+      }
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;

@@ -126,9 +126,11 @@ class TransferService:
         if not transfers:
             raise ValueError("No transfers found")
         
-        # Generate KH Bank export with ISO-8859-2 encoding
+        # Generate KH Bank export with ISO-8859-2 encoding (required by bank)
+        import base64
         exporter = KHBankExporter()
-        kh_content = exporter.generate_kh_export(transfers)  # Keep string for response
+        kh_content_bytes = exporter.generate_kh_export_encoded(transfers)  # Get ISO-8859-2 encoded bytes
+        kh_content_base64 = base64.b64encode(kh_content_bytes).decode('ascii')  # Base64 for JSON transport
         filename = exporter.get_filename(batch_name)
         
         # Create batch if name provided
@@ -166,8 +168,10 @@ class TransferService:
             }
         
         return {
-            'content': kh_content,
+            'content': kh_content_base64,
             'filename': filename,
+            'encoding': 'iso-8859-2',  # Required by Hungarian bank
+            'content_encoding': 'base64',  # Content is base64 encoded
             'transfer_count': len(transfers),
             'total_amount': str(sum(t.amount for t in transfers)),
             'batch': batch_data
