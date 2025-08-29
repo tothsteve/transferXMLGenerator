@@ -197,13 +197,13 @@ class TransferBatch(CompanyOwnedTimestampedModel):
             safe_name = safe_name.replace(' ', '_')
             
             if self.batch_format == 'KH_CSV':
-                return f"{safe_name}_{date_str}.HUF.CSV"
+                return f"{safe_name}_{date_str}.HUF.csv"
             else:
                 return f"{safe_name}_{date_str}.xml"
         else:
             safe_name = self.name.replace(' ', '_')
             if self.batch_format == 'KH_CSV':
-                return f"{safe_name}.HUF.CSV"
+                return f"{safe_name}.HUF.csv"
             else:
                 return f"{safe_name}.xml"
     

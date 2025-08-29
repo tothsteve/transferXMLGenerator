@@ -1,6 +1,6 @@
 """
 KH Bank Text Export Generator
-Generates .HUF.CSV files for KH Bank import according to "IV. Egyszerűsített forintátutalás" format
+Generates .HUF.csv files for KH Bank import according to "IV. Egyszerűsített forintátutalás" format
 """
 
 from typing import List
@@ -9,20 +9,20 @@ from .models import Transfer, BankAccount
 
 
 class KHBankExporter:
-    """Generate KH Bank import files in .HUF.CSV format"""
+    """Generate KH Bank import files in .HUF.csv format"""
     
     def __init__(self):
         self.max_transfers = 40  # KH Bank limit
     
     def generate_kh_export(self, transfers: List[Transfer]) -> str:
         """
-        Generate KH Bank .HUF.CSV file content from transfers
+        Generate KH Bank .HUF.csv file content from transfers
         
         Args:
             transfers: List of Transfer objects to export
             
         Returns:
-            String content of the .HUF.CSV file
+            String content of the .HUF.csv file
             
         Raises:
             ValueError: If more than 40 transfers or validation fails
@@ -89,6 +89,31 @@ class KHBankExporter:
             lines.append(";".join(row))
         
         return "\n".join(lines)
+    
+    def generate_kh_export_encoded(self, transfers: List[Transfer]) -> bytes:
+        """
+        Generate KH Bank .HUF.csv file content with ISO-8859-2 encoding
+        
+        Args:
+            transfers: List of Transfer objects to export
+            
+        Returns:
+            Bytes content with ISO-8859-2 encoding for KH Bank
+        """
+        # Generate the CSV content as string
+        content = self.generate_kh_export(transfers)
+        
+        # Encode to ISO-8859-2 (Latin-2) for Hungarian bank compatibility
+        try:
+            encoded_content = content.encode('iso-8859-2')
+            return encoded_content
+        except UnicodeEncodeError as e:
+            # If encoding fails, log problematic characters and use replacement
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"KH export encoding warning: {str(e)}")
+            encoded_content = content.encode('iso-8859-2', errors='replace')
+            return encoded_content
     
     def _validate_transfer(self, transfer: Transfer):
         """Validate transfer for KH Bank export requirements"""
@@ -173,6 +198,6 @@ class KHBankExporter:
             # Clean batch name for filename
             safe_name = "".join(c for c in batch_name if c.isalnum() or c in (' ', '_', '-')).strip()
             safe_name = safe_name.replace(' ', '_')
-            return f"{safe_name}_KH_{timestamp}.HUF.CSV"
+            return f"{safe_name}_KH_{timestamp}.HUF.csv"
         else:
-            return f"KH_export_{timestamp}.HUF.CSV"
+            return f"KH_export_{timestamp}.HUF.csv"

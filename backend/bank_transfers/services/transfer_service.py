@@ -126,9 +126,9 @@ class TransferService:
         if not transfers:
             raise ValueError("No transfers found")
         
-        # Generate KH Bank export
+        # Generate KH Bank export with ISO-8859-2 encoding
         exporter = KHBankExporter()
-        kh_content = exporter.generate_kh_export(transfers)
+        kh_content = exporter.generate_kh_export(transfers)  # Keep string for response
         filename = exporter.get_filename(batch_name)
         
         # Create batch if name provided

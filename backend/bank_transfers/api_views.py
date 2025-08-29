@@ -450,7 +450,7 @@ class TransferViewSet(viewsets.ModelViewSet):
             200: openapi.Schema(
                 type=openapi.TYPE_OBJECT,
                 properties={
-                    'content': openapi.Schema(type=openapi.TYPE_STRING, description='KH Bank .HUF.CSV file tartalma'),
+                    'content': openapi.Schema(type=openapi.TYPE_STRING, description='KH Bank .HUF.csv file tartalma'),
                     'filename': openapi.Schema(type=openapi.TYPE_STRING, description='Ajánlott fájlnév'),
                     'transfer_count': openapi.Schema(type=openapi.TYPE_INTEGER),
                     'total_amount': openapi.Schema(type=openapi.TYPE_STRING)
@@ -462,7 +462,7 @@ class TransferViewSet(viewsets.ModelViewSet):
     )
     @action(detail=False, methods=['post'])
     def generate_kh_export(self, request):
-        """KH Bank formátumú .HUF.CSV export generálás"""
+        """KH Bank formátumú .HUF.csv export generálás"""
         serializer = XMLGenerateSerializer(data=request.data)
         
         if serializer.is_valid():
@@ -510,8 +510,8 @@ class TransferBatchViewSet(viewsets.ReadOnlyModelViewSet):
                 from bank_transfers.kh_export import KHBankExporter
                 transfers = batch.transfers.all().select_related('beneficiary', 'originator_account').order_by('order', 'execution_date')
                 exporter = KHBankExporter()
-                content = exporter.generate_kh_export(transfers)
-                response = HttpResponse(content, content_type='text/csv; charset=utf-8')
+                content = exporter.generate_kh_export_encoded(transfers)
+                response = HttpResponse(content, content_type='text/csv; charset=iso-8859-2')
             else:
                 # Generate SEPA XML content
                 content = TransferBatchService.regenerate_xml_for_batch(batch)
