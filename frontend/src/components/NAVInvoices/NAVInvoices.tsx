@@ -410,7 +410,7 @@ const NAVInvoices: React.FC = () => {
               <FormControlLabel
                 control={
                   <Checkbox
-                    checked={directionFilter === 'INBOUND'}
+                    checked={Boolean(directionFilter === 'INBOUND')}
                     onChange={(e) => setDirectionFilter(e.target.checked ? 'INBOUND' : undefined)}
                     size="small"
                   />
@@ -423,7 +423,7 @@ const NAVInvoices: React.FC = () => {
               <FormControlLabel
                 control={
                   <Checkbox
-                    checked={directionFilter === 'OUTBOUND'}
+                    checked={Boolean(directionFilter === 'OUTBOUND')}
                     onChange={(e) => setDirectionFilter(e.target.checked ? 'OUTBOUND' : undefined)}
                     size="small"
                   />
@@ -436,7 +436,7 @@ const NAVInvoices: React.FC = () => {
               <FormControlLabel
                 control={
                   <Checkbox
-                    checked={currencyFilter === 'HUF'}
+                    checked={Boolean(currencyFilter === 'HUF')}
                     onChange={(e) => setCurrencyFilter(e.target.checked ? 'HUF' : undefined)}
                     size="small"
                   />
