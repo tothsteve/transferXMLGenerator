@@ -34,8 +34,8 @@ import ExcelImport from './ExcelImport';
 
 const BeneficiaryManager: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [showActive, setShowActive] = useState<boolean | undefined>(undefined);
-  const [showFrequent, setShowFrequent] = useState<boolean | undefined>(undefined);
+  const [showActive, setShowActive] = useState<boolean | undefined>();
+  const [showFrequent, setShowFrequent] = useState<boolean | undefined>();
   const [currentPage, setCurrentPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);

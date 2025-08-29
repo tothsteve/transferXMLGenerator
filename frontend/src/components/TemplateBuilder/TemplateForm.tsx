@@ -145,7 +145,7 @@ const SortableBeneficiary: React.FC<{
                 type="number"
                 size="small"
                 fullWidth
-                value={beneficiary.default_amount}
+                value={beneficiary.default_amount || ''}
                 onChange={(e) => onUpdate(beneficiary.beneficiary_id, 'default_amount', e.target.value)}
                 placeholder="0"
               />
@@ -155,7 +155,7 @@ const SortableBeneficiary: React.FC<{
                 label="Alapértelmezett közlemény"
                 size="small"
                 fullWidth
-                value={beneficiary.default_remittance_info}
+                value={beneficiary.default_remittance_info || ''}
                 onChange={(e) => onUpdate(beneficiary.beneficiary_id, 'default_remittance_info', e.target.value)}
                 placeholder="Közlemény..."
               />
