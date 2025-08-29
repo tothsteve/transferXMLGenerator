@@ -36,7 +36,7 @@ import {
   SwapHoriz,
   Add as AddIcon,
 } from '@mui/icons-material';
-import { useToast } from '../../hooks/useToast';
+import { useToastContext } from '../../context/ToastContext';
 import { navInvoicesApi } from '../../services/api';
 import NAVInvoiceTable from './NAVInvoiceTable';
 
@@ -135,7 +135,7 @@ const NAVInvoices: React.FC = () => {
   const [invoiceLineItems, setInvoiceLineItems] = useState<InvoiceLineItem[]>([]);
   const [invoiceDetailsLoading, setInvoiceDetailsLoading] = useState(false);
   
-  const { success: showSuccess, error: showError } = useToast();
+  const { success: showSuccess, error: showError } = useToastContext();
   const navigate = useNavigate();
 
   // Load invoices
@@ -293,11 +293,6 @@ const NAVInvoices: React.FC = () => {
       const errorMessage = `A kiválasztott számlák nem tartalmaznak elegendő adatot az átutalás generálásához:\n${errorDetails.join('\n')}${invalidInvoices.length > 3 ? `\n...és további ${invalidInvoices.length - 3} számla` : ''}`;
       showError(errorMessage);
       return;
-    }
-
-    if (validInvoices.length !== selectedInvoiceObjects.length) {
-      // This is a warning, not an error - we still proceed
-      console.warn(`${invalidInvoices.length} számlát kihagytunk a hiányos adatok miatt:`, invalidInvoices);
     }
 
     // Create transfer data structure compatible with TransferWorkflow
