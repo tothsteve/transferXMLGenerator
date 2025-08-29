@@ -74,15 +74,21 @@ class KHBankExporter:
             # Generate unique ID (optional) - use transfer ID or sequential number
             unique_id = str(transfer.id) if transfer.id else str(i)
             
+            # Apply KH Bank field padding requirements
+            partner_name_padded = partner_name.ljust(75)                    # Right pad with spaces to 75
+            amount_padded = str(amount).zfill(18)                          # Left pad with zeros to 18
+            remittance_padded = remittance.ljust(140)                      # Right pad with spaces to 140
+            unique_id_padded = unique_id.zfill(35)                         # Left pad with zeros to 35
+            
             # Build row
             row = [
                 source_account,           # Forrás számlaszám (28)
                 partner_account,          # Partner számlaszáma (28)  
-                partner_name,             # Partner neve (75)
-                str(amount),              # Átutalandó összeg (18)
+                partner_name_padded,      # Partner neve (75) - right padded
+                amount_padded,            # Átutalandó összeg (18) - left padded with zeros
                 "HUF",                    # Átutalandó deviza (3)
-                remittance,               # Közlemény (140)
-                unique_id,                # Átutalás egyedi azonosítója (35)
+                remittance_padded,        # Közlemény (140) - right padded
+                unique_id_padded,         # Átutalás egyedi azonosítója (35) - left padded with zeros
                 execution_date            # Értéknap (10)
             ]
             
