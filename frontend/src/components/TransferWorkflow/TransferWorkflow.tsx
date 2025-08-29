@@ -66,6 +66,39 @@ const TransferWorkflow: React.FC = () => {
   const templates = templatesData?.results || [];
   const beneficiaries = beneficiariesData?.results || [];
 
+  // Handle preloaded transfers from NAV invoices
+  useEffect(() => {
+    const state = location.state as any;
+    if (state?.preloadedTransfers && state?.source === 'nav_invoices') {
+      console.log('Loading preloaded transfers from NAV invoices:', state.preloadedTransfers);
+      
+      // Convert preloaded data to TransferData format
+      const convertedTransfers: TransferData[] = state.preloadedTransfers.map((transfer: any, index: number) => ({
+        tempId: `nav_${index}`,
+        beneficiary: transfer.beneficiary_id, // null initially
+        beneficiary_data: transfer.beneficiary_id ? undefined : {
+          id: 0,
+          name: transfer.beneficiary_name,
+          account_number: transfer.account_number,
+          description: `From NAV: ${transfer.remittance_info}`,
+          remittance_information: transfer.remittance_info,
+          is_frequent: false,
+          is_active: true,
+        },
+        amount: transfer.amount,
+        currency: transfer.currency as 'HUF' | 'EUR' | 'USD',
+        execution_date: transfer.execution_date,
+        remittance_info: transfer.remittance_info,
+        order: transfer.order,
+        is_processed: false,
+      }));
+
+      setTransfers(convertedTransfers);
+      // Clear the location state so it doesn't reload on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
+
   const handleLoadTemplate = async (templateId: number) => {
     if (!defaultAccount) {
       console.error('No default account available for template loading');

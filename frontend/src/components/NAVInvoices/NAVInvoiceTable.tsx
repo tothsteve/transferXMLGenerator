@@ -12,6 +12,7 @@ import {
   Skeleton,
   Box,
   Tooltip,
+  Checkbox,
 } from '@mui/material';
 import {
   Visibility as ViewIcon,
@@ -73,6 +74,10 @@ interface NAVInvoiceTableProps {
   sortField?: string;
   sortDirection?: 'asc' | 'desc';
   showStornoColumn?: boolean; // Show Sztornó column when STORNO invoices are visible
+  // Selection functionality
+  selectedInvoices?: number[];
+  onSelectInvoice?: (invoiceId: number, selected: boolean) => void;
+  onSelectAll?: (selected: boolean) => void;
 }
 
 const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
@@ -83,7 +88,26 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
   sortField,
   sortDirection,
   showStornoColumn = false,
+  selectedInvoices = [],
+  onSelectInvoice,
+  onSelectAll,
 }) => {
+  // Helper functions for checkbox selection
+  const isAllSelected = (selectedInvoices?.length || 0) === invoices.length && invoices.length > 0;
+  const isIndeterminate = (selectedInvoices?.length || 0) > 0 && (selectedInvoices?.length || 0) < invoices.length;
+
+  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (onSelectAll) {
+      onSelectAll(event.target.checked);
+    }
+  };
+
+  const handleSelectInvoice = (invoiceId: number) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    event.stopPropagation(); // Prevent row click when checking checkbox
+    if (onSelectInvoice) {
+      onSelectInvoice(invoiceId, event.target.checked);
+    }
+  };
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -224,6 +248,9 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
                 borderBottomColor: 'divider',
               }
             }}>
+              <TableCell sx={{ backgroundColor: 'background.paper', width: '60px' }}>
+                <Checkbox disabled />
+              </TableCell>
               <TableCell sx={{ backgroundColor: 'background.paper' }}>Számlaszám</TableCell>
               <TableCell align="center" sx={{ backgroundColor: 'background.paper' }}>Irány</TableCell>
               <TableCell sx={{ backgroundColor: 'background.paper' }}>Partner</TableCell>
@@ -241,7 +268,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
           <TableBody>
             {Array.from({ length: 10 }).map((_, index) => (
               <TableRow key={index}>
-                {Array.from({ length: showStornoColumn ? 12 : 11 }).map((_, cellIndex) => (
+                {Array.from({ length: showStornoColumn ? 13 : 12 }).map((_, cellIndex) => (
                   <TableCell key={cellIndex}><Skeleton /></TableCell>
                 ))}
               </TableRow>
@@ -281,6 +308,15 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
               borderBottomColor: 'divider',
             }
           }}>
+            <TableCell sx={{ width: '60px', backgroundColor: 'background.paper' }}>
+              {onSelectAll && (
+                <Checkbox
+                  checked={isAllSelected}
+                  indeterminate={isIndeterminate}
+                  onChange={handleSelectAll}
+                />
+              )}
+            </TableCell>
             {renderHeaderCell('nav_invoice_number', 'Számlaszám')}
             {renderHeaderCell('invoice_direction', 'Irány', 'center')}
             <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'background.paper' }}>Partner</TableCell>
@@ -308,6 +344,14 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
               }}
               onClick={() => onView(invoice)}
             >
+              <TableCell sx={{ width: '60px' }} onClick={(e) => e.stopPropagation()}>
+                {onSelectInvoice && (
+                  <Checkbox
+                    checked={Boolean(selectedInvoices?.includes(invoice.id))}
+                    onChange={handleSelectInvoice(invoice.id)}
+                  />
+                )}
+              </TableCell>
               <TableCell>
                 <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
                   {invoice.nav_invoice_number}

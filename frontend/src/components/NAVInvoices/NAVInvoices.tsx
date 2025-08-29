@@ -27,12 +27,14 @@ import {
   TableRow,
   CircularProgress,
 } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import {
   Search as SearchIcon,
   FilterList as FilterIcon,
   Refresh as RefreshIcon,
   Visibility as ViewIcon,
   SwapHoriz,
+  Add as AddIcon,
 } from '@mui/icons-material';
 import { useToast } from '../../hooks/useToast';
 import { navInvoicesApi } from '../../services/api';
@@ -89,6 +91,8 @@ interface Invoice {
   customer_name?: string;
   supplier_tax_number?: string;
   customer_tax_number?: string;
+  supplier_bank_account_number?: string;
+  customer_bank_account_number?: string;
   
   // Line items (available in detail view)
   line_items?: InvoiceLineItem[];
@@ -122,6 +126,9 @@ const NAVInvoices: React.FC = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [inboundTransferFilter, setInboundTransferFilter] = useState(false);
   
+  // Selection states
+  const [selectedInvoices, setSelectedInvoices] = useState<number[]>([]);
+  
   // Modal states
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [invoiceDetailsOpen, setInvoiceDetailsOpen] = useState(false);
@@ -129,6 +136,7 @@ const NAVInvoices: React.FC = () => {
   const [invoiceDetailsLoading, setInvoiceDetailsLoading] = useState(false);
   
   const { success: showSuccess, error: showError } = useToast();
+  const navigate = useNavigate();
 
   // Load invoices
   const loadInvoices = async () => {
@@ -189,6 +197,8 @@ const NAVInvoices: React.FC = () => {
 
   useEffect(() => {
     loadInvoices();
+    // Clear selections when filters or page change
+    setSelectedInvoices([]);
   }, [searchTerm, directionFilter, currencyFilter, currentPage, sortField, sortDirection, hideStornoInvoices, inboundTransferFilter]);
 
   const handleViewInvoice = async (invoice: Invoice) => {
@@ -222,6 +232,101 @@ const NAVInvoices: React.FC = () => {
 
   const refetch = () => {
     loadInvoices();
+  };
+
+  // Selection handlers
+  const handleSelectInvoice = (invoiceId: number, selected: boolean) => {
+    if (selected) {
+      setSelectedInvoices(prev => [...prev, invoiceId]);
+    } else {
+      setSelectedInvoices(prev => prev.filter(id => id !== invoiceId));
+    }
+  };
+
+  const handleSelectAll = (selected: boolean) => {
+    if (selected) {
+      setSelectedInvoices(invoices.map(invoice => invoice.id));
+    } else {
+      setSelectedInvoices([]);
+    }
+  };
+
+  // Generate transfers from selected invoices
+  const handleGenerateTransfers = () => {
+    const selectedInvoiceObjects = invoices.filter(invoice => selectedInvoices.includes(invoice.id));
+    
+    if (selectedInvoiceObjects.length === 0) {
+      showError('Kérjük, válasszon ki legalább egy számlát');
+      return;
+    }
+
+    // Filter out invoices without required data and collect missing data info
+    const validInvoices = [];
+    const invalidInvoices = [];
+    
+    for (const invoice of selectedInvoiceObjects) {
+      const hasAccountNumber = invoice.supplier_bank_account_number && invoice.supplier_bank_account_number.trim() !== '';
+      const hasAmount = invoice.invoice_gross_amount && invoice.invoice_gross_amount > 0;
+      const hasPartnerName = invoice.partner_name && invoice.partner_name.trim() !== '';
+      
+      if (hasAccountNumber && hasAmount && hasPartnerName) {
+        validInvoices.push(invoice);
+      } else {
+        const missingFields = [];
+        if (!hasAccountNumber) missingFields.push('bankszámlaszám');
+        if (!hasAmount) missingFields.push('összeg');
+        if (!hasPartnerName) missingFields.push('partnernév');
+        
+        invalidInvoices.push({
+          invoice,
+          missingFields
+        });
+      }
+    }
+
+    if (validInvoices.length === 0) {
+      // Show detailed error about why all invoices were invalid
+      const errorDetails = invalidInvoices.map(item => 
+        `${item.invoice.nav_invoice_number}: hiányzik ${item.missingFields.join(', ')}`
+      ).slice(0, 3); // Show max 3 examples
+      
+      const errorMessage = `A kiválasztott számlák nem tartalmaznak elegendő adatot az átutalás generálásához:\n${errorDetails.join('\n')}${invalidInvoices.length > 3 ? `\n...és további ${invalidInvoices.length - 3} számla` : ''}`;
+      showError(errorMessage);
+      return;
+    }
+
+    if (validInvoices.length !== selectedInvoiceObjects.length) {
+      // This is a warning, not an error - we still proceed
+      console.warn(`${invalidInvoices.length} számlát kihagytunk a hiányos adatok miatt:`, invalidInvoices);
+    }
+
+    // Create transfer data structure compatible with TransferWorkflow
+    const transfersData = validInvoices.map((invoice, index) => ({
+      beneficiary_id: null, // Will need to be set manually or matched
+      beneficiary_name: invoice.partner_name,
+      account_number: invoice.supplier_bank_account_number!,
+      amount: Math.floor(invoice.invoice_gross_amount).toString(), // Convert to int as requested
+      currency: invoice.currency_code === 'HUF' ? 'HUF' : invoice.currency_code,
+      execution_date: invoice.payment_due_date || new Date().toISOString().split('T')[0], // Use payment due date or today
+      remittance_info: invoice.nav_invoice_number,
+      order: index + 1,
+      fromNAVInvoice: true // Flag to indicate this came from NAV invoice
+    }));
+
+    // Navigate to transfers with pre-populated data
+    navigate('/transfers', { 
+      state: { 
+        preloadedTransfers: transfersData,
+        source: 'nav_invoices'
+      } 
+    });
+
+    // Show success message with details about skipped invoices
+    const successMessage = validInvoices.length === selectedInvoiceObjects.length 
+      ? `${validInvoices.length} átutalás előkészítve`
+      : `${validInvoices.length} átutalás előkészítve (${invalidInvoices.length} számlát kihagytunk hiányos adatok miatt)`;
+    
+    showSuccess(successMessage);
   };
 
   const totalPages = Math.ceil(totalCount / 20);
@@ -436,9 +541,31 @@ const NAVInvoices: React.FC = () => {
       </Box>
 
       {/* Results count - Same pattern as BeneficiaryManager */}
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-        {totalCount} számla találat
-      </Typography>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+        <Typography variant="body2" color="text.secondary">
+          {totalCount} számla találat
+        </Typography>
+        {selectedInvoices.length > 0 && (
+          <Typography variant="body2" color="primary.main" sx={{ fontWeight: 'medium' }}>
+            {selectedInvoices.length} kijelölve
+          </Typography>
+        )}
+      </Stack>
+
+      {/* Action button for selected invoices */}
+      {selectedInvoices.length > 0 && (
+        <Box sx={{ mb: 1 }}>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={handleGenerateTransfers}
+            sx={{ fontWeight: 'medium' }}
+          >
+            Eseti utalás generálás ({selectedInvoices.length})
+          </Button>
+        </Box>
+      )}
 
       {/* Table - Same pattern as BeneficiaryManager */}
       <Paper elevation={1} sx={{ flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -450,6 +577,9 @@ const NAVInvoices: React.FC = () => {
           sortField={sortField}
           sortDirection={sortDirection}
           showStornoColumn={!hideStornoInvoices}
+          selectedInvoices={selectedInvoices}
+          onSelectInvoice={handleSelectInvoice}
+          onSelectAll={handleSelectAll}
         />
       </Paper>
 
