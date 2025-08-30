@@ -162,7 +162,7 @@ export const TemplateStep: React.FC<TemplateStepProps> = ({
               <Avatar sx={{ width: 24, height: 24, bgcolor: 'info.main', fontSize: '0.75rem' }}>3</Avatar>
             </ListItemIcon>
             <ListItemText
-              primary="XML generálás"
+              primary="Generálás"
               secondary="Töltse le az XML fájlt a banki importhoz"
             />
           </ListItem>

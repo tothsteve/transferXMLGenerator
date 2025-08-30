@@ -405,7 +405,7 @@ const TransferWorkflow: React.FC = () => {
       console.log('Transfer IDs for XML generation:', transferIds);
       
       if (transferIds.length === 0) {
-        setValidationErrors(['Nincsenek mentett átutalások az XML generáláshoz.']);
+        setValidationErrors(['Nincsenek mentett átutalások a generáláshoz.']);
         return;
       }
       
@@ -435,7 +435,7 @@ const TransferWorkflow: React.FC = () => {
       
       const errorMessage = error.response?.data?.detail || 
                           error.response?.data?.message || 
-                          'Hiba történt az XML generálása során.';
+                          'Hiba történt a generálás során.';
       setValidationErrors([errorMessage]);
     }
   };
@@ -533,7 +533,7 @@ const TransferWorkflow: React.FC = () => {
             Átutalások
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Átutalások létrehozása, szerkesztése és XML generálás bank importáláshoz
+            Átutalások létrehozása, szerkesztése és generálás bank importáláshoz
           </Typography>
         </Box>
       </Box>
@@ -618,8 +618,8 @@ const TransferWorkflow: React.FC = () => {
               >
                 {bulkCreateMutation.isPending ? 'Új átutalások mentése...' : 
                  bulkUpdateMutation.isPending ? 'Változások mentése...' :
-                 generateXmlMutation.isPending ? 'XML generálás...' : 
-                 'XML Generálás'}
+                 generateXmlMutation.isPending ? 'Generálás...' : 
+                 'Generálás'}
               </Button>
               <Button
                 variant="contained"
@@ -670,7 +670,7 @@ const TransferWorkflow: React.FC = () => {
             </Step>
             <Step active={!xmlPreview}>
               <StepLabel icon={<PlayIcon sx={{ color: xmlPreview ? 'success.main' : 'primary.main' }} />}>
-                XML generálás
+                Generálás
               </StepLabel>
             </Step>
             <Step>
