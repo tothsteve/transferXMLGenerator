@@ -153,15 +153,10 @@ class NavConfigurationSerializer(serializers.ModelSerializer):
         model = NavConfiguration
         fields = [
             'id', 'company', 'company_name', 'tax_number', 'technical_user_login',
-            'api_environment', 'sync_enabled', 'is_active', 'sync_frequency_hours',
-            'last_sync_timestamp', 'last_sync_formatted', 'sync_status', 'created_at', 'updated_at'
+            'api_environment', 'sync_enabled', 'is_active', 'sync_status', 'created_at', 'updated_at'
         ]
         read_only_fields = ['__all__']
     
-    def get_last_sync_formatted(self, obj):
-        if obj.last_sync_timestamp:
-            return obj.last_sync_timestamp.strftime('%Y-%m-%d %H:%M:%S')
-        return 'Még nem szinkronizált'
     
     def get_sync_status(self, obj):
         if not obj.sync_enabled:

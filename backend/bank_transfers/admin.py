@@ -46,10 +46,10 @@ class TransferBatchAdmin(admin.ModelAdmin):
 
 @admin.register(NavConfiguration)
 class NavConfigurationAdmin(admin.ModelAdmin):
-    list_display = ['company', 'tax_number', 'technical_user_login', 'api_environment', 'sync_enabled', 'is_active', 'last_sync_timestamp']
+    list_display = ['company', 'tax_number', 'technical_user_login', 'api_environment', 'sync_enabled', 'is_active']
     list_filter = ['api_environment', 'sync_enabled', 'is_active', 'created_at']
     search_fields = ['company__name', 'tax_number', 'technical_user_login']
-    readonly_fields = ['created_at', 'updated_at', 'last_sync_timestamp']
+    readonly_fields = ['created_at', 'updated_at']
     
     fieldsets = (
         ('Cég információk', {
@@ -65,10 +65,10 @@ class NavConfigurationAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         ('Beállítások', {
-            'fields': ('api_environment', 'is_active', 'sync_enabled', 'sync_frequency_hours')
+            'fields': ('api_environment', 'is_active', 'sync_enabled')
         }),
         ('Státusz', {
-            'fields': ('last_sync_timestamp', 'created_at', 'updated_at')
+            'fields': ('created_at', 'updated_at')
         }),
     )
 

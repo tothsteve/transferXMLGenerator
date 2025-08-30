@@ -103,7 +103,7 @@ class NavConfigurationViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['company__name', 'tax_number', 'technical_user_login']
     filterset_fields = ['api_environment', 'sync_enabled', 'is_active']
-    ordering_fields = ['company__name', 'created_at', 'last_sync_timestamp']
+    ordering_fields = ['company__name', 'created_at']
     ordering = ['-created_at']
     
     def get_queryset(self):
@@ -207,9 +207,7 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         recent_count = queryset.filter(created_at__gte=last_30_days).count()
         
         # Sync statistics
-        last_sync = NavConfiguration.objects.filter(
-            is_active=True
-        ).aggregate(Max('last_sync_timestamp'))['last_sync_timestamp__max']
+        # Remove last_sync tracking since field was removed
         
         sync_enabled_count = NavConfiguration.objects.filter(
             sync_enabled=True,
@@ -230,7 +228,6 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
                     'total_amount': item['total_amount']
                 } for item in currency_stats
             },
-            'last_sync_date': last_sync,
             'sync_enabled_companies': sync_enabled_count,
             'recent_invoices_count': recent_count
         }

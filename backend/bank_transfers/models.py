@@ -307,8 +307,6 @@ class NavConfiguration(models.Model):
     
     is_active = models.BooleanField(default=True, verbose_name="Aktív")
     sync_enabled = models.BooleanField(default=False, verbose_name="Szinkronizáció engedélyezett")
-    last_sync_timestamp = models.DateTimeField(null=True, blank=True, verbose_name="Utolsó szinkronizáció")
-    sync_frequency_hours = models.IntegerField(default=12, verbose_name="Szinkronizáció gyakorisága (óra)")
     
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
