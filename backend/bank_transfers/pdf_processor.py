@@ -141,7 +141,7 @@ class PDFTransactionProcessor:
             'beneficiaries_created': len([t for t in all_transactions if t.get('created_beneficiary', False)]),
             'consolidations': consolidations,
             'template_created': template_created,
-            'template_updated': existing_template is not None,
+            'template_updated': not template_created,
             'preview': all_transactions,
             'total_amount': sum(t['amount'] for t in all_transactions)
         }
@@ -635,7 +635,9 @@ class PDFTransactionProcessor:
         pdf_account_numbers = set()
         for transaction in transactions:
             account_number = transaction['account_number'].replace('-', '').replace(' ', '')
-            pdf_account_numbers.add(account_number)
+            # Normalize account number - remove trailing zeros for comparison
+            normalized_account = self._normalize_account_number(account_number)
+            pdf_account_numbers.add(normalized_account)
         
         print(f"DEBUG: PDF has {len(pdf_account_numbers)} unique accounts: {sorted(list(pdf_account_numbers))}")
         
@@ -649,7 +651,9 @@ class PDFTransactionProcessor:
             template_account_numbers = set()
             for tb in template.template_beneficiaries.filter(is_active=True):
                 account_number = tb.beneficiary.account_number.replace('-', '').replace(' ', '')
-                template_account_numbers.add(account_number)
+                # Normalize account number - remove trailing zeros for comparison
+                normalized_account = self._normalize_account_number(account_number)
+                template_account_numbers.add(normalized_account)
             
             print(f"DEBUG: Template '{template.name}' has {len(template_account_numbers)} accounts: {sorted(list(template_account_numbers))}")
             
@@ -663,6 +667,32 @@ class PDFTransactionProcessor:
         
         print("DEBUG: No exact matching template found - will create new one")
         return None
+    
+    def _normalize_account_number(self, account_number: str) -> str:
+        """
+        Normalize Hungarian account number for comparison
+        
+        Hungarian account numbers can be in:
+        - 16 digit format: 1210001111409520 (bank + account)
+        - 24 digit format: 121000111140952000000000 (bank + account + padding zeros)
+        
+        This normalizes to 16-digit format by removing trailing zeros
+        """
+        clean_account = account_number.replace('-', '').replace(' ', '')
+        
+        if len(clean_account) == 24:
+            # Remove trailing zeros from 24-digit format to get 16-digit format
+            # Find the position where trailing zeros start
+            i = 23  # Start from the end
+            while i >= 16 and clean_account[i] == '0':
+                i -= 1
+            # Keep everything up to the last non-zero digit, but at least 16 digits
+            normalized = clean_account[:max(16, i + 1)]
+        else:
+            # Already in correct format or other format
+            normalized = clean_account
+        
+        return normalized
     
     def update_template_beneficiaries(self, template: TransferTemplate, transactions: List[Dict], company=None):
         """Update template with beneficiaries from transactions - merge with existing"""

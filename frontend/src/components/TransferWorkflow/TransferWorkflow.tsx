@@ -174,6 +174,28 @@ const TransferWorkflow: React.FC = () => {
     }
   }, [location.state, templates, defaultAccount]);
 
+  // Handle template parameter from URL (e.g., /transfers?template=123)
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const templateIdParam = searchParams.get('template');
+    
+    if (templateIdParam && templates.length > 0 && defaultAccount && !selectedTemplate) {
+      const templateId = parseInt(templateIdParam, 10);
+      const template = templates.find(t => t.id === templateId);
+      
+      if (template) {
+        console.log('Auto-loading template from URL parameter:', template);
+        setSelectedTemplate(template);
+        handleLoadTemplate(templateId);
+        
+        // Remove the template parameter from URL to clean it up
+        searchParams.delete('template');
+        const newUrl = `${location.pathname}${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, [location.search, templates, defaultAccount, selectedTemplate]);
+
   const handleUpdateTransfer = (index: number, updatedData: Partial<TransferData>) => {
     setTransfers(prev => prev.map((transfer, i) => 
       i === index ? { ...transfer, ...updatedData } : transfer

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Typography,
@@ -11,6 +12,7 @@ import {
   StepLabel
 } from '@mui/material';
 import { useToast } from '../../hooks/useToast';
+import { queryKeys } from '../../hooks/api';
 import { TransferTemplate } from '../../types/api';
 import { UploadStep } from './UploadStep';
 import { ReviewStep } from './ReviewStep';
@@ -55,6 +57,7 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete }) 
   
   const navigate = useNavigate();
   const { success } = useToast();
+  const queryClient = useQueryClient();
 
   const handleFilesSelected = (files: File[]) => {
     setSelectedFiles(files);
@@ -97,6 +100,10 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete }) 
 
       console.log('Success result:', response.data);
       setPreviewData(response.data);
+      
+      // Invalidate templates cache to refresh template lists
+      queryClient.invalidateQueries({ queryKey: queryKeys.templates });
+      
       setCurrentStep(2);
       success('PDF fájlok sikeresen feldolgozva!');
     } catch (err: any) {
@@ -131,13 +138,7 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete }) 
           success(`Sablon létrehozva: ${previewData.template.name}`);
         }
         
-        // Navigate to transfer workflow with the template
-        setTimeout(() => {
-          navigate(`/transfers?template=${previewData.template.id}`);
-          if (onComplete) {
-            onComplete(response.data);
-          }
-        }, 1500);
+        // Don't auto-navigate, let user decide when to proceed via buttons in TemplateStep
       }
     } catch (error: any) {
       console.error('Template verification failed:', error);
@@ -225,7 +226,6 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete }) 
         {currentStep === 3 && previewData && (
           <TemplateStep
             previewData={previewData}
-            onViewTemplate={() => navigate(`/templates/${previewData.template.id}`)}
             onCreateTransfers={() => navigate(`/transfers?template=${previewData.template.id}`)}
           />
         )}

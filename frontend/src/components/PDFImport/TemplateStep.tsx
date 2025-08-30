@@ -16,20 +16,17 @@ import {
 } from '@mui/material';
 import {
   CheckCircle as CheckCircleIcon,
-  Visibility as VisibilityIcon,
   Add as AddIcon,
 } from '@mui/icons-material';
 import { PDFProcessingResult } from './PDFImportWizard';
 
 interface TemplateStepProps {
   previewData: PDFProcessingResult;
-  onViewTemplate: () => void;
   onCreateTransfers: () => void;
 }
 
 export const TemplateStep: React.FC<TemplateStepProps> = ({
   previewData,
-  onViewTemplate,
   onCreateTransfers,
 }) => {
   const formatCurrency = (amount: number) => {
@@ -179,15 +176,6 @@ export const TemplateStep: React.FC<TemplateStepProps> = ({
         justifyContent="center" 
         sx={{ mb: 4 }}
       >
-        <Button
-          onClick={onViewTemplate}
-          variant="outlined"
-          size="large"
-          startIcon={<VisibilityIcon />}
-        >
-          Sablon Megtekintése
-        </Button>
-        
         <Button
           onClick={onCreateTransfers}
           variant="contained"
