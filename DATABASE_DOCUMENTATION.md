@@ -84,7 +84,7 @@ The system implements a **multi-tenant architecture** where:
 ---
 
 ## 4. **bank_transfers_bankaccount**
-**Table Comment:** *Company-scoped originator bank accounts for transfers. Contains accounts that will be debited during XML generation.*
+**Table Comment:** *Company-scoped originator bank accounts for transfers. Contains accounts that will be debited during XML/CSV export generation.*
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -193,8 +193,8 @@ The system implements a **multi-tenant architecture** where:
 | `execution_date` | DATE | NOT NULL | Requested date for the bank to process the transfer |
 | `remittance_info` | VARCHAR(500) | NOT NULL | Payment reference/memo that appears on bank statements |
 | `template_id` | INTEGER | FK(bank_transfers_transfertemplate.id) | Reference to template if this transfer was created from a template |
-| `order` | INTEGER | DEFAULT 0 | Transfer order within batch for XML generation |
-| `is_processed` | BOOLEAN | DEFAULT FALSE | Marks transfers that have been included in generated XML files |
+| `order` | INTEGER | DEFAULT 0 | Transfer order within batch for XML/CSV export generation |
+| `is_processed` | BOOLEAN | DEFAULT FALSE | Marks transfers that have been included in generated XML/CSV files |
 | `notes` | TEXT | | Internal notes about this specific transfer |
 | `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Transfer creation timestamp |
 | `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
@@ -214,7 +214,7 @@ The system implements a **multi-tenant architecture** where:
 ---
 
 ## 9. **bank_transfers_transferbatch**
-**Table Comment:** *Groups transfers into batches for XML generation. Each batch represents one XML file sent to the bank.*
+**Table Comment:** *Groups transfers into batches for XML/CSV export generation. Each batch represents one export file (XML or CSV) sent to the bank.*
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -223,11 +223,12 @@ The system implements a **multi-tenant architecture** where:
 | `name` | VARCHAR(200) | NOT NULL | User-defined name for the batch (e.g., "Payroll 2025-01", "Supplier Payments Week 3") |
 | `description` | TEXT | | Detailed description of the batch contents and purpose |
 | `total_amount` | DECIMAL(15,2) | DEFAULT 0 | Sum of all transfer amounts in this batch |
-| `used_in_bank` | BOOLEAN | DEFAULT FALSE | Flag indicating whether XML file was uploaded to internet banking |
-| `bank_usage_date` | TIMESTAMP | | Timestamp when the XML was uploaded to bank system |
+| `used_in_bank` | BOOLEAN | DEFAULT FALSE | Flag indicating whether export file (XML/CSV) was uploaded to internet banking |
+| `bank_usage_date` | TIMESTAMP | | Timestamp when the export file was uploaded to bank system |
 | `order` | INTEGER | DEFAULT 0 | Display order for batch listing and downloads |
 | `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Batch creation timestamp |
-| `xml_generated_at` | TIMESTAMP | | Timestamp when the XML file was generated for this batch |
+| `batch_format` | VARCHAR(10) | DEFAULT 'XML' | Export file format: XML (SEPA XML) or KH_CSV (KH Bank CSV) |
+| `xml_generated_at` | TIMESTAMP | | Timestamp when the export file was generated for this batch |
 
 **Indexes:**
 - Primary key on `id`
@@ -467,10 +468,19 @@ All core business models include a `company_id` foreign key:
 - Validated using Hungarian checksum algorithm
 - Stored with proper formatting (dashes included)
 
-### XML Export Format
+### Export Formats
+
+#### XML Export Format
 - Clean account numbers (no dashes) for XML generation
 - SEPA-compatible Hungarian transaction format
 - Support for HUF, EUR, USD currencies
+- Unlimited transfers per batch
+
+#### KH Bank CSV Format
+- Hungarian "Egyszerűsített forintátutalás" (.HUF.csv) format
+- Specialized for KH Bank import system
+- Maximum 40 transfers per batch (KH Bank limitation)
+- HUF currency only
 
 ---
 
@@ -517,3 +527,30 @@ All core business models include a `company_id` foreign key:
 - PostgreSQL-specific data types and constraints
 
 **Note**: This documentation represents the PostgreSQL production schema. SQL Server development retains compatibility through Django model abstraction.
+
+## Database Comment Implementation
+
+### SQL Comment Scripts Available:
+- **SQL Server (Local)**: `/backend/sql/complete_database_comments_sqlserver.sql`
+- **PostgreSQL (Production)**: `/backend/sql/complete_database_comments_postgresql.sql`
+
+Both scripts provide complete table and column comments for all 14 tables and their columns, including:
+- Multi-company architecture tables (Company, CompanyUser, UserProfile)
+- Core transfer system (BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch)
+- NAV integration system (NavConfiguration, Invoice, InvoiceLineItem, InvoiceSyncLog)
+
+### Script Features:
+- **Complete coverage**: All current models and fields documented
+- **Database-specific syntax**: SQL Server extended properties vs PostgreSQL COMMENT ON
+- **Verification queries**: Built-in queries to confirm comments were added
+- **Clean installation**: Optional cleanup of existing comments before adding new ones
+
+### Usage:
+```sql
+-- SQL Server
+USE administration;
+-- Execute: complete_database_comments_sqlserver.sql
+
+-- PostgreSQL  
+-- Execute: complete_database_comments_postgresql.sql
+```

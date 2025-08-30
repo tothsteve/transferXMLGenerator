@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture Overview
 
-This is a Django + React application for generating XML files for bank transfers. The system manages beneficiaries, transfer templates, and generates SEPA-compatible XML files for bulk bank transfers.
+This is a Django + React application for generating XML and CSV files for bank transfers. The system manages beneficiaries, transfer templates, and generates SEPA-compatible XML files and KH Bank CSV files for bulk bank transfers.
 
 ### Backend (Django)
 - **Django REST API** with `bank_transfers` app
 - **SQL Server database** connection (port 1435, database: 'administration')  
 - **Key models**: BankAccount, Beneficiary, TransferTemplate, Transfer, TransferBatch
-- **XML generation** via `utils.generate_xml()` - creates HUF transaction XML files
+- **Export generation** via `utils.generate_xml()` and `kh_export.py` - creates HUF transaction XML files and KH Bank CSV files
 - **Excel import** functionality for bulk beneficiary creation
 - **Template system** for recurring transfer patterns (e.g., monthly payroll)
 - **Swagger API docs** available via drf_yasg
@@ -107,22 +107,32 @@ else:
 - `BankAccountViewSet`: Manages originator accounts with default account functionality
 - `BeneficiaryViewSet`: Handles beneficiary CRUD with filtering (frequent, active, search)
 - `TransferTemplateViewSet`: Template management with beneficiary associations
-- `TransferViewSet`: Individual transfers with bulk creation and XML generation
-- `TransferBatchViewSet`: Read-only batches created during XML generation
+- `TransferViewSet`: Individual transfers with bulk creation and XML/CSV export generation
+- `TransferBatchViewSet`: Read-only batches created during XML/CSV export generation
 
 ### Key API Endpoints
 - `POST /api/transfers/bulk_create/`: Bulk transfer creation
 - `POST /api/transfers/generate_xml/`: XML file generation from transfer IDs
+- `POST /api/transfers/generate_csv/`: CSV file generation from transfer IDs (KH Bank format)
 - `POST /api/templates/{id}/load_transfers/`: Generate transfers from template
 - `POST /api/import/excel/`: Import beneficiaries from Excel files
 
-## XML Generation
+## Export Generation
 
+### XML Export
 The `utils.generate_xml()` function creates XML files with this structure:
 - Root element: `<HUFTransactions>`
 - Each transfer becomes a `<Transaction>` with Originator, Beneficiary, Amount, RequestedExecutionDate, and RemittanceInfo
 - Supports HUF, EUR, USD currencies
+- Unlimited transfers per batch
 - Marks transfers as `is_processed=True` after XML generation
+
+### CSV Export (KH Bank)
+The `kh_export.py` module creates KH Bank CSV files:
+- Hungarian "Egyszerűsített forintátutalás" format (.HUF.csv)
+- Maximum 40 transfers per batch (KH Bank limitation)
+- HUF currency only
+- Marks transfers as `is_processed=True` after CSV generation
 
 ## Excel Import Format
 
@@ -271,11 +281,11 @@ POST   /api/upload/excel/               // Excel import
 - Editable transfer list (amounts, dates, remittance)
 - Add/remove transfers dynamically
 - Real-time validation
-- XML generation and preview
+- Export file generation and preview (XML/CSV)
 
-#### 4. **XMLGenerator** (Priority 4)
-- XML preview with syntax highlighting
-- Download generated XML
+#### 4. **ExportGenerator** (Priority 4)
+- Export file preview with syntax highlighting (XML) or tabular format (CSV)
+- Download generated export files (XML/CSV)
 - Batch management
 - Transfer history
 
@@ -298,7 +308,7 @@ POST   /api/upload/excel/               // Excel import
 1. **Template-driven workflow** - core user journey
 2. **Inline editing** - modify transfers without modal popups
 3. **Bulk operations** - select multiple items for actions
-4. **Real-time XML preview** - see XML as you build transfers
+4. **Real-time export preview** - see XML/CSV format as you build transfers
 5. **Persistent state** - don't lose work on navigation
 6. **Excel integration** - smooth import experience
 
@@ -372,6 +382,6 @@ The system generates Hungarian bank-compatible XML for transfer imports. Here's 
 - **Encoding** - UTF-8 for Hungarian characters
 - **Amount format** - Decimal with 2 places (e.g., "150000.00")
 
-The backend `/api/transfers/generate_xml/` endpoint returns this XML format, and the frontend should display it with syntax highlighting for preview before download.
+The backend `/api/transfers/generate_xml/` and `/api/transfers/generate_csv/` endpoints return XML and CSV formats respectively, and the frontend should display them with appropriate formatting for preview before download.
 
 **Swagger documentation available at: http://localhost:8000/swagger/**
