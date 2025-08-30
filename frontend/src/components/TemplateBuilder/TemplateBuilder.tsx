@@ -9,9 +9,11 @@ import {
   CardContent,
   Avatar,
   Alert,
-  Snackbar
+  Snackbar,
+  FormControlLabel,
+  Switch
 } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
+import { Add as AddIcon, VisibilityOff as InactiveIcon } from '@mui/icons-material';
 import { 
   useTemplates, 
   useCreateTemplate, 
@@ -42,6 +44,7 @@ const TemplateBuilder: React.FC = () => {
   const [showView, setShowView] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TransferTemplate | null>(null);
   const [viewingTemplate, setViewingTemplate] = useState<TransferTemplate | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
   const [notification, setNotification] = useState<{
     open: boolean;
     message: string;
@@ -54,7 +57,7 @@ const TemplateBuilder: React.FC = () => {
   
   const navigate = useNavigate();
 
-  const { data: templatesData, isLoading, refetch } = useTemplates();
+  const { data: templatesData, isLoading, refetch } = useTemplates(showInactive);
   const createMutation = useCreateTemplate();
   const updateMutation = useUpdateTemplate();
   const deleteMutation = useDeleteTemplate();
@@ -263,13 +266,32 @@ const TemplateBuilder: React.FC = () => {
               Átutalási sablonok létrehozása és kezelése ismétlődő fizetésekhez
             </Typography>
           </Box>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setShowForm(true)}
-          >
-            Új sablon
-          </Button>
+          <Stack direction="row" spacing={2} alignItems="center">
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={showInactive}
+                  onChange={(e) => setShowInactive(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label={
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <InactiveIcon sx={{ fontSize: 16 }} />
+                  <Typography variant="body2">
+                    Inaktív sablonok
+                  </Typography>
+                </Stack>
+              }
+            />
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setShowForm(true)}
+            >
+              Új sablon
+            </Button>
+          </Stack>
         </Stack>
       </Box>
 
@@ -279,7 +301,8 @@ const TemplateBuilder: React.FC = () => {
           display: 'grid',
           gridTemplateColumns: {
             xs: '1fr',
-            sm: 'repeat(3, 1fr)'
+            sm: 'repeat(2, 1fr)',
+            md: showInactive ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)'
           },
           gap: 3,
           mb: 4
@@ -290,11 +313,11 @@ const TemplateBuilder: React.FC = () => {
             <Stack direction="row" alignItems="center" spacing={2}>
               <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}>
                 <Typography variant="body2" fontWeight="bold" color="white">
-                  {templates.length}
+                  {showInactive ? templates.length : templates.filter(t => t.is_active).length}
                 </Typography>
               </Avatar>
               <Typography variant="body2" color="text.secondary">
-                Összes sablon
+                {showInactive ? 'Összes sablon' : 'Aktív sablonok'}
               </Typography>
             </Stack>
           </CardContent>
@@ -315,16 +338,33 @@ const TemplateBuilder: React.FC = () => {
           </CardContent>
         </Card>
 
+        {showInactive && (
+          <Card elevation={1}>
+            <CardContent>
+              <Stack direction="row" alignItems="center" spacing={2}>
+                <Avatar sx={{ bgcolor: 'warning.main', width: 40, height: 40 }}>
+                  <Typography variant="body2" fontWeight="bold" color="white">
+                    {templates.filter(t => !t.is_active).length}
+                  </Typography>
+                </Avatar>
+                <Typography variant="body2" color="text.secondary">
+                  Inaktív sablonok
+                </Typography>
+              </Stack>
+            </CardContent>
+          </Card>
+        )}
+
         <Card elevation={1}>
           <CardContent>
             <Stack direction="row" alignItems="center" spacing={2}>
               <Avatar sx={{ bgcolor: 'info.main', width: 40, height: 40 }}>
                 <Typography variant="body2" fontWeight="bold" color="white">
-                  {templates.reduce((sum, t) => sum + t.beneficiary_count, 0)}
+                  {templates.reduce((sum, t) => sum + (showInactive || t.is_active ? t.beneficiary_count : 0), 0)}
                 </Typography>
               </Avatar>
               <Typography variant="body2" color="text.secondary">
-                Összes kedvezményezett
+                Kedvezményezettek
               </Typography>
             </Stack>
           </CardContent>

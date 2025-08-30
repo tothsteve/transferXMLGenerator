@@ -86,10 +86,10 @@ export function useDeleteBeneficiary() {
 }
 
 // Templates Hooks
-export function useTemplates() {
+export function useTemplates(showInactive?: boolean) {
   return useQuery({
-    queryKey: queryKeys.templates,
-    queryFn: () => templatesApi.getAll(),
+    queryKey: [...queryKeys.templates, showInactive],
+    queryFn: () => templatesApi.getAll(showInactive ? { show_inactive: true } : undefined),
     select: (data) => data.data,
   });
 }

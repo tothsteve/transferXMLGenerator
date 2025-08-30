@@ -70,8 +70,8 @@ export const beneficiariesApi = {
 
 // Templates API
 export const templatesApi = {
-  getAll: () =>
-    apiClient.get<ApiResponse<TransferTemplate>>('/templates/'),
+  getAll: (params?: { show_inactive?: boolean }) =>
+    apiClient.get<ApiResponse<TransferTemplate>>('/templates/', { params }),
   
   getById: (id: number) =>
     apiClient.get<TransferTemplate>(`/templates/${id}/`),
