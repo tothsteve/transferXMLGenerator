@@ -152,9 +152,14 @@ class TransferTemplateViewSet(viewsets.ModelViewSet):
         if not hasattr(self.request, 'company') or not self.request.company:
             return TransferTemplate.objects.none()
         
-        # Check if inactive templates should be included
-        show_inactive = self.request.query_params.get('show_inactive', 'false').lower() == 'true'
-        include_inactive = show_inactive
+        # For modification operations (PUT, PATCH, DELETE), always include inactive templates
+        # so users can edit/delete inactive templates they can see
+        if self.action in ['retrieve', 'update', 'partial_update', 'destroy']:
+            include_inactive = True
+        else:
+            # For list operations, check if inactive templates should be included
+            show_inactive = self.request.query_params.get('show_inactive', 'false').lower() == 'true'
+            include_inactive = show_inactive
         
         return TemplateService.get_company_templates(self.request.company, include_inactive=include_inactive)
     
