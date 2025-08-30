@@ -97,8 +97,8 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
   const selectedCount = safeSelectedInvoices.length;
   const totalCount = invoices.length;
   
-  const isAllSelected = totalCount > 0 && selectedCount === totalCount;
-  const isIndeterminate = selectedCount > 0 && selectedCount < totalCount;
+  const isAllSelected = Boolean(totalCount > 0 && selectedCount === totalCount);
+  const isIndeterminate = Boolean(selectedCount > 0 && selectedCount < totalCount);
 
   const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (onSelectAll) {
@@ -351,7 +351,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
               <TableCell sx={{ width: '60px' }} onClick={(e) => e.stopPropagation()}>
                 {onSelectInvoice && (
                   <Checkbox
-                    checked={safeSelectedInvoices.includes(invoice.id)}
+                    checked={Boolean(safeSelectedInvoices.includes(invoice.id))}
                     onChange={handleSelectInvoice(invoice.id)}
                   />
                 )}
