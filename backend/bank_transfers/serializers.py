@@ -146,7 +146,6 @@ class NavConfigurationSerializer(serializers.ModelSerializer):
     """READ-ONLY serializer for NAV configuration."""
     
     company_name = serializers.CharField(source='company.name', read_only=True)
-    last_sync_formatted = serializers.SerializerMethodField()
     sync_status = serializers.SerializerMethodField()
     
     class Meta:
