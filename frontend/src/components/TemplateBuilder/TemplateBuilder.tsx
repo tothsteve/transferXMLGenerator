@@ -313,11 +313,11 @@ const TemplateBuilder: React.FC = () => {
             <Stack direction="row" alignItems="center" spacing={2}>
               <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}>
                 <Typography variant="body2" fontWeight="bold" color="white">
-                  {showInactive ? templates.length : templates.filter(t => t.is_active).length}
+                  {templates.length}
                 </Typography>
               </Avatar>
               <Typography variant="body2" color="text.secondary">
-                {showInactive ? 'Összes sablon' : 'Aktív sablonok'}
+                Összes sablon
               </Typography>
             </Stack>
           </CardContent>
