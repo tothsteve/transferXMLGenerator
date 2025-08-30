@@ -12,12 +12,19 @@ class TemplateService:
     """Service for transfer template business logic"""
     
     @staticmethod
-    def get_company_templates(company):
-        """Get active templates for a company"""
-        return TransferTemplate.objects.filter(
-            company=company,
-            is_active=True
-        ).order_by('-created_at')
+    def get_company_templates(company, include_inactive=False):
+        """Get templates for a company
+        
+        Args:
+            company: Company instance
+            include_inactive: If True, includes inactive templates as well
+        """
+        queryset = TransferTemplate.objects.filter(company=company)
+        
+        if not include_inactive:
+            queryset = queryset.filter(is_active=True)
+        
+        return queryset.order_by('-created_at')
     
     @staticmethod
     def create_template(company, **template_data):

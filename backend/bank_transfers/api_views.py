@@ -151,7 +151,12 @@ class TransferTemplateViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if not hasattr(self.request, 'company') or not self.request.company:
             return TransferTemplate.objects.none()
-        return TemplateService.get_company_templates(self.request.company)
+        
+        # Check if inactive templates should be included
+        show_inactive = self.request.query_params.get('show_inactive', 'false').lower() == 'true'
+        include_inactive = show_inactive
+        
+        return TemplateService.get_company_templates(self.request.company, include_inactive=include_inactive)
     
     def perform_create(self, serializer):
         """Assign company on creation"""
