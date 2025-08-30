@@ -56,8 +56,8 @@ cd frontend
 # Install dependencies
 npm install
 
-# Run development server
-npm start
+# Run development server (bypasses CRACO/ESLint issues)
+npx react-scripts start
 
 # Run tests
 npm test
