@@ -147,55 +147,67 @@ const TemplateBuilder: React.FC = () => {
         data.beneficiaries.map(b => b.beneficiary_id)
       );
       
-      // Remove beneficiaries that are no longer selected
-      for (const currentBeneficiaryId of Array.from(currentBeneficiaryIds)) {
-        if (!newBeneficiaryIds.has(currentBeneficiaryId)) {
-          try {
-            await removeBeneficiaryMutation.mutateAsync({
-              templateId: editingTemplate.id,
-              beneficiaryId: currentBeneficiaryId
-            });
-          } catch (error) {
-            console.error(`Failed to remove beneficiary ${currentBeneficiaryId}:`, error);
+      // Check if beneficiaries have actually changed
+      const beneficiariesChanged = 
+        currentBeneficiaryIds.size !== newBeneficiaryIds.size ||
+        !Array.from(currentBeneficiaryIds).every(id => newBeneficiaryIds.has(id));
+      
+      if (!beneficiariesChanged) {
+        // Only template metadata changed (name, description, is_active), skip beneficiary sync
+        console.log('Only template metadata changed, skipping beneficiary sync');
+      } else {
+        console.log('Beneficiaries changed, syncing beneficiary associations...');
+        
+        // Remove beneficiaries that are no longer selected
+        for (const currentBeneficiaryId of Array.from(currentBeneficiaryIds)) {
+          if (!newBeneficiaryIds.has(currentBeneficiaryId)) {
+            try {
+              await removeBeneficiaryMutation.mutateAsync({
+                templateId: editingTemplate.id,
+                beneficiaryId: currentBeneficiaryId
+              });
+            } catch (error) {
+              console.error(`Failed to remove beneficiary ${currentBeneficiaryId}:`, error);
+            }
           }
         }
-      }
-      
-      // Handle beneficiaries (add new ones and update existing ones)
-      for (let i = 0; i < data.beneficiaries.length; i++) {
-        const beneficiary = data.beneficiaries[i];
         
-        if (!currentBeneficiaryIds.has(beneficiary.beneficiary_id)) {
-          // Add new beneficiaries
-          try {
-            await addBeneficiaryMutation.mutateAsync({
-              templateId: editingTemplate.id,
-              data: {
-                beneficiary_id: beneficiary.beneficiary_id,
-                default_amount: beneficiary.default_amount ? parseFloat(beneficiary.default_amount) : undefined,
-                default_remittance: beneficiary.default_remittance_info || undefined,
-                order: i,
-                is_active: true,
-              }
-            });
-          } catch (error) {
-            console.error(`Failed to add beneficiary ${beneficiary.beneficiary_id}:`, error);
-          }
-        } else {
-          // Update existing beneficiaries (order, amount, remittance info)
-          try {
-            await updateBeneficiaryMutation.mutateAsync({
-              templateId: editingTemplate.id,
-              data: {
-                beneficiary_id: beneficiary.beneficiary_id,
-                default_amount: beneficiary.default_amount ? parseFloat(beneficiary.default_amount) : undefined,
-                default_remittance: beneficiary.default_remittance_info || undefined,
-                order: i,
-                is_active: true,
-              }
-            });
-          } catch (error) {
-            console.error(`Failed to update beneficiary ${beneficiary.beneficiary_id}:`, error);
+        // Handle beneficiaries (add new ones and update existing ones)
+        for (let i = 0; i < data.beneficiaries.length; i++) {
+          const beneficiary = data.beneficiaries[i];
+          
+          if (!currentBeneficiaryIds.has(beneficiary.beneficiary_id)) {
+            // Add new beneficiaries
+            try {
+              await addBeneficiaryMutation.mutateAsync({
+                templateId: editingTemplate.id,
+                data: {
+                  beneficiary_id: beneficiary.beneficiary_id,
+                  default_amount: beneficiary.default_amount ? parseFloat(beneficiary.default_amount) : undefined,
+                  default_remittance: beneficiary.default_remittance_info || undefined,
+                  order: i,
+                  is_active: true,
+                }
+              });
+            } catch (error) {
+              console.error(`Failed to add beneficiary ${beneficiary.beneficiary_id}:`, error);
+            }
+          } else {
+            // Update existing beneficiaries (order, amount, remittance info)
+            try {
+              await updateBeneficiaryMutation.mutateAsync({
+                templateId: editingTemplate.id,
+                data: {
+                  beneficiary_id: beneficiary.beneficiary_id,
+                  default_amount: beneficiary.default_amount ? parseFloat(beneficiary.default_amount) : undefined,
+                  default_remittance: beneficiary.default_remittance_info || undefined,
+                  order: i,
+                  is_active: true,
+                }
+              });
+            } catch (error) {
+              console.error(`Failed to update beneficiary ${beneficiary.beneficiary_id}:`, error);
+            }
           }
         }
       }
