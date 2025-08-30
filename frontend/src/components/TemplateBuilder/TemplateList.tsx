@@ -209,19 +209,30 @@ const TemplateList: React.FC<TemplateListProps> = ({
               variant="contained"
               startIcon={<PlayIcon />}
               onClick={() => onLoadTemplate(template.id)}
+              disabled={!template.is_active}
               sx={{ 
                 flex: 1,
                 borderRadius: 2,
-                background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
-                boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)',
-                '&:hover': {
+                background: template.is_active 
+                  ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)'
+                  : 'linear-gradient(135deg, #9ca3af 0%, #d1d5db 100%)',
+                boxShadow: template.is_active 
+                  ? '0 4px 12px rgba(5, 150, 105, 0.3)'
+                  : 'none',
+                color: template.is_active ? 'white' : '#6b7280',
+                '&:hover': template.is_active ? {
                   background: 'linear-gradient(135deg, #047857 0%, #059669 100%)',
                   transform: 'translateY(-1px)',
                   boxShadow: '0 6px 16px rgba(5, 150, 105, 0.4)',
+                } : {},
+                '&:disabled': {
+                  background: 'linear-gradient(135deg, #9ca3af 0%, #d1d5db 100%)',
+                  color: '#9ca3af',
+                  cursor: 'not-allowed'
                 }
               }}
             >
-              Betöltés
+              {template.is_active ? 'Betöltés' : 'Inaktív'}
             </Button>
             <Stack direction="row" spacing={0.5}>
               <IconButton
