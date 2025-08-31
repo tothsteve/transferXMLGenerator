@@ -1,95 +1,38 @@
 # Database Schema Documentation
 ## Transfer XML Generator - Hungarian Banking System
 
-**Last Updated:** 2025-08-23  
+**Last Updated:** 2025-08-31  
 **Database:** PostgreSQL (Production on Railway) / SQL Server (Local Development)  
-**Schema Version:** Multi-Company Architecture with NAV Integration (Migration 0019)  
+**Schema Version:** Multi-Company Architecture with Feature Flags and Comprehensive NAV Integration (Migration 0028)  
 
 > **Note:** This documentation is the **single source of truth** for database schema. All database comment scripts should be generated from this document.
 
 ## Multi-Company Architecture Overview
 
 The system implements a **multi-tenant architecture** where:
-- **Companies** are isolated data containers
-- **Users** can belong to multiple companies with different roles
+- **Companies** are isolated data containers with **feature flag system**
+- **Users** can belong to multiple companies with different **role-based permissions**
 - **All business data** is company-scoped for complete data isolation
+- **Features** can be enabled/disabled per company independently
 - **Authentication** is handled via JWT with company context switching
 
----
+## ✅ IMPLEMENTED: Feature Flag System & Role-Based Access Control
 
-## 1. **bank_transfers_company**
-**Table Comment:** *Company entities for multi-tenant architecture. Each company has complete data isolation.*
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | SERIAL | PRIMARY KEY | Unique identifier for company |
-| `name` | VARCHAR(200) | NOT NULL | Company legal name |
-| `tax_id` | VARCHAR(20) | NOT NULL, UNIQUE | Hungarian tax identification number (adószám) |
-| `address` | TEXT | | Company registered address |
-| `phone` | VARCHAR(50) | | Primary contact phone number |
-| `email` | VARCHAR(254) | | Primary contact email address |
-| `is_active` | BOOLEAN | DEFAULT TRUE | Soft delete flag for company deactivation |
-| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Company registration timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
-
-**Indexes:**
-- Primary key on `id`
-- Unique index on `tax_id`
-- Index on `is_active` for filtering
+### Feature Flag Architecture
+- **FeatureTemplate**: Master catalog of all available features
+- **CompanyFeature**: Per-company feature enablement with configuration
+- **Role-based permissions**: Two-layer permission checking (company features + user roles)
+- **Audit trails**: Complete tracking of feature enablement and configuration changes
 
 ---
 
-## 2. **bank_transfers_companyuser**
-**Table Comment:** *User-company relationships with role-based access control. Enables multi-company membership.*
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | SERIAL | PRIMARY KEY | Unique identifier for user-company relationship |
-| `user_id` | INTEGER | NOT NULL, FK(auth_user.id) | Reference to Django User |
-| `company_id` | INTEGER | NOT NULL, FK(bank_transfers_company.id) | Reference to Company |
-| `role` | VARCHAR(10) | NOT NULL, DEFAULT 'USER' | Role: 'ADMIN' or 'USER' |
-| `is_active` | BOOLEAN | DEFAULT TRUE | Active membership flag |
-| `joined_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Membership creation timestamp |
-
-**Indexes:**
-- Primary key on `id`
-- Unique constraint on `user_id, company_id`
-- Index on `company_id` for membership queries
-- Index on `role` for role filtering
-
-**Constraints:**
-- `role` CHECK constraint: VALUES ('ADMIN', 'USER')
-
----
-
-## 3. **bank_transfers_userprofile**
-**Table Comment:** *Extended user profile information with company preferences and localization settings.*
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | SERIAL | PRIMARY KEY | Unique identifier for user profile |
-| `user_id` | INTEGER | NOT NULL, UNIQUE, FK(auth_user.id) | One-to-one reference to Django User |
-| `phone` | VARCHAR(50) | | User phone number |
-| `preferred_language` | VARCHAR(10) | DEFAULT 'hu' | UI language preference |
-| `timezone` | VARCHAR(50) | DEFAULT 'Europe/Budapest' | User timezone setting |
-| `last_active_company_id` | INTEGER | FK(bank_transfers_company.id) | Last company context used |
-| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Profile creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
-
-**Indexes:**
-- Primary key on `id`
-- Unique index on `user_id`
-- Index on `last_active_company_id`
-
----
-
-## 4. **bank_transfers_bankaccount**
+## 1. **bank_transfers_bankaccount**
 **Table Comment:** *Company-scoped originator bank accounts for transfers. Contains accounts that will be debited during XML/CSV export generation.*
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | SERIAL | PRIMARY KEY | Unique identifier for bank account record |
-| `company_id` | INTEGER | FK(bank_transfers_company.id) | Company owner of this account |
+| `company_id` | INTEGER | NOT NULL, FK(bank_transfers_company.id) | Company owner of this account |
 | `name` | VARCHAR(200) | NOT NULL | Display name for the account (e.g., "Main Business Account", "Payroll Account") |
 | `account_number` | VARCHAR(50) | NOT NULL | Hungarian bank account number in formatted form (e.g., "1210001119014874" or "12100011-19014874") |
 | `bank_name` | VARCHAR(200) | | Name of the bank holding this account |
@@ -108,13 +51,13 @@ The system implements a **multi-tenant architecture** where:
 
 ---
 
-## 5. **bank_transfers_beneficiary**
+## 2. **bank_transfers_beneficiary**
 **Table Comment:** *Company-scoped beneficiary information for bank transfers. Contains payees, suppliers, employees, and tax authorities.*
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | SERIAL | PRIMARY KEY | Unique identifier for beneficiary record |
-| `company_id` | INTEGER | FK(bank_transfers_company.id) | Company owner of this beneficiary |
+| `company_id` | INTEGER | NOT NULL, FK(bank_transfers_company.id) | Company owner of this beneficiary |
 | `name` | VARCHAR(200) | NOT NULL | Full legal name of the beneficiary (person or organization) |
 | `account_number` | VARCHAR(50) | NOT NULL | Beneficiary's bank account number in Hungarian format (validated and formatted) |
 | `description` | VARCHAR(200) | | Additional information about the beneficiary (bank name, organization details, etc.) |
@@ -137,7 +80,105 @@ The system implements a **multi-tenant architecture** where:
 
 ---
 
-## 6. **bank_transfers_transfertemplate**
+## 3. **bank_transfers_company**
+**Table Comment:** *Company entities for multi-tenant architecture. Each company has complete data isolation.*
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for company |
+| `name` | VARCHAR(200) | NOT NULL | Company legal name |
+| `tax_id` | VARCHAR(20) | NOT NULL, UNIQUE | Hungarian tax identification number (adószám) |
+| `address` | TEXT | | Company registered address |
+| `phone` | VARCHAR(50) | | Primary contact phone number |
+| `email` | VARCHAR(254) | | Primary contact email address |
+| `is_active` | BOOLEAN | DEFAULT TRUE | Soft delete flag for company deactivation |
+| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Company registration timestamp |
+| `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
+
+**Indexes:**
+- Primary key on `id`
+- Unique index on `tax_id`
+- Index on `is_active` for filtering
+
+---
+
+## 4. **bank_transfers_companyfeature**
+**Table Comment:** *Controls which features are active for each company. One record per company-feature combination with audit trail.*
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for company feature instance |
+| `company_id` | INTEGER | NOT NULL, FK(bank_transfers_company.id) | Reference to company |
+| `feature_template_id` | INTEGER | NOT NULL, FK(bank_transfers_featuretemplate.id) | Reference to feature template |
+| `is_enabled` | BOOLEAN | DEFAULT FALSE | Whether feature is active for company |
+| `configuration` | JSON | | Company-specific configuration (API keys, settings) |
+| `enabled_by_id` | INTEGER | FK(auth_user.id) | User who enabled feature (audit trail) |
+| `enabled_date` | TIMESTAMP | | When feature was enabled |
+| `disabled_date` | TIMESTAMP | | When feature was disabled (null if enabled) |
+| `notes` | TEXT | | Administrative notes about feature |
+| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Record creation timestamp |
+| `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
+
+**Indexes:**
+- Primary key on `id`
+- Unique constraint on `company_id, feature_template_id`
+- Index on `company_id` for company feature queries
+- Index on `is_enabled` for enabled feature filtering
+
+---
+
+## 5. **bank_transfers_companyuser**
+**Table Comment:** *User-company relationships with role-based access control. Enables multi-company membership.*
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for user-company relationship |
+| `user_id` | INTEGER | NOT NULL, FK(auth_user.id) | Reference to Django User |
+| `company_id` | INTEGER | NOT NULL, FK(bank_transfers_company.id) | Reference to Company |
+| `role` | VARCHAR(20) | NOT NULL, DEFAULT 'USER' | Role: 'ADMIN', 'FINANCIAL', 'ACCOUNTANT', 'USER' |
+| `custom_permissions` | JSON | | Override permissions for specific features |
+| `permission_restrictions` | JSON | | Additional restrictions beyond role defaults |
+| `is_active` | BOOLEAN | DEFAULT TRUE | Active membership flag |
+| `joined_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Membership creation timestamp |
+
+**Indexes:**
+- Primary key on `id`
+- Unique constraint on `user_id, company_id`
+- Index on `company_id` for membership queries
+- Index on `role` for role filtering
+
+**Constraints:**
+- `role` CHECK constraint: VALUES ('ADMIN', 'FINANCIAL', 'ACCOUNTANT', 'USER')
+
+---
+
+## 6. **bank_transfers_featuretemplate**
+**Table Comment:** *Master catalog of features available across the system. Defines what capabilities can be enabled per company.*
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for feature template |
+| `feature_code` | VARCHAR(50) | NOT NULL, UNIQUE | Unique code identifier (e.g., 'NAV_SYNC', 'EXPORT_XML_SEPA') |
+| `display_name` | VARCHAR(100) | NOT NULL | Human-readable feature name |
+| `description` | TEXT | | Detailed description of feature functionality |
+| `category` | VARCHAR(20) | NOT NULL | Feature grouping: EXPORT, SYNC, TRACKING, REPORTING, INTEGRATION, GENERAL |
+| `default_enabled` | BOOLEAN | DEFAULT FALSE | Auto-enable for new companies |
+| `is_system_critical` | BOOLEAN | DEFAULT FALSE | Whether feature is critical for core system operation |
+| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Template creation timestamp |
+| `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
+
+**Indexes:**
+- Primary key on `id`
+- Unique index on `feature_code`
+- Index on `category` for feature grouping
+- Index on `default_enabled` for default feature queries
+
+**Constraints:**
+- `category` CHECK constraint: VALUES ('EXPORT', 'SYNC', 'TRACKING', 'REPORTING', 'INTEGRATION', 'GENERAL')
+
+---
+
+## 7. **bank_transfers_invoice**
 **Table Comment:** *Company-scoped reusable transfer templates for recurring payments like monthly payroll, VAT payments, or supplier batches.*
 
 | Column | Type | Constraints | Description |
@@ -158,7 +199,103 @@ The system implements a **multi-tenant architecture** where:
 
 ---
 
-## 7. **bank_transfers_templatebeneficiary**
+## 8. **bank_transfers_invoicelineitem**
+**Table Comment:** *Line items extracted from NAV invoice XML data. Represents individual products/services on invoices.*
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for invoice line item |
+| `invoice_id` | INTEGER | NOT NULL, FK(bank_transfers_invoice.id) | Reference to parent invoice |
+| `line_number` | INTEGER | NOT NULL | Line item sequence number (1, 2, 3...) |
+| `line_description` | VARCHAR(500) | | Description of product/service |
+| `quantity` | DECIMAL(15,6) | | Quantity of product/service |
+| `unit_of_measure` | VARCHAR(50) | | Unit of measurement (e.g., "PIECE", "LITER", "HOUR") |
+| `unit_price` | DECIMAL(15,2) | | Price per unit before VAT |
+| `line_net_amount` | DECIMAL(15,2) | | Line total net amount (quantity × unit_price) |
+| `vat_rate` | DECIMAL(5,4) | | VAT rate as decimal (e.g., 0.27 for 27%) |
+| `line_vat_amount` | DECIMAL(15,2) | | VAT amount for this line |
+| `line_gross_amount` | DECIMAL(15,2) | | Total gross amount for this line |
+| `product_code` | VARCHAR(100) | | Internal product/service code |
+| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Line item extraction timestamp |
+
+**Indexes:**
+- Primary key on `id`
+- Index on `invoice_id` for invoice line lookup
+- Index on `line_number` for ordered display
+
+**Business Rules:**
+- Line items are automatically extracted from NAV invoice XML
+- Some older invoices (pre-2021) may not have detailed line item data
+- VAT rates stored as decimals (0.27 = 27%, 0.05 = 5%)
+
+---
+
+## 9. **bank_transfers_invoicesynclog**
+**Table Comment:** *Audit log for NAV invoice synchronization operations with error tracking and performance metrics.*
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for sync log entry |
+| `company_id` | INTEGER | NOT NULL, FK(bank_transfers_company.id) | Company for which sync was performed |
+| `sync_type` | VARCHAR(20) | NOT NULL | Type of sync operation (e.g., "DAILY", "HISTORICAL", "MANUAL") |
+| `direction` | VARCHAR(10) | NOT NULL | Invoice direction synced: "INBOUND" or "OUTBOUND" |
+| `date_from` | DATE | NOT NULL | Start date of sync range |
+| `date_to` | DATE | NOT NULL | End date of sync range |
+| `invoices_processed` | INTEGER | DEFAULT 0 | Total number of invoices processed |
+| `invoices_created` | INTEGER | DEFAULT 0 | Number of new invoices created |
+| `invoices_updated` | INTEGER | DEFAULT 0 | Number of existing invoices updated |
+| `invoices_skipped` | INTEGER | DEFAULT 0 | Number of invoices skipped due to errors |
+| `line_items_extracted` | INTEGER | DEFAULT 0 | Total line items extracted from XML |
+| `errors` | TEXT | | JSON array of error messages encountered |
+| `sync_duration_seconds` | INTEGER | | Total sync operation duration |
+| `api_calls_made` | INTEGER | DEFAULT 0 | Number of NAV API calls performed |
+| `xml_data_size_mb` | DECIMAL(10,3) | | Total size of XML data processed (MB) |
+| `started_at` | TIMESTAMP | NOT NULL | Sync operation start timestamp |
+| `completed_at` | TIMESTAMP | | Sync operation completion timestamp |
+| `status` | VARCHAR(20) | NOT NULL, DEFAULT 'RUNNING' | Sync status: "RUNNING", "COMPLETED", "FAILED", "PARTIAL" |
+
+**Indexes:**
+- Primary key on `id`
+- Index on `company_id` for company sync history
+- Index on `started_at` for chronological ordering
+- Index on `status` for filtering by sync status
+- Index on `sync_type` for sync operation analysis
+
+**Constraints:**
+- `direction` CHECK constraint: VALUES ('INBOUND', 'OUTBOUND')
+- `status` CHECK constraint: VALUES ('RUNNING', 'COMPLETED', 'FAILED', 'PARTIAL')
+- `sync_type` CHECK constraint: VALUES ('DAILY', 'HISTORICAL', 'MANUAL', 'REALTIME')
+
+---
+
+## 10. **bank_transfers_navconfiguration**
+**Table Comment:** *NAV (Hungarian Tax Authority) API configuration for invoice synchronization. One configuration per company.*
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for NAV configuration |
+| `company_id` | INTEGER | NOT NULL, UNIQUE, FK(bank_transfers_company.id) | One-to-one reference to company |
+| `tax_number` | VARCHAR(20) | NOT NULL | Hungarian tax number for NAV authentication |
+| `username` | VARCHAR(100) | NOT NULL | NAV API username |
+| `password` | VARCHAR(255) | NOT NULL | NAV API password (encrypted with Fernet) |
+| `signature_key` | VARCHAR(255) | NOT NULL | NAV API signature key (encrypted with Fernet) |
+| `is_production` | BOOLEAN | DEFAULT FALSE | Use production NAV API (true) or test environment (false) |
+| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Configuration creation timestamp |
+| `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
+
+**Indexes:**
+- Primary key on `id`
+- Unique index on `company_id`
+- Index on `tax_number`
+
+**Security Notes:**
+- `password` and `signature_key` are encrypted using Fernet symmetric encryption
+- Decryption handled by `CredentialManager` service
+- Production/test endpoint automatically selected based on `is_production` flag
+
+---
+
+## 11. **bank_transfers_templatebeneficiary**
 **Table Comment:** *Junction table linking templates to beneficiaries with default payment amounts and remittance information.*
 
 | Column | Type | Constraints | Description |
@@ -180,7 +317,7 @@ The system implements a **multi-tenant architecture** where:
 
 ---
 
-## 8. **bank_transfers_transfer**
+## 12. **bank_transfers_transfer**
 **Table Comment:** *Individual transfer records representing single bank payments. These are processed into XML batches for bank import.*
 
 | Column | Type | Constraints | Description |
@@ -213,7 +350,7 @@ The system implements a **multi-tenant architecture** where:
 
 ---
 
-## 9. **bank_transfers_transferbatch**
+## 13. **bank_transfers_transferbatch**
 **Table Comment:** *Groups transfers into batches for XML/CSV export generation. Each batch represents one export file (XML or CSV) sent to the bank.*
 
 | Column | Type | Constraints | Description |
@@ -238,7 +375,7 @@ The system implements a **multi-tenant architecture** where:
 
 ---
 
-## 10. **bank_transfers_transferbatch_transfers**
+## 14. **bank_transfers_transferbatch_transfers**
 **Table Comment:** *Many-to-many junction table linking transfer batches to individual transfers.*
 
 | Column | Type | Constraints | Description |
@@ -255,7 +392,47 @@ The system implements a **multi-tenant architecture** where:
 
 ---
 
-## 11. **bank_transfers_navconfiguration**
+## 15. **bank_transfers_transfertemplate**
+**Table Comment:** *Company-scoped reusable transfer templates for recurring payments like monthly payroll, VAT payments, or supplier batches.*
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for transfer template |
+| `company_id` | INTEGER | NOT NULL, FK(bank_transfers_company.id) | Company owner of this template |
+| `name` | VARCHAR(200) | NOT NULL | Descriptive name for the template (e.g., "Monthly Payroll", "Q1 VAT Payments") |
+| `description` | TEXT | | Detailed description of when and how to use this template |
+| `is_active` | BOOLEAN | DEFAULT TRUE | Soft delete flag - inactive templates are hidden from selection |
+| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Template creation timestamp |
+| `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
+
+**Indexes:**
+- Primary key on `id`
+- Index on `company_id` for company-scoped queries
+- Index on `name` for search functionality
+- Index on `is_active` for active filtering
+
+---
+
+## 16. **bank_transfers_userprofile**
+**Table Comment:** *Extended user profile information with company preferences and localization settings.*
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for user profile |
+| `user_id` | INTEGER | NOT NULL, UNIQUE, FK(auth_user.id) | One-to-one reference to Django User |
+| `phone` | VARCHAR(50) | | User phone number |
+| `preferred_language` | VARCHAR(10) | DEFAULT 'hu' | UI language preference |
+| `timezone` | VARCHAR(50) | DEFAULT 'Europe/Budapest' | User timezone setting |
+| `last_active_company_id` | INTEGER | FK(bank_transfers_company.id) | Last company context used |
+| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Profile creation timestamp |
+| `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
+
+**Indexes:**
+- Primary key on `id`
+- Unique index on `user_id`
+- Index on `last_active_company_id`
+
+---
 **Table Comment:** *NAV (Hungarian Tax Authority) API configuration for invoice synchronization. One configuration per company.*
 
 | Column | Type | Constraints | Description |
@@ -448,9 +625,69 @@ All core business models include a `company_id` foreign key:
 - **Transfer.company**: Derived from `originator_account.company`
 - **TemplateBeneficiary.company**: Derived from `template.company` and `beneficiary.company`
 
-### Permission Model
-- **ADMIN**: Full CRUD access to company data, user management
-- **USER**: Read/write access to transfers, beneficiaries, templates
+### Role-Based Permission Model
+
+#### User Roles Definition
+| Role | Code | Description | Access Level |
+|------|------|-------------|--------------|
+| **Administrator** | `ADMIN` | Full system access | All enabled company features |
+| **Financial Manager** | `FINANCIAL` | Transfer management | Transfers, templates, exports |
+| **Accountant** | `ACCOUNTANT` | Financial data entry | Invoices, expenses (future) |
+| **Basic User** | `USER` | Read-only access | View-only permissions |
+
+#### Permission Matrix
+| Role | Beneficiaries | Transfers | Templates | Batches | NAV Invoices | Exports | User Management |
+|------|---------------|-----------|-----------|---------|---------------|---------|-----------------|
+| **ADMIN** | Full CRUD | Full CRUD | Full CRUD | Full CRUD | Full CRUD | All formats | Full |
+| **FINANCIAL** | Full CRUD | Full CRUD | Full CRUD | View only | View only | SEPA XML | None |
+| **ACCOUNTANT** | View only | View only | View only | View only | Full CRUD | None | None |
+| **USER** | View only | View only | View only | View only | View only | None | None |
+
+#### Two-Layer Permission System
+1. **Company Feature Level**: Must be enabled for company
+2. **User Role Level**: User role must allow specific action
+
+```python
+def has_permission(request, required_feature):
+    # Layer 1: Company feature enablement
+    if not FeatureChecker.is_feature_enabled(request.company, required_feature):
+        return False
+    
+    # Layer 2: User role permissions  
+    company_user = CompanyUser.objects.get(user=request.user, company=request.company)
+    allowed_features = company_user.get_allowed_features()
+    
+    return (required_feature in allowed_features or '*' in allowed_features)
+```
+
+#### Current Active Features (15 Total)
+
+**1. Export Features (3)**
+- `EXPORT_XML_SEPA`: Generate SEPA-compatible XML files
+- `EXPORT_CSV_KH`: Generate KH Bank specific CSV format  
+- `EXPORT_CSV_CUSTOM`: Custom CSV format exports
+
+**2. Sync Features (1)**
+- `NAV_SYNC`: NAV invoice synchronization and import
+
+**3. Tracking Features (6)**
+- `BENEFICIARY_MANAGEMENT`: Full CRUD operations on beneficiaries
+- `BENEFICIARY_VIEW`: View beneficiaries only (read-only)
+- `TRANSFER_MANAGEMENT`: Full CRUD operations on transfers
+- `TRANSFER_VIEW`: View transfers only (read-only)
+- `BATCH_MANAGEMENT`: Full CRUD operations on batches
+- `BATCH_VIEW`: View batches only (read-only)
+
+**4. Reporting Features (2)**
+- `REPORTING_DASHBOARD`: Access to dashboard views
+- `REPORTING_ANALYTICS`: Advanced analytics features
+
+**5. Integration Features (2)**
+- `API_ACCESS`: REST API access for external integrations
+- `WEBHOOK_NOTIFICATIONS`: Webhook notification system
+
+**6. General Features (1)**
+- `BULK_OPERATIONS`: Bulk import/export operations
 
 ### Authentication Flow
 1. User logs in → JWT token issued
@@ -510,7 +747,9 @@ All core business models include a `company_id` foreign key:
 - **0017**: Fixed NAV field nullable constraints
 - **0018**: Added batch index field for NAV processing
 - **0019**: Added XML storage fields (`nav_invoice_xml`, `nav_invoice_hash`)
-- **Current**: Full multi-tenant isolation with complete NAV integration
+- **0020**: Added feature flag system (`FeatureTemplate`, `CompanyFeature`)
+- **0021**: Enhanced CompanyUser with role-based permissions (`role`, `custom_permissions`, `permission_restrictions`)
+- **Current**: Full multi-tenant isolation with feature flags, role-based access control, and complete NAV integration
 
 ---
 
