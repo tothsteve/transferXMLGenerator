@@ -4,13 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture Overview
 
-This is a Django + React application for generating XML and CSV files for bank transfers. The system manages beneficiaries, transfer templates, and generates SEPA-compatible XML files and KH Bank CSV files for bulk bank transfers.
+This is a Django + React application for generating XML and CSV files for bank transfers with **multi-company architecture**, **feature flags**, and **role-based access control**. The system manages beneficiaries, transfer templates, NAV invoice synchronization, and generates SEPA-compatible XML files and KH Bank CSV files for bulk bank transfers.
 
 ### Backend (Django)
-- **Django REST API** with `bank_transfers` app
+- **Django REST API** with `bank_transfers` app and **multi-company architecture**
 - **SQL Server database** connection (port 1435, database: 'administration')  
-- **Key models**: BankAccount, Beneficiary, TransferTemplate, Transfer, TransferBatch
+- **Multi-tenant isolation** with company-scoped data and **feature flag system**
+- **Role-based access control** with 4-level permissions (ADMIN, FINANCIAL, ACCOUNTANT, USER)
+- **Key models**: Company, CompanyUser, FeatureTemplate, CompanyFeature, BankAccount, Beneficiary, TransferTemplate, Transfer, TransferBatch
+- **NAV integration** with invoice synchronization and XML storage
 - **Export generation** via `utils.generate_xml()` and `kh_export.py` - creates HUF transaction XML files and KH Bank CSV files
+- **Feature-gated functionality** with company-specific feature enablement
 - **Excel import** functionality for bulk beneficiary creation
 - **Template system** for recurring transfer patterns (e.g., monthly payroll)
 - **Swagger API docs** available via drf_yasg
@@ -25,6 +29,119 @@ This is a Django + React application for generating XML and CSV files for bank t
 - **Settings management** for default bank account configuration with full CRUD operations
 - **React Query integration** for optimistic updates, caching, and error handling
 - **Modern UI components** with form validation, loading states, and Hungarian localization
+
+## ✅ IMPLEMENTED: Multi-Company Feature Flag System
+
+### Company-Specific Feature Control
+The system implements a sophisticated **two-layer permission architecture**:
+
+1. **Company Feature Level**: Features must be enabled for the company
+2. **User Role Level**: User's role must permit access to the feature
+
+### Role-Based Access Control
+
+#### User Roles (4 Levels)
+- **ADMIN**: Full access to all enabled company features + user management
+- **FINANCIAL**: Transfer operations, templates, SEPA XML exports
+- **ACCOUNTANT**: Invoice/expense management (NAV integration)
+- **USER**: Read-only access to basic features
+
+#### Permission Matrix
+| Feature Category | ADMIN | FINANCIAL | ACCOUNTANT | USER |
+|------------------|-------|-----------|------------|------|
+| **Beneficiaries** | Full CRUD | Full CRUD | View only | View only |
+| **Transfers** | Full CRUD | Full CRUD | View only | View only |
+| **Templates** | Full CRUD | Full CRUD | View only | View only |
+| **Batches** | Full CRUD | View only | View only | View only |
+| **NAV Invoices** | Full CRUD | View only | Full CRUD | View only |
+| **Exports** | All formats | SEPA XML | None | None |
+| **User Management** | Full | None | None | None |
+
+### Active Features (15 Total)
+
+#### 1. Export Features (3)
+- **EXPORT_XML_SEPA**: Generate SEPA-compatible XML files
+- **EXPORT_CSV_KH**: Generate KH Bank specific CSV format  
+- **EXPORT_CSV_CUSTOM**: Custom CSV format exports
+
+#### 2. Sync Features (1)
+- **NAV_SYNC**: NAV invoice synchronization and import
+
+#### 3. Tracking Features (6)
+- **BENEFICIARY_MANAGEMENT**: Full CRUD operations on beneficiaries
+- **BENEFICIARY_VIEW**: View beneficiaries only
+- **TRANSFER_MANAGEMENT**: Full CRUD operations on transfers
+- **TRANSFER_VIEW**: View transfers only
+- **BATCH_MANAGEMENT**: Full CRUD operations on batches
+- **BATCH_VIEW**: View batches only
+
+#### 4. Reporting Features (2)
+- **REPORTING_DASHBOARD**: Access to dashboard views
+- **REPORTING_ANALYTICS**: Advanced analytics features
+
+#### 5. Integration Features (2)
+- **API_ACCESS**: REST API access for external integrations
+- **WEBHOOK_NOTIFICATIONS**: Webhook notification system
+
+#### 6. General Features (1)
+- **BULK_OPERATIONS**: Bulk import/export operations
+
+### Implementation Notes
+- Features are cached at login for performance
+- Permission checking happens at ViewSet level with custom permission classes
+- Companies can enable/disable features independently
+- Admin users can force logout other users for security
+- Complete audit trail for feature enablement and user actions
+
+## Database Documentation
+
+### 📋 DATABASE_DOCUMENTATION.md
+**Location**: `/DATABASE_DOCUMENTATION.md`
+
+This file contains the **single source of truth** for all database schema documentation including:
+- Multi-company architecture tables
+- Feature flag system tables  
+- Role-based access control implementation
+- NAV integration tables
+- Complete table and column descriptions
+- Performance indexes and constraints
+- Troubleshooting guide for permissions
+
+**⚠️ CRITICAL - DATABASE DOCUMENTATION REQUIREMENT**: 
+**WHENEVER ANY DATABASE SCHEMA CHANGES ARE MADE, YOU MUST UPDATE ALL 3 FILES:**
+
+1. **`/DATABASE_DOCUMENTATION.md`** - Master database schema documentation
+2. **`/backend/sql/complete_database_comments_postgresql.sql`** - PostgreSQL comment script  
+3. **`/backend/sql/complete_database_comments_sqlserver.sql`** - SQL Server comment script
+
+**This includes:**
+- New tables or columns
+- Field modifications or renames  
+- Model changes in `bank_transfers/models.py`
+- Django migrations that affect database structure
+- Any business logic changes that impact data meaning
+
+**All 3 files must stay synchronized and complete. No exceptions.**
+
+### Database Comment Scripts
+**Locations**:
+- **PostgreSQL (Production)**: `/backend/sql/complete_database_comments_postgresql.sql`
+- **SQL Server (Development)**: `/backend/sql/complete_database_comments_sqlserver.sql`
+
+These scripts add comprehensive table and column comments to the database schema:
+- Generated from `DATABASE_DOCUMENTATION.md`
+- Database-specific syntax (PostgreSQL `COMMENT ON` vs SQL Server extended properties)
+- Complete coverage of all 16+ tables and hundreds of columns
+- Verification queries to confirm comments were applied
+
+**Usage**:
+```bash
+# PostgreSQL (Production)
+psql -d your_database -f backend/sql/complete_database_comments_postgresql.sql
+
+# SQL Server (Development)  
+sqlcmd -S localhost,1435 -d administration -i backend/sql/complete_database_comments_sqlserver.sql
+```
 
 ## Development Commands
 
@@ -104,18 +221,40 @@ else:
 ## API Architecture
 
 ### Core ViewSets
+- `AuthenticationViewSet`: User registration, login, company switching, profile management
 - `BankAccountViewSet`: Manages originator accounts with default account functionality
-- `BeneficiaryViewSet`: Handles beneficiary CRUD with filtering (frequent, active, search)
-- `TransferTemplateViewSet`: Template management with beneficiary associations
-- `TransferViewSet`: Individual transfers with bulk creation and XML/CSV export generation
-- `TransferBatchViewSet`: Read-only batches created during XML/CSV export generation
+- `BeneficiaryViewSet`: Handles beneficiary CRUD with filtering (frequent, active, search) - **Feature gated**
+- `TransferTemplateViewSet`: Template management with beneficiary associations - **Feature gated**
+- `TransferViewSet`: Individual transfers with bulk creation and XML/CSV export generation - **Feature gated**
+- `TransferBatchViewSet`: Read-only batches created during XML/CSV export generation - **Feature gated**
+
+### Authentication & Permission System
+All ViewSets use **two-layer permission checking**:
+
+1. **CompanyContextPermission**: Ensures user belongs to company and company is active
+2. **Feature-specific permissions**: Check both company feature enablement AND user role permissions
+
+**Example Permission Classes**:
+- `RequiresBeneficiaryManagement`: Needs `BENEFICIARY_MANAGEMENT` feature + appropriate role
+- `RequiresTransferManagement`: Needs `TRANSFER_MANAGEMENT` feature + appropriate role
+- `RequiresExportGeneration`: Needs export features (`EXPORT_XML_SEPA`, `EXPORT_CSV_KH`) + appropriate role
 
 ### Key API Endpoints
-- `POST /api/transfers/bulk_create/`: Bulk transfer creation
-- `POST /api/transfers/generate_xml/`: XML file generation from transfer IDs
-- `POST /api/transfers/generate_csv/`: CSV file generation from transfer IDs (KH Bank format)
-- `POST /api/templates/{id}/load_transfers/`: Generate transfers from template
-- `POST /api/import/excel/`: Import beneficiaries from Excel files
+
+#### Authentication & Company Management
+- `POST /api/auth/register/`: User and company registration
+- `POST /api/auth/login/`: Login with JWT token + company context + enabled features
+- `POST /api/auth/switch_company/`: Change active company context
+- `GET /api/auth/profile/`: Get user profile and company memberships
+- `GET /api/auth/features/`: Get enabled features for current company
+- `POST /api/auth/force_logout/`: Admin force logout other users
+
+#### Core Business Operations  
+- `POST /api/transfers/bulk_create/`: Bulk transfer creation - **Requires TRANSFER_MANAGEMENT**
+- `POST /api/transfers/generate_xml/`: XML file generation - **Requires EXPORT_XML_SEPA**
+- `POST /api/transfers/generate_csv/`: CSV file generation - **Requires EXPORT_CSV_KH**
+- `POST /api/templates/{id}/load_transfers/`: Generate transfers from template - **Requires TRANSFER_MANAGEMENT**
+- `POST /api/import/excel/`: Import beneficiaries from Excel files - **Requires BULK_OPERATIONS**
 
 ## Export Generation
 

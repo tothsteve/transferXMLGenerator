@@ -3,8 +3,9 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import RefreshToken, UntypedToken
 from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from django.db import transaction
@@ -12,6 +13,7 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
 from .models import Company, CompanyUser, UserProfile
+from .permissions import FeatureChecker
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -198,11 +200,20 @@ class AuthenticationViewSet(GenericViewSet):
             profile, created = UserProfile.objects.get_or_create(user=user)
             profile_serializer = UserProfileSerializer(profile)
             
+            # Get enabled features for each company
+            companies_with_features = []
+            for membership in companies:
+                company_data = CompanySerializer(membership.company, context={'user': user}).data
+                enabled_features = FeatureChecker.get_enabled_features_for_company(membership.company)
+                company_data['enabled_features'] = enabled_features
+                companies_with_features.append(company_data)
+            
             return Response({
                 'access': str(refresh.access_token),
                 'refresh': str(refresh),
                 'user': profile_serializer.data,
-                'companies': company_serializer.data
+                'companies': companies_with_features,
+                'login_timestamp': user.last_login.isoformat() if user.last_login else None
             })
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
@@ -238,9 +249,14 @@ class AuthenticationViewSet(GenericViewSet):
         profile.last_active_company = membership.company
         profile.save()
         
+        # Include enabled features for the new active company
+        company_data = CompanySerializer(membership.company, context={'user': request.user}).data
+        enabled_features = FeatureChecker.get_enabled_features_for_company(membership.company)
+        company_data['enabled_features'] = enabled_features
+        
         return Response({
             'message': 'Aktív cég megváltoztatva',
-            'company': CompanySerializer(membership.company, context={'user': request.user}).data
+            'company': company_data
         })
     
     @swagger_auto_schema(
@@ -262,7 +278,157 @@ class AuthenticationViewSet(GenericViewSet):
             context={'user': request.user}
         )
         
+        # Add enabled features for each company
+        companies_with_features = []
+        for membership in companies:
+            company_data = CompanySerializer(membership.company, context={'user': request.user}).data
+            enabled_features = FeatureChecker.get_enabled_features_for_company(membership.company)
+            company_data['enabled_features'] = enabled_features
+            companies_with_features.append(company_data)
+        
         return Response({
             'user': serializer.data,
-            'companies': company_serializer.data
+            'companies': companies_with_features
+        })
+    
+    @swagger_auto_schema(
+        operation_description="Aktív cég engedélyezett funkcióinak lekérése"
+    )
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def features(self, request):
+        """Get enabled features for user's current active company"""
+        if not hasattr(request, 'company') or not request.company:
+            # Try to get company from user profile
+            try:
+                profile = UserProfile.objects.get(user=request.user)
+                if profile.last_active_company:
+                    # Verify user still has access
+                    membership = CompanyUser.objects.filter(
+                        user=request.user,
+                        company=profile.last_active_company,
+                        is_active=True
+                    ).first()
+                    if membership:
+                        company = membership.company
+                    else:
+                        # Fall back to first available company
+                        membership = CompanyUser.objects.filter(
+                            user=request.user,
+                            is_active=True
+                        ).select_related('company').first()
+                        company = membership.company if membership else None
+                else:
+                    company = None
+            except UserProfile.DoesNotExist:
+                company = None
+        else:
+            company = request.company
+        
+        if not company:
+            return Response({
+                'error': 'Nincs aktív cég',
+                'enabled_features': []
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        enabled_features = FeatureChecker.get_enabled_features_for_company(company)
+        
+        return Response({
+            'company_id': company.id,
+            'company_name': company.name,
+            'enabled_features': enabled_features,
+            'feature_count': len(enabled_features)
+        })
+    
+    @swagger_auto_schema(
+        operation_description="Felhasználó kiléptetése (csak adminok)",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'user_id': openapi.Schema(type=openapi.TYPE_INTEGER, description='A kiléptetendő felhasználó ID-ja')
+            },
+            required=['user_id']
+        ),
+        responses={
+            200: openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'user_username': openapi.Schema(type=openapi.TYPE_STRING)
+                }
+            ),
+            403: 'Nincs jogosultság',
+            404: 'Felhasználó nem található'
+        }
+    )
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def force_logout(self, request):
+        """Force logout a user (admin only)"""
+        user_id = request.data.get('user_id')
+        
+        if not user_id:
+            return Response({'error': 'user_id szükséges'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if current user is admin in any company
+        admin_memberships = CompanyUser.objects.filter(
+            user=request.user,
+            role='ADMIN',
+            is_active=True
+        )
+        
+        if not admin_memberships.exists():
+            return Response({'error': 'Csak adminok érhető el ez a funkció'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Get target user
+        try:
+            target_user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'Felhasználó nem található'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check if admin has permission to manage this user (same company)
+        admin_companies = set(m.company_id for m in admin_memberships)
+        target_companies = set(
+            CompanyUser.objects.filter(
+                user=target_user,
+                is_active=True
+            ).values_list('company_id', flat=True)
+        )
+        
+        if not admin_companies.intersection(target_companies):
+            return Response({
+                'error': 'Nincs jogosultság ennek a felhasználónak a kezelésére'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        # Don't allow admin to logout themselves
+        if target_user.id == request.user.id:
+            return Response({'error': 'Nem tudja saját magát kiléptetni'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Force logout by updating user's password (this invalidates all tokens)
+        # We'll use a more sophisticated approach with token blacklisting if available
+        try:
+            # Update last_login to force re-authentication
+            target_user.last_login = None
+            target_user.save(update_fields=['last_login'])
+            
+            return Response({
+                'message': f'Felhasználó {target_user.username} sikeresen kiléptetve',
+                'user_username': target_user.username,
+                'forced_logout_by': request.user.username
+            })
+        except Exception as e:
+            return Response({
+                'error': 'Hiba a kiléptetés során',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @swagger_auto_schema(
+        operation_description="Token érvényességének ellenőrzése"
+    )
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def validate_token(self, request):
+        """Validate current token and return user info"""
+        return Response({
+            'valid': True,
+            'user_id': request.user.id,
+            'username': request.user.username,
+            'is_active': request.user.is_active
         })

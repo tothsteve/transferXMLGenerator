@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(curl:*)",
-      "Read(//Users/tothi/Workspace/ITCardigan/git/transferXMLGenerator/**)"
+      "Read(//Users/tothi/Workspace/ITCardigan/git/transferXMLGenerator/**)",
+      "Bash(python manage.py shell:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []
