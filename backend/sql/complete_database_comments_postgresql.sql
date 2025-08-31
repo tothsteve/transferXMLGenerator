@@ -17,9 +17,6 @@ COMMENT ON TABLE bank_transfers_company IS 'Legal entities using the system. Eac
 COMMENT ON COLUMN bank_transfers_company.id IS 'Primary key - unique company identifier';
 COMMENT ON COLUMN bank_transfers_company.name IS 'Legal company name as registered with authorities';
 COMMENT ON COLUMN bank_transfers_company.tax_id IS 'Hungarian tax identification number (adószám) - unique per company';
-COMMENT ON COLUMN bank_transfers_company.address IS 'Full registered company address including postal code';
-COMMENT ON COLUMN bank_transfers_company.phone IS 'Primary contact phone number for company';
-COMMENT ON COLUMN bank_transfers_company.email IS 'Primary contact email address for company';
 COMMENT ON COLUMN bank_transfers_company.is_active IS 'Whether this company is currently active in the system';
 COMMENT ON COLUMN bank_transfers_company.created_at IS 'Company registration timestamp in system';
 COMMENT ON COLUMN bank_transfers_company.updated_at IS 'Last modification timestamp for company data';

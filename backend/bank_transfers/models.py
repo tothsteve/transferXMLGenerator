@@ -11,9 +11,6 @@ class Company(TimestampedActiveModel):
     """Cég entitás multi-tenant architektúrához"""
     name = models.CharField(max_length=200, verbose_name="Cég neve")
     tax_id = models.CharField(max_length=20, unique=True, verbose_name="Adószám")
-    address = models.TextField(blank=True, verbose_name="Cím")
-    phone = models.CharField(max_length=50, blank=True, verbose_name="Telefon")
-    email = models.EmailField(blank=True, verbose_name="E-mail")
     
     class Meta:
         verbose_name = "Cég"

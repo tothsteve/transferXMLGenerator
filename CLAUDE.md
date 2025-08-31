@@ -156,8 +156,8 @@ pip install -r requirements.txt
 python manage.py makemigrations
 python manage.py migrate
 
-# Run development server
-python manage.py runserver
+# Run development server on port 8002
+python manage.py runserver 8002
 
 # Create superuser
 python manage.py createsuperuser
@@ -242,7 +242,7 @@ All ViewSets use **two-layer permission checking**:
 ### Key API Endpoints
 
 #### Authentication & Company Management
-- `POST /api/auth/register/`: User and company registration
+- `POST /api/auth/register/`: User and company registration (simplified: username, email, names, password, company_name, company_tax_id) - automatically initializes default features
 - `POST /api/auth/login/`: Login with JWT token + company context + enabled features
 - `POST /api/auth/switch_company/`: Change active company context
 - `GET /api/auth/profile/`: Get user profile and company memberships
@@ -295,7 +295,7 @@ TransferTemplate allows for recurring transfer patterns:
 # Transfer XML Generator - React Frontend Development
 
 ## Project Context
-I have a **Django REST API backend** (100% complete) for a bank transfer XML generator system, and now need to build the **React TypeScript frontend**. The backend is running on `http://localhost:8000` with full Swagger documentation at `/swagger/`.
+I have a **Django REST API backend** (100% complete) for a bank transfer XML generator system, and now need to build the **React TypeScript frontend**. The backend is running on `http://localhost:8002` with full Swagger documentation at `/swagger/`.
 
 ## Project Structure
 ```
@@ -328,7 +328,7 @@ transferXMLGenerator/          # Git repo root
 
 ## Backend API (READY TO USE)
 
-### Base URL: `http://localhost:8000/api/`
+### Base URL: `http://localhost:8002/api/`
 
 ### Key Endpoints:
 ```typescript
@@ -523,4 +523,4 @@ The system generates Hungarian bank-compatible XML for transfer imports. Here's 
 
 The backend `/api/transfers/generate_xml/` and `/api/transfers/generate_csv/` endpoints return XML and CSV formats respectively, and the frontend should display them with appropriate formatting for preview before download.
 
-**Swagger documentation available at: http://localhost:8000/swagger/**
+**Swagger documentation available at: http://localhost:8002/swagger/**
