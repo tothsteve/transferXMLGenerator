@@ -1,5 +1,385 @@
 from rest_framework import permissions
-from .models import CompanyUser, UserProfile
+from .models import CompanyUser, UserProfile, CompanyFeature, FeatureTemplate
+from functools import wraps
+from django.http import JsonResponse
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.response import Response
+from rest_framework import status
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class FeatureNotEnabledException(Exception):
+    """Exception raised when a feature is not enabled for the company"""
+    def __init__(self, feature_code, company_name=None):
+        self.feature_code = feature_code
+        self.company_name = company_name
+        super().__init__(f"Feature '{feature_code}' not enabled for company '{company_name}'")
+
+
+class FeatureChecker:
+    """Central service for checking feature enablement"""
+    
+    @staticmethod
+    def is_feature_enabled(company, feature_code):
+        """Check if a feature is enabled for the company"""
+        try:
+            company_feature = CompanyFeature.objects.select_related('feature_template').get(
+                company=company,
+                feature_template__feature_code=feature_code
+            )
+            return company_feature.is_enabled
+        except CompanyFeature.DoesNotExist:
+            # Feature doesn't exist for company - check if it's system critical
+            try:
+                feature_template = FeatureTemplate.objects.get(feature_code=feature_code)
+                if feature_template.is_system_critical:
+                    logger.warning(f"System critical feature {feature_code} not found for company {company.name}")
+                    return True  # System critical features are assumed enabled if not explicitly disabled
+                return False
+            except FeatureTemplate.DoesNotExist:
+                logger.error(f"Feature template {feature_code} does not exist")
+                return False
+    
+    @staticmethod
+    def check_feature_or_raise(company, feature_code):
+        """Check feature and raise exception if not enabled"""
+        if not FeatureChecker.is_feature_enabled(company, feature_code):
+            raise FeatureNotEnabledException(feature_code, company.name if company else None)
+    
+    @staticmethod
+    def check_multiple_features_or_raise(company, feature_codes, require_all=True):
+        """Check multiple features - require_all=True means ALL must be enabled, False means ANY must be enabled"""
+        if not feature_codes:
+            return
+        
+        enabled_features = []
+        disabled_features = []
+        
+        for feature_code in feature_codes:
+            if FeatureChecker.is_feature_enabled(company, feature_code):
+                enabled_features.append(feature_code)
+            else:
+                disabled_features.append(feature_code)
+        
+        if require_all and disabled_features:
+            # ALL features required but some are disabled
+            raise FeatureNotEnabledException(disabled_features[0], company.name if company else None)
+        elif not require_all and not enabled_features:
+            # ANY feature allowed but NONE are enabled
+            raise FeatureNotEnabledException(feature_codes[0], company.name if company else None)
+    
+    @staticmethod
+    def get_enabled_features_for_company(company):
+        """Get all enabled features for a company"""
+        return list(
+            CompanyFeature.objects.filter(
+                company=company,
+                is_enabled=True
+            ).select_related('feature_template').values_list(
+                'feature_template__feature_code', flat=True
+            )
+        )
+
+
+def require_feature_api(feature_code):
+    """Decorator for API view methods that require a specific feature"""
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapped_view(*args, **kwargs):
+            # Extract request from args (self, request) or (request,)
+            request = None
+            if len(args) >= 2 and hasattr(args[1], 'company'):
+                request = args[1]  # (self, request, ...)
+            elif len(args) >= 1 and hasattr(args[0], 'company'):
+                request = args[0]  # (request, ...)
+            
+            if not request:
+                return JsonResponse({
+                    'error': 'Could not determine request context',
+                    'feature_required': feature_code
+                }, status=400)
+            
+            if hasattr(request, 'company') and request.company:
+                try:
+                    FeatureChecker.check_feature_or_raise(request.company, feature_code)
+                except FeatureNotEnabledException as e:
+                    return JsonResponse({
+                        'error': str(e),
+                        'feature_required': feature_code,
+                        'company': request.company.name,
+                        'enabled_features': FeatureChecker.get_enabled_features_for_company(request.company)
+                    }, status=403)
+            else:
+                return JsonResponse({
+                    'error': 'No company context available',
+                    'feature_required': feature_code
+                }, status=400)
+            
+            return view_func(*args, **kwargs)
+        return wrapped_view
+    return decorator
+
+
+def require_features_api(*feature_codes, require_all=True):
+    """Decorator for API view methods that require multiple features"""
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapped_view(*args, **kwargs):
+            # Extract request from args
+            request = None
+            if len(args) >= 2 and hasattr(args[1], 'company'):
+                request = args[1]  # (self, request, ...)
+            elif len(args) >= 1 and hasattr(args[0], 'company'):
+                request = args[0]  # (request, ...)
+            
+            if not request:
+                return JsonResponse({
+                    'error': 'Could not determine request context',
+                    'features_required': list(feature_codes),
+                    'require_all': require_all
+                }, status=400)
+            
+            if hasattr(request, 'company') and request.company:
+                try:
+                    FeatureChecker.check_multiple_features_or_raise(
+                        request.company, feature_codes, require_all=require_all
+                    )
+                except FeatureNotEnabledException as e:
+                    return JsonResponse({
+                        'error': str(e),
+                        'features_required': list(feature_codes),
+                        'require_all': require_all,
+                        'company': request.company.name,
+                        'enabled_features': FeatureChecker.get_enabled_features_for_company(request.company)
+                    }, status=403)
+            else:
+                return JsonResponse({
+                    'error': 'No company context available',
+                    'features_required': list(feature_codes),
+                    'require_all': require_all
+                }, status=400)
+            
+            return view_func(*args, **kwargs)
+        return wrapped_view
+    return decorator
+
+
+class FeatureBasedPermission(permissions.BasePermission):
+    """DRF Permission class that checks feature enablement"""
+    required_features = []
+    require_all_features = True
+    
+    def has_permission(self, request, view):
+        if not self.required_features:
+            return True
+        
+        if not hasattr(request, 'company') or not request.company:
+            return False
+        
+        try:
+            FeatureChecker.check_multiple_features_or_raise(
+                request.company, 
+                self.required_features, 
+                require_all=self.require_all_features
+            )
+            return True
+        except FeatureNotEnabledException:
+            return False
+    
+    def has_object_permission(self, request, view, obj):
+        return self.has_permission(request, view)
+
+
+class RequireBeneficiaryManagement(FeatureBasedPermission):
+    """Permission class for beneficiary management features with role-based restrictions"""
+    def has_permission(self, request, view):
+        if not hasattr(request, 'company') or not request.company:
+            return False
+        
+        # Get user's company membership and allowed features
+        try:
+            from .models import CompanyUser
+            company_user = CompanyUser.objects.get(
+                user=request.user, 
+                company=request.company,
+                is_active=True
+            )
+            user_allowed_features = company_user.get_allowed_features()
+        except CompanyUser.DoesNotExist:
+            return False
+        
+        # Check for write operations vs read operations
+        if request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+            # Write operations require BENEFICIARY_MANAGEMENT
+            required_feature = 'BENEFICIARY_MANAGEMENT'
+            
+            # Check both company feature enablement AND user role permission
+            return (
+                FeatureChecker.is_feature_enabled(request.company, required_feature) and
+                (required_feature in user_allowed_features or '*' in user_allowed_features)
+            )
+        else:
+            # Read operations - allow either management or view-only
+            company_has_feature = (
+                FeatureChecker.is_feature_enabled(request.company, 'BENEFICIARY_MANAGEMENT') or
+                FeatureChecker.is_feature_enabled(request.company, 'BENEFICIARY_VIEW')
+            )
+            
+            user_has_permission = (
+                'BENEFICIARY_MANAGEMENT' in user_allowed_features or
+                'BENEFICIARY_VIEW' in user_allowed_features or
+                '*' in user_allowed_features
+            )
+            
+            return company_has_feature and user_has_permission
+
+
+class RequireTransferManagement(FeatureBasedPermission):
+    """Permission class for transfer management features with role-based restrictions"""
+    def has_permission(self, request, view):
+        if not hasattr(request, 'company') or not request.company:
+            return False
+        
+        # Get user's company membership and allowed features
+        try:
+            from .models import CompanyUser
+            company_user = CompanyUser.objects.get(
+                user=request.user, 
+                company=request.company,
+                is_active=True
+            )
+            user_allowed_features = company_user.get_allowed_features()
+        except CompanyUser.DoesNotExist:
+            return False
+        
+        # Check for write operations vs read operations
+        if request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+            # Write operations require TRANSFER_MANAGEMENT
+            required_feature = 'TRANSFER_MANAGEMENT'
+            
+            # Check both company feature enablement AND user role permission
+            return (
+                FeatureChecker.is_feature_enabled(request.company, required_feature) and
+                (required_feature in user_allowed_features or '*' in user_allowed_features)
+            )
+        else:
+            # Read operations - allow either management or view-only
+            company_has_feature = (
+                FeatureChecker.is_feature_enabled(request.company, 'TRANSFER_MANAGEMENT') or
+                FeatureChecker.is_feature_enabled(request.company, 'TRANSFER_VIEW')
+            )
+            
+            user_has_permission = (
+                'TRANSFER_MANAGEMENT' in user_allowed_features or
+                'TRANSFER_VIEW' in user_allowed_features or
+                '*' in user_allowed_features
+            )
+            
+            return company_has_feature and user_has_permission
+
+
+class RequireBatchManagement(FeatureBasedPermission):
+    """Permission class for batch management features with role-based restrictions"""
+    def has_permission(self, request, view):
+        if not hasattr(request, 'company') or not request.company:
+            return False
+        
+        # Get user's company membership and allowed features
+        try:
+            from .models import CompanyUser
+            company_user = CompanyUser.objects.get(
+                user=request.user, 
+                company=request.company,
+                is_active=True
+            )
+            user_allowed_features = company_user.get_allowed_features()
+        except CompanyUser.DoesNotExist:
+            return False
+        
+        # Check for write operations vs read operations
+        if request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+            # Write operations require BATCH_MANAGEMENT
+            required_feature = 'BATCH_MANAGEMENT'
+            
+            # Check both company feature enablement AND user role permission
+            return (
+                FeatureChecker.is_feature_enabled(request.company, required_feature) and
+                (required_feature in user_allowed_features or '*' in user_allowed_features)
+            )
+        else:
+            # Read operations - allow either management or view-only
+            company_has_feature = (
+                FeatureChecker.is_feature_enabled(request.company, 'BATCH_MANAGEMENT') or
+                FeatureChecker.is_feature_enabled(request.company, 'BATCH_VIEW')
+            )
+            
+            user_has_permission = (
+                'BATCH_MANAGEMENT' in user_allowed_features or
+                'BATCH_VIEW' in user_allowed_features or
+                '*' in user_allowed_features
+            )
+            
+            return company_has_feature and user_has_permission
+
+
+class RequireNavSync(FeatureBasedPermission):
+    """Permission class for NAV synchronization features with role-based restrictions"""
+    def has_permission(self, request, view):
+        if not hasattr(request, 'company') or not request.company:
+            return False
+        
+        # Get user's company membership and allowed features
+        try:
+            from .models import CompanyUser
+            company_user = CompanyUser.objects.get(
+                user=request.user, 
+                company=request.company,
+                is_active=True
+            )
+            user_allowed_features = company_user.get_allowed_features()
+        except CompanyUser.DoesNotExist:
+            return False
+        
+        # NAV_SYNC feature required
+        required_feature = 'NAV_SYNC'
+        
+        # Check both company feature enablement AND user role permission
+        return (
+            FeatureChecker.is_feature_enabled(request.company, required_feature) and
+            (required_feature in user_allowed_features or '*' in user_allowed_features)
+        )
+
+
+class RequireExportFeatures(FeatureBasedPermission):
+    """Permission class for export features with role-based restrictions"""
+    def has_permission(self, request, view):
+        if not hasattr(request, 'company') or not request.company:
+            return False
+        
+        # Get user's company membership and allowed features
+        try:
+            from .models import CompanyUser
+            company_user = CompanyUser.objects.get(
+                user=request.user, 
+                company=request.company,
+                is_active=True
+            )
+            user_allowed_features = company_user.get_allowed_features()
+        except CompanyUser.DoesNotExist:
+            return False
+        
+        # For export endpoints, require at least one export feature
+        export_features = ['EXPORT_XML_SEPA', 'EXPORT_CSV_KH', 'EXPORT_CSV_CUSTOM']
+        
+        for feature in export_features:
+            # Check both company feature enablement AND user role permission
+            if (FeatureChecker.is_feature_enabled(request.company, feature) and
+                (feature in user_allowed_features or '*' in user_allowed_features)):
+                return True
+        
+        return False
 
 
 class IsCompanyMember(permissions.BasePermission):
@@ -143,3 +523,4 @@ class IsCompanyAdminOrReadOnly(IsCompanyMember):
         
         # Allow write operations only for admins
         return membership.role == 'ADMIN'
+

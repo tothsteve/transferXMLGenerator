@@ -547,3 +547,287 @@ CREATE INDEX IX_financial_reporting ON invoice (company_id, issue_date, invoice_
 6. Complete financial picture available in Power BI dashboard
 
 This comprehensive plan transforms your transfer XML generator into a complete financial management system while preserving all existing functionality and enabling gradual feature adoption based on company-specific needs.
+
+---
+
+# DATABASE DOCUMENTATION & IMPLEMENTATION STATUS
+
+## Current Implementation Status (As of August 2025)
+
+### ✅ COMPLETED: Feature Flag System (Phase 1)
+
+#### Database Schema - Feature Management
+
+**FeatureTemplate** - Master catalog of available features
+```sql
+-- Features available across the system
+CREATE TABLE bank_transfers_featuretemplate (
+    id INTEGER PRIMARY KEY,
+    feature_code VARCHAR(50) UNIQUE NOT NULL,  -- e.g., 'NAV_SYNC', 'EXPORT_XML_SEPA'
+    display_name VARCHAR(100) NOT NULL,        -- Human-readable name
+    description TEXT,                          -- Detailed feature description
+    category VARCHAR(20) NOT NULL,             -- EXPORT, SYNC, TRACKING, etc.
+    default_enabled BOOLEAN DEFAULT FALSE,     -- Auto-enable for new companies
+    requires_configuration BOOLEAN DEFAULT FALSE, -- Needs setup before use
+    configuration_schema JSON,                 -- JSON schema for config
+    business_priority INTEGER DEFAULT 1,       -- 1=High, 3=Low priority
+    technical_complexity INTEGER DEFAULT 1,    -- 1=Simple, 3=Complex
+    estimated_setup_time INTEGER,             -- Minutes to configure
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table comment for SQL Server/PostgreSQL compatibility
+COMMENT ON TABLE bank_transfers_featuretemplate IS 'Master catalog of features available across the system. Defines what capabilities can be enabled per company.';
+COMMENT ON COLUMN bank_transfers_featuretemplate.feature_code IS 'Unique identifier used in code (e.g., NAV_SYNC, EXPORT_XML_SEPA)';
+COMMENT ON COLUMN bank_transfers_featuretemplate.category IS 'Feature grouping: EXPORT, SYNC, TRACKING, REPORTING, INTEGRATION, GENERAL';
+COMMENT ON COLUMN bank_transfers_featuretemplate.business_priority IS '1=High business value, 2=Medium, 3=Nice to have';
+```
+
+**CompanyFeature** - Company-specific feature enablement
+```sql
+-- Which features are enabled for each company
+CREATE TABLE bank_transfers_companyfeature (
+    id INTEGER PRIMARY KEY,
+    company_id INTEGER NOT NULL REFERENCES bank_transfers_company(id),
+    feature_template_id INTEGER NOT NULL REFERENCES bank_transfers_featuretemplate(id),
+    is_enabled BOOLEAN DEFAULT FALSE,          -- Feature active for company
+    configuration JSON,                        -- Company-specific settings
+    enabled_by_id INTEGER REFERENCES auth_user(id), -- Who enabled it
+    enabled_date TIMESTAMP,                    -- When enabled
+    disabled_date TIMESTAMP,                   -- When disabled (if applicable)
+    notes TEXT,                               -- Admin notes about feature
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(company_id, feature_template_id)
+);
+
+COMMENT ON TABLE bank_transfers_companyfeature IS 'Controls which features are active for each company. One record per company-feature combination.';
+COMMENT ON COLUMN bank_transfers_companyfeature.configuration IS 'JSON configuration specific to this company-feature combination';
+COMMENT ON COLUMN bank_transfers_companyfeature.enabled_by_id IS 'User who enabled this feature (audit trail)';
+```
+
+#### Role-Based Access Control Implementation
+
+**Enhanced CompanyUser Model**
+```sql
+-- Updated company user with role-based permissions
+ALTER TABLE bank_transfers_companyuser ADD COLUMN role VARCHAR(20) DEFAULT 'USER';
+ALTER TABLE bank_transfers_companyuser ADD COLUMN custom_permissions JSON;
+ALTER TABLE bank_transfers_companyuser ADD COLUMN permission_restrictions JSON;
+
+-- Role definitions
+-- ADMIN: Full access to all enabled company features
+-- FINANCIAL: Can manage transfers, view reports, limited admin functions
+-- ACCOUNTANT: Can view/edit invoices, expenses, accounting data
+-- USER: Read-only access to basic features
+```
+
+**Role Permission Matrix:**
+
+| Role | Beneficiaries | Transfers | Templates | Batches | NAV Invoices | Exports | User Mgmt |
+|------|---------------|-----------|-----------|---------|---------------|---------|-----------|
+| **ADMIN** | Full CRUD | Full CRUD | Full CRUD | Full CRUD | Full CRUD | All formats | Full |
+| **FINANCIAL** | Full CRUD | Full CRUD | Full CRUD | View only | View only | SEPA XML | None |
+| **ACCOUNTANT** | View only | View only | View only | View only | Full CRUD | None | None |
+| **USER** | View only | View only | View only | View only | View only | None | None |
+
+#### Feature Categories & Default Features
+
+**Current Active Features (15 total):**
+
+1. **EXPORT Features (3)**
+   - `EXPORT_XML_SEPA`: Generate SEPA XML files
+   - `EXPORT_CSV_KH`: Generate KH Bank CSV files  
+   - `EXPORT_CSV_CUSTOM`: Custom CSV format exports
+
+2. **SYNC Features (1)**
+   - `NAV_SYNC`: NAV invoice synchronization
+
+3. **TRACKING Features (6)**
+   - `BENEFICIARY_MANAGEMENT`: Full beneficiary CRUD
+   - `BENEFICIARY_VIEW`: View beneficiaries only
+   - `TRANSFER_MANAGEMENT`: Full transfer CRUD
+   - `TRANSFER_VIEW`: View transfers only
+   - `BATCH_MANAGEMENT`: Full batch CRUD
+   - `BATCH_VIEW`: View batches only
+
+4. **REPORTING Features (2)**
+   - `REPORTING_DASHBOARD`: Access to dashboard views
+   - `REPORTING_ANALYTICS`: Advanced analytics features
+
+5. **INTEGRATION Features (2)**
+   - `API_ACCESS`: REST API access
+   - `WEBHOOK_NOTIFICATIONS`: Webhook notifications
+
+6. **GENERAL Features (1)**
+   - `BULK_OPERATIONS`: Bulk import/export operations
+
+#### Permission System Architecture
+
+**Two-Layer Permission Checking:**
+
+1. **Company Feature Level**: Is feature enabled for company?
+2. **User Role Level**: Does user role allow this specific action?
+
+```python
+# Permission checking flow
+def has_permission(request, required_feature):
+    # Layer 1: Company must have feature enabled
+    if not FeatureChecker.is_feature_enabled(request.company, required_feature):
+        return False
+    
+    # Layer 2: User role must allow this feature
+    company_user = CompanyUser.objects.get(user=request.user, company=request.company)
+    user_allowed_features = company_user.get_allowed_features()
+    
+    return (required_feature in user_allowed_features or '*' in user_allowed_features)
+```
+
+### 🔄 IN PROGRESS: Database Documentation Enhancement
+
+#### Core Database Tables (Existing)
+
+**Company Management**
+```sql
+-- Main company entity
+CREATE TABLE bank_transfers_company (
+    id INTEGER PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,               -- Company legal name
+    tax_id VARCHAR(20) UNIQUE,                -- Hungarian tax number
+    address TEXT,                             -- Full company address
+    phone VARCHAR(50),                        -- Contact phone
+    email VARCHAR(254),                       -- Contact email
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE bank_transfers_company IS 'Legal entities using the system. Each company has isolated data and feature access.';
+COMMENT ON COLUMN bank_transfers_company.tax_id IS 'Hungarian tax identification number (adószám)';
+```
+
+**User-Company Relationships**
+```sql
+-- Links users to companies with roles
+CREATE TABLE bank_transfers_companyuser (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES auth_user(id),
+    company_id INTEGER NOT NULL REFERENCES bank_transfers_company(id),
+    role VARCHAR(20) DEFAULT 'USER',          -- ADMIN, FINANCIAL, ACCOUNTANT, USER
+    is_active BOOLEAN DEFAULT TRUE,           -- Can user access company
+    custom_permissions JSON,                  -- Override permissions
+    permission_restrictions JSON,             -- Additional restrictions
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, company_id)
+);
+
+COMMENT ON TABLE bank_transfers_companyuser IS 'User membership in companies with role-based permissions';
+COMMENT ON COLUMN bank_transfers_companyuser.role IS 'User role: ADMIN (full access), FINANCIAL (transfers/reports), ACCOUNTANT (invoices/expenses), USER (read-only)';
+```
+
+**Financial Operations**
+```sql
+-- Bank accounts for originators
+CREATE TABLE bank_transfers_bankaccount (
+    id INTEGER PRIMARY KEY,
+    company_id INTEGER NOT NULL REFERENCES bank_transfers_company(id),
+    account_number VARCHAR(30) NOT NULL,      -- Clean account number
+    account_name VARCHAR(200),                -- Account holder name
+    bank_name VARCHAR(200),                   -- Bank institution name
+    currency VARCHAR(3) DEFAULT 'HUF',       -- Account currency
+    is_default BOOLEAN DEFAULT FALSE,         -- Default for company
+    is_active BOOLEAN DEFAULT TRUE,           -- Can be used for transfers
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE bank_transfers_bankaccount IS 'Company bank accounts used as originator accounts for transfers';
+COMMENT ON COLUMN bank_transfers_bankaccount.account_number IS 'Clean bank account number without dashes or spaces';
+```
+
+```sql
+-- Transfer beneficiaries/partners
+CREATE TABLE bank_transfers_beneficiary (
+    id INTEGER PRIMARY KEY,
+    company_id INTEGER NOT NULL REFERENCES bank_transfers_company(id),
+    name VARCHAR(200) NOT NULL,               -- Beneficiary legal name
+    account_number VARCHAR(30) NOT NULL,      -- Bank account number
+    bank_name VARCHAR(200),                   -- Bank institution
+    tax_number VARCHAR(20),                   -- Tax ID for business partners
+    email VARCHAR(254),                       -- Contact email
+    phone VARCHAR(50),                        -- Contact phone
+    address TEXT,                             -- Full address
+    is_frequent BOOLEAN DEFAULT FALSE,        -- Frequently used
+    is_active BOOLEAN DEFAULT TRUE,           -- Available for transfers
+    notes TEXT,                               -- Additional notes
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE bank_transfers_beneficiary IS 'Transfer recipients and business partners with bank account details';
+COMMENT ON COLUMN bank_transfers_beneficiary.is_frequent IS 'Mark for easy access in UI - frequently used partners';
+```
+
+#### Troubleshooting Guide
+
+**Common Permission Issues:**
+
+1. **"Permission denied" errors**
+   - Check: Is company feature enabled? `CompanyFeature.objects.filter(company=X, feature_template__feature_code='Y', is_enabled=True)`
+   - Check: Does user role allow feature? Review role permission matrix above
+   - Check: Is user active in company? `CompanyUser.objects.filter(user=X, company=Y, is_active=True)`
+
+2. **Features not appearing in frontend**
+   - Backend: Check `/api/auth/features/` endpoint returns expected features
+   - Check: Login endpoint includes `enabled_features` in response
+   - Check: Frontend feature checking logic matches backend feature codes
+
+3. **Role permission conflicts**
+   - ADMIN always has full access (returns `['*']` from `get_allowed_features()`)
+   - Other roles return specific feature lists based on role permission matrix
+   - Custom permissions can override default role permissions
+
+**Database Maintenance:**
+
+```sql
+-- Check company feature status
+SELECT c.name as company, 
+       ft.feature_code, 
+       ft.display_name,
+       cf.is_enabled,
+       cf.enabled_date
+FROM bank_transfers_company c
+LEFT JOIN bank_transfers_companyfeature cf ON c.id = cf.company_id  
+LEFT JOIN bank_transfers_featuretemplate ft ON cf.feature_template_id = ft.id
+WHERE c.id = YOUR_COMPANY_ID
+ORDER BY ft.category, ft.feature_code;
+
+-- Check user permissions
+SELECT u.username,
+       c.name as company,
+       cu.role,
+       cu.is_active,
+       cu.custom_permissions
+FROM auth_user u
+JOIN bank_transfers_companyuser cu ON u.id = cu.user_id
+JOIN bank_transfers_company c ON cu.company_id = c.id
+WHERE c.id = YOUR_COMPANY_ID;
+```
+
+### 📋 PLANNED: Future Database Enhancements
+
+#### Phase 2: Enhanced Invoice Management (Planned)
+- `invoice` table with NAV integration
+- `invoice_payment` linking to transfers  
+- Multi-currency support with exchange rates
+
+#### Phase 3: Expense Tracking (Planned)
+- `expense_entry` table with categorization
+- `expense_category` with company customization
+- Bank statement import and matching
+
+#### Phase 4: Advanced Features (Planned)
+- `bank_transaction` import and reconciliation
+- `financial_report` generation and caching
+- Power BI integration endpoints

@@ -24,7 +24,7 @@ from .serializers import (
 from .utils import generate_xml
 from .pdf_processor import PDFTransactionProcessor
 from .kh_export import KHBankExporter
-from .permissions import IsCompanyMember, IsCompanyAdmin, IsCompanyAdminOrReadOnly
+from .permissions import IsCompanyMember, IsCompanyAdmin, IsCompanyAdminOrReadOnly, RequireBeneficiaryManagement, RequireTransferManagement, RequireBatchManagement, RequireNavSync, RequireExportFeatures, require_feature_api
 from .services.bank_account_service import BankAccountService
 from .services.beneficiary_service import BeneficiaryService
 from .services.template_service import TemplateService
@@ -86,9 +86,11 @@ class BeneficiaryViewSet(viewsets.ModelViewSet):
     - is_active: true/false
     - is_frequent: true/false  
     - search: név, számlaszám és leírás alapján keresés
+    
+    Jogosultság: BENEFICIARY_MANAGEMENT (írás) vagy BENEFICIARY_VIEW (olvasás)
     """
     serializer_class = BeneficiarySerializer
-    permission_classes = [IsAuthenticated, IsCompanyMember]
+    permission_classes = [IsAuthenticated, IsCompanyMember, RequireBeneficiaryManagement]
     
     def get_queryset(self):
         if not hasattr(self.request, 'company') or not self.request.company:
@@ -359,9 +361,11 @@ class TransferViewSet(viewsets.ModelViewSet):
     - template: sablon ID
     - execution_date_from: dátum (YYYY-MM-DD)
     - execution_date_to: dátum (YYYY-MM-DD)
+    
+    Jogosultság: TRANSFER_MANAGEMENT (írás) vagy TRANSFER_VIEW (olvasás)
     """
     serializer_class = TransferSerializer
-    permission_classes = [IsAuthenticated, IsCompanyMember]
+    permission_classes = [IsAuthenticated, IsCompanyMember, RequireTransferManagement]
     
     def get_queryset(self):
         if not hasattr(self.request, 'company') or not self.request.company:
@@ -436,6 +440,7 @@ class TransferViewSet(viewsets.ModelViewSet):
             404: 'No transfers found'
         }
     )
+    @require_feature_api('EXPORT_XML_SEPA')
     @action(detail=False, methods=['post'])
     def generate_xml(self, request):
         """XML generálás kiválasztott utalásokból"""
@@ -470,6 +475,7 @@ class TransferViewSet(viewsets.ModelViewSet):
             400: 'Export error'
         }
     )
+    @require_feature_api('EXPORT_CSV_KH')
     @action(detail=False, methods=['post'])
     def generate_kh_export(self, request):
         """KH Bank formátumú .HUF.csv export generálás"""
@@ -496,9 +502,11 @@ class TransferBatchViewSet(viewsets.ReadOnlyModelViewSet):
     
     A kötegek automatikusan létrejönnek XML generáláskor,
     és nyilvántartják a feldolgozott utalásokat.
+    
+    Jogosultság: BATCH_MANAGEMENT (írás) vagy BATCH_VIEW (olvasás)
     """
     serializer_class = TransferBatchSerializer
-    permission_classes = [IsAuthenticated, IsCompanyMember]
+    permission_classes = [IsAuthenticated, IsCompanyMember, RequireBatchManagement]
     
     def get_queryset(self):
         if not hasattr(self.request, 'company') or not self.request.company:
@@ -714,8 +722,10 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
     
     list: Az összes NAV számla listája (szűréssel és keresés)
     retrieve: Egy konkrét NAV számla részletes adatai tételekkel együtt
+    
+    Jogosultság: NAV_SYNC
     """
-    permission_classes = [IsAuthenticated, IsCompanyMember]
+    permission_classes = [IsAuthenticated, IsCompanyMember, RequireNavSync]
     
     def get_serializer_class(self):
         """Use different serializers for list vs detail view"""
@@ -888,9 +898,11 @@ class InvoiceSyncLogViewSet(viewsets.ReadOnlyModelViewSet):
     
     list: Az összes szinkronizáció napló listája
     retrieve: Egy konkrét szinkronizáció napló részletei
+    
+    Jogosultság: NAV_SYNC
     """
     serializer_class = InvoiceSyncLogSerializer
-    permission_classes = [IsAuthenticated, IsCompanyMember]
+    permission_classes = [IsAuthenticated, IsCompanyMember, RequireNavSync]
     
     def get_queryset(self):
         """Company-scoped queryset"""
