@@ -88,9 +88,6 @@ The system implements a **multi-tenant architecture** where:
 | `id` | SERIAL | PRIMARY KEY | Unique identifier for company |
 | `name` | VARCHAR(200) | NOT NULL | Company legal name |
 | `tax_id` | VARCHAR(20) | NOT NULL, UNIQUE | Hungarian tax identification number (adószám) |
-| `address` | TEXT | | Company registered address |
-| `phone` | VARCHAR(50) | | Primary contact phone number |
-| `email` | VARCHAR(254) | | Primary contact email address |
 | `is_active` | BOOLEAN | DEFAULT TRUE | Soft delete flag for company deactivation |
 | `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Company registration timestamp |
 | `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |

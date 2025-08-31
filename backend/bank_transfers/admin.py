@@ -308,12 +308,12 @@ class CompanyAdmin(admin.ModelAdmin):
     """Enhanced Company admin with feature management capabilities"""
     list_display = ['name', 'tax_id', 'feature_count', 'user_count', 'is_active', 'created_at']
     list_filter = ['is_active', 'created_at']
-    search_fields = ['name', 'tax_id', 'email']
+    search_fields = ['name', 'tax_id']
     inlines = [CompanyFeatureInline]
     
     fieldsets = (
         ('Company Information', {
-            'fields': ('name', 'tax_id', 'address', 'phone', 'email')
+            'fields': ('name', 'tax_id')
         }),
         ('Status', {
             'fields': ('is_active',)

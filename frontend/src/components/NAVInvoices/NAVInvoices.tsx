@@ -118,7 +118,6 @@ const NAVInvoices: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [directionFilter, setDirectionFilter] = useState<string>('');
-  const [currencyFilter, setCurrencyFilter] = useState<string>('');
   const [hideStornoInvoices, setHideStornoInvoices] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -148,7 +147,6 @@ const NAVInvoices: React.FC = () => {
         page_size: 20,
         search: searchTerm || undefined,
         direction: inboundTransferFilter ? 'INBOUND' : (directionFilter || undefined),
-        currency: currencyFilter || undefined,
         payment_method: inboundTransferFilter ? 'TRANSFER' : undefined,
         ordering: `${sortDirection === 'desc' ? '-' : ''}${sortField}`,
         hide_storno_invoices: hideStornoInvoices,
@@ -199,7 +197,7 @@ const NAVInvoices: React.FC = () => {
     loadInvoices();
     // Clear selections when filters or page change
     setSelectedInvoices([]);
-  }, [searchTerm, directionFilter, currencyFilter, currentPage, sortField, sortDirection, hideStornoInvoices, inboundTransferFilter]);
+  }, [searchTerm, directionFilter, currentPage, sortField, sortDirection, hideStornoInvoices, inboundTransferFilter]);
 
   const handleViewInvoice = async (invoice: Invoice) => {
     setInvoiceDetailsOpen(true);
@@ -222,7 +220,6 @@ const NAVInvoices: React.FC = () => {
   const clearFilters = () => {
     setSearchTerm('');
     setDirectionFilter('');
-    setCurrencyFilter('');
     setInboundTransferFilter(false);
     setHideStornoInvoices(true); // Reset to default (hide STORNO invoices)
     setCurrentPage(1);
@@ -432,19 +429,6 @@ const NAVInvoices: React.FC = () => {
                 sx={{ m: 0 }}
               />
             </MenuItem>
-            <MenuItem disableRipple sx={{ '&:hover': { backgroundColor: 'transparent' } }}>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={Boolean(currencyFilter === 'HUF')}
-                    onChange={(e) => setCurrencyFilter(e.target.checked ? 'HUF' : '')}
-                    size="small"
-                  />
-                }
-                label="Csak HUF számlák"
-                sx={{ m: 0 }}
-              />
-            </MenuItem>
             <Divider />
             <MenuItem disableRipple sx={{ '&:hover': { backgroundColor: 'transparent' } }}>
               <FormControlLabel
@@ -486,7 +470,7 @@ const NAVInvoices: React.FC = () => {
         </Stack>
 
         {/* Active filters display - Same pattern as BeneficiaryManager */}
-        {(searchTerm || directionFilter || currencyFilter || !hideStornoInvoices || inboundTransferFilter) && (
+        {(searchTerm || directionFilter || !hideStornoInvoices || inboundTransferFilter) && (
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
             <Typography variant="body2" color="text.secondary">
               Aktív szűrők:
@@ -504,14 +488,6 @@ const NAVInvoices: React.FC = () => {
                 label={directionFilter === 'INBOUND' ? 'Bejövő' : 'Kimenő'}
                 size="small"
                 color="success"
-                variant="outlined"
-              />
-            )}
-            {currencyFilter && (
-              <Chip
-                label={`Pénznem: ${currencyFilter}`}
-                size="small"
-                color="warning"
                 variant="outlined"
               />
             )}

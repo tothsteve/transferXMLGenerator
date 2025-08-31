@@ -6,9 +6,6 @@ export interface Company {
   id: number;
   name: string;
   tax_id: string;
-  address: string;
-  phone: string;
-  email: string;
   user_role: 'ADMIN' | 'USER';
 }
 

@@ -45,9 +45,9 @@ npm start
 ### Access the Application
 
 - **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **Admin Panel**: http://localhost:8000/admin/
-- **API Documentation**: http://localhost:8000/swagger/
+- **Backend API**: http://localhost:8002
+- **Admin Panel**: http://localhost:8002/admin/
+- **API Documentation**: http://localhost:8002/swagger/
 
 ## 📋 Product Requirements (PRPs)
 

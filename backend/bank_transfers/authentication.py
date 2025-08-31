@@ -71,6 +71,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                 last_active_company=company
             )
             
+            # Initialize default features for the company
+            from .models import CompanyFeatureManager
+            CompanyFeatureManager.initialize_company_features(company, user)
+            
             return user
 
 
@@ -112,7 +116,7 @@ class CompanySerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Company
-        fields = ['id', 'name', 'tax_id', 'address', 'phone', 'email', 'user_role']
+        fields = ['id', 'name', 'tax_id', 'user_role']
     
     def get_user_role(self, obj):
         user = self.context.get('user')
