@@ -29,7 +29,8 @@ import {
   useGenerateXml,
   useGenerateKHExport,
   useDefaultBankAccount,
-  useBeneficiaries
+  useBeneficiaries,
+  useCreateBeneficiary
 } from '../../hooks/api';
 import { Transfer, TransferTemplate, LoadTemplateResponse, Beneficiary } from '../../types/api';
 import TemplateSelector from './TemplateSelector';
@@ -62,6 +63,7 @@ const TransferWorkflow: React.FC = () => {
   const bulkUpdateMutation = useBulkUpdateTransfers();
   const generateXmlMutation = useGenerateXml();
   const generateKHExportMutation = useGenerateKHExport();
+  const createBeneficiaryMutation = useCreateBeneficiary();
 
   const templates = templatesData?.results || [];
   const beneficiaries = beneficiariesData?.results || [];
@@ -140,13 +142,15 @@ const TransferWorkflow: React.FC = () => {
     }
   };
 
-  // Handle template data passed from TemplateBuilder
+  // Handle template data passed from TemplateBuilder or preloaded transfers from NAV
   useEffect(() => {
     const state = location.state as { 
       templateData?: LoadTemplateResponse; 
       loadedFromTemplate?: boolean;
       templateId?: number;
       loadFromTemplate?: boolean;
+      preloadedTransfers?: any[];
+      source?: string;
     } | null;
     
     // Handle direct template data (from previous workflow)
@@ -168,6 +172,22 @@ const TransferWorkflow: React.FC = () => {
         setSelectedTemplate(template);
         handleLoadTemplate(state.templateId);
       }
+      
+      // Clear the location state to prevent re-loading on refresh
+      window.history.replaceState({}, '');
+    }
+    // Handle preloaded transfers from NAV invoices
+    else if (state?.preloadedTransfers && state.source === 'nav_invoices' && defaultAccount) {
+      console.log('Loading preloaded transfers from NAV invoices:', state.preloadedTransfers);
+      
+      const navTransfers = state.preloadedTransfers.map((transfer, index) => ({
+        ...transfer,
+        tempId: `nav-${index}`,
+        originator_account: defaultAccount.id,
+        // Keep beneficiary_id as null initially - will be resolved before saving
+      }));
+      
+      setTransfers(navTransfers);
       
       // Clear the location state to prevent re-loading on refresh
       window.history.replaceState({}, '');
@@ -236,11 +256,76 @@ const TransferWorkflow: React.FC = () => {
       }
       
       if (!transfer.beneficiary) {
-        errors.push(`${index + 1}. átutalás: Kedvezményezettet kell választani`);
+        // For NAV transfers, check if we have beneficiary_name and account_number
+        if (!(transfer as any).beneficiary_name || !(transfer as any).account_number) {
+          errors.push(`${index + 1}. átutalás: Kedvezményezettet kell választani`);
+        }
       }
     });
 
     return errors;
+  };
+
+  // Helper function to resolve beneficiaries for NAV transfers
+  const resolveBeneficiariesForTransfers = async (transfersToProcess: TransferData[]) => {
+    const resolvedTransfers = [...transfersToProcess];
+    
+    for (let i = 0; i < resolvedTransfers.length; i++) {
+      const transfer = resolvedTransfers[i] as any;
+      
+      // Skip if beneficiary is already set
+      if (transfer.beneficiary) continue;
+      
+      // Skip if we don't have the required NAV transfer data
+      if (!transfer.beneficiary_name || !transfer.account_number) continue;
+      
+      console.log(`Resolving beneficiary for NAV transfer: ${transfer.beneficiary_name}`);
+      
+      // Try to find existing beneficiary by account number (most reliable match)
+      let matchingBeneficiary = beneficiaries.find(b => 
+        b.account_number === transfer.account_number && b.is_active
+      );
+      
+      // If not found by account number, try to find by name
+      if (!matchingBeneficiary) {
+        matchingBeneficiary = beneficiaries.find(b => 
+          b.name.toLowerCase() === transfer.beneficiary_name!.toLowerCase() && b.is_active
+        );
+      }
+      
+      if (matchingBeneficiary) {
+        // Use existing beneficiary
+        resolvedTransfers[i] = {
+          ...transfer,
+          beneficiary: matchingBeneficiary.id,
+        };
+        console.log(`Matched existing beneficiary for ${transfer.beneficiary_name}:`, matchingBeneficiary);
+      } else {
+        // Create new beneficiary
+        try {
+          console.log(`Creating new beneficiary for NAV transfer: ${transfer.beneficiary_name}`);
+          const newBeneficiary = await createBeneficiaryMutation.mutateAsync({
+            name: transfer.beneficiary_name!,
+            account_number: transfer.account_number!,
+            description: 'NAV számla alapján automatikusan létrehozva',
+            is_active: true,
+            is_frequent: false,
+            remittance_information: '',
+          });
+          
+          resolvedTransfers[i] = {
+            ...transfer,
+            beneficiary: newBeneficiary.data.id,
+          };
+          console.log(`Created new beneficiary for ${transfer.beneficiary_name}:`, newBeneficiary.data);
+        } catch (error) {
+          console.error(`Failed to create beneficiary for ${transfer.beneficiary_name}:`, error);
+          throw new Error(`Nem sikerült létrehozni a kedvezményezettet: ${transfer.beneficiary_name}`);
+        }
+      }
+    }
+    
+    return resolvedTransfers;
   };
 
   const handleSaveTransfers = async (): Promise<false | number[]> => {
@@ -256,9 +341,16 @@ const TransferWorkflow: React.FC = () => {
     }
 
     try {
+      // First, resolve beneficiaries for any NAV transfers
+      console.log('Resolving beneficiaries for NAV transfers if needed...');
+      const resolvedTransfers = await resolveBeneficiariesForTransfers(transfers);
+      
+      // Update the transfers state with resolved beneficiaries
+      setTransfers(resolvedTransfers);
+      
       // Separate transfers into create and update groups
-      const transfersToCreate = transfers.filter(t => !t.id);
-      const transfersToUpdate = transfers.filter(t => t.id);
+      const transfersToCreate = resolvedTransfers.filter(t => !t.id);
+      const transfersToUpdate = resolvedTransfers.filter(t => t.id);
       
       console.log('Transfers to create:', transfersToCreate.length);
       console.log('Transfers to update:', transfersToUpdate.length);
