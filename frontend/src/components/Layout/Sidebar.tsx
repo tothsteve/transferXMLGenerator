@@ -26,6 +26,7 @@ import {
   Receipt as ReceiptIcon,
 } from '@mui/icons-material';
 import { useIsCompanyAdmin } from '../../hooks/useAuth';
+import { usePermissions } from '../../hooks/usePermissions';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -40,25 +41,57 @@ interface NavigationItem {
   icon: React.ElementType;
   badge?: string;
   adminOnly?: boolean;
+  requiredPermission?: keyof ReturnType<typeof usePermissions>;
 }
 
-const navigation = [
+const navigation: NavigationItem[] = [
   { name: 'Főoldal', href: '/', icon: HomeIcon },
-  { name: 'Kedvezményezettek', href: '/beneficiaries', icon: PeopleIcon },
-  { name: 'Sablonok', href: '/templates', icon: DescriptionIcon },
-  { name: 'PDF Importálás', href: '/pdf-import', icon: CloudUploadIcon },
-  { name: 'Átutalások', href: '/transfers', icon: SwapHorizIcon },
-  { name: 'Kötegek kezelése', href: '/batches', icon: FolderIcon },
-  { name: 'NAV Számlák', href: '/nav-invoices', icon: ReceiptIcon },
+  { 
+    name: 'Kedvezményezettek', 
+    href: '/beneficiaries', 
+    icon: PeopleIcon,
+    requiredPermission: 'canViewBeneficiaries'
+  },
+  { 
+    name: 'Sablonok', 
+    href: '/templates', 
+    icon: DescriptionIcon,
+    requiredPermission: 'canViewTemplates'
+  },
+  { 
+    name: 'PDF Importálás', 
+    href: '/pdf-import', 
+    icon: CloudUploadIcon,
+    requiredPermission: 'canAccessPDFImport'
+  },
+  { 
+    name: 'Átutalások', 
+    href: '/transfers', 
+    icon: SwapHorizIcon,
+    requiredPermission: 'canViewTransfers'
+  },
+  { 
+    name: 'Kötegek kezelése', 
+    href: '/batches', 
+    icon: FolderIcon,
+    requiredPermission: 'canViewBatches'
+  },
+  { 
+    name: 'NAV Számlák', 
+    href: '/nav-invoices', 
+    icon: ReceiptIcon,
+    requiredPermission: 'canAccessNavInvoices'
+  },
   { name: 'Beállítások', href: '/settings', icon: SettingsIcon },
 ];
 
 const adminNavigation: NavigationItem[] = [
-  { name: 'Felhasználókezelés', href: '/users', icon: AdminIcon },
+  { name: 'Felhasználókezelés', href: '/users', icon: AdminIcon, adminOnly: true },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) => {
   const isAdmin = useIsCompanyAdmin();
+  const permissions = usePermissions();
   const drawerContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Header with Logo */}
@@ -98,7 +131,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
       {/* Navigation */}
       <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
         <List sx={{ p: 1 }}>
-          {navigation.map((item) => (
+          {navigation
+            .filter(item => {
+              // Always show home and settings
+              if (!item.requiredPermission) return true;
+              // Check if user has the required permission
+              return permissions[item.requiredPermission] === true;
+            })
+            .map((item) => (
             <ListItem key={item.name} disablePadding sx={{ mb: 0.5 }}>
               <ListItemButton
                 component={NavLink}

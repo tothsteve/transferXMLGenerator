@@ -30,6 +30,7 @@ import {
   formatAccountNumberOnInput, 
   validateAndFormatHungarianAccountNumber 
 } from '../../utils/bankAccountValidation';
+import { usePermissions } from '../../hooks/usePermissions';
 
 interface BeneficiaryTableProps {
   beneficiaries: Beneficiary[];
@@ -52,6 +53,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
   sortField,
   sortDirection,
 }) => {
+  const permissions = usePermissions();
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editData, setEditData] = useState<Partial<Beneficiary>>({});
   const [fieldErrors, setFieldErrors] = useState<{[key: string]: string}>({});
@@ -445,20 +447,24 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                   </Stack>
                 ) : (
                   <Stack direction="row" justifyContent="flex-end" spacing={1}>
-                    <IconButton
-                      size="small"
-                      onClick={() => handleStartEdit(beneficiary)}
-                      color="primary"
-                    >
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => onDelete(beneficiary.id)}
-                      color="error"
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
+                    {permissions.canManageBeneficiaries && (
+                      <>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleStartEdit(beneficiary)}
+                          color="primary"
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={() => onDelete(beneficiary.id)}
+                          color="error"
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </>
+                    )}
                   </Stack>
                 )}
               </TableCell>

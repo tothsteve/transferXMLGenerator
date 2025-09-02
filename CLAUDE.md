@@ -70,7 +70,7 @@ The system implements a sophisticated **two-layer permission architecture**:
 #### 3. Tracking Features (6)
 - **BENEFICIARY_MANAGEMENT**: Full CRUD operations on beneficiaries
 - **BENEFICIARY_VIEW**: View beneficiaries only
-- **TRANSFER_MANAGEMENT**: Full CRUD operations on transfers
+- **TRANSFER_AND_TEMPLATE_MANAGEMENT**: Full CRUD operations on transfers, templates, and PDF imports
 - **TRANSFER_VIEW**: View transfers only
 - **BATCH_MANAGEMENT**: Full CRUD operations on batches
 - **BATCH_VIEW**: View batches only
@@ -92,6 +92,76 @@ The system implements a sophisticated **two-layer permission architecture**:
 - Companies can enable/disable features independently
 - Admin users can force logout other users for security
 - Complete audit trail for feature enablement and user actions
+
+### Frontend Permission System
+
+The frontend implements comprehensive permission-based UI rendering using the `usePermissions` hook:
+
+#### Permission Hook (`frontend/src/hooks/usePermissions.ts`)
+```typescript
+export const usePermissions = () => {
+  const { state } = useAuth();
+  const enabledFeatures = state.currentCompany?.enabled_features || [];
+  const userRole = state.currentCompany?.user_role || 'USER';
+  
+  const hasFeature = (featureCode: string): boolean => {
+    return enabledFeatures.includes(featureCode);
+  };
+  
+  const hasPermission = (featureCode: string, action: 'view' | 'manage' = 'view'): boolean => {
+    if (!hasFeature(featureCode)) return false;
+    if (userRole === 'ADMIN') return true;
+    
+    if (action === 'manage') {
+      switch (featureCode) {
+        case 'TRANSFER_AND_TEMPLATE_MANAGEMENT':
+          return ['ADMIN', 'FINANCIAL'].includes(userRole);
+        case 'BENEFICIARY_MANAGEMENT':
+          return ['ADMIN', 'FINANCIAL'].includes(userRole);
+        case 'BATCH_MANAGEMENT':
+          return userRole === 'ADMIN';
+        // ... more role checks
+      }
+    }
+    return true; // View access allowed if feature enabled
+  };
+  
+  return {
+    // Convenience methods for UI components
+    canViewBeneficiaries: hasFeature('BENEFICIARY_VIEW') || hasFeature('BENEFICIARY_MANAGEMENT'),
+    canManageBeneficiaries: hasPermission('BENEFICIARY_MANAGEMENT', 'manage'),
+    canViewTransfers: hasFeature('TRANSFER_VIEW') || hasFeature('TRANSFER_AND_TEMPLATE_MANAGEMENT'),
+    canManageTransfers: hasPermission('TRANSFER_AND_TEMPLATE_MANAGEMENT', 'manage'),
+    canAccessPDFImport: hasPermission('TRANSFER_AND_TEMPLATE_MANAGEMENT', 'manage'),
+    // ... more permission checks
+  };
+};
+```
+
+#### Menu-Level Security (Sidebar.tsx)
+Navigation items are filtered based on user permissions:
+```typescript
+navigation.filter(item => {
+  if (!item.requiredPermission) return true;
+  return permissions[item.requiredPermission] === true;
+})
+```
+
+#### Action Button Security (Implementation Pattern)
+Components should conditionally render action buttons based on permissions:
+```typescript
+const permissions = usePermissions();
+
+// Only show Add button if user can manage beneficiaries
+{permissions.canManageBeneficiaries && (
+  <Button startIcon={<AddIcon />}>Add Beneficiary</Button>
+)}
+
+// Show edit/delete actions only for management permissions
+{permissions.canManageBeneficiaries ? (
+  <IconButton onClick={handleEdit}><EditIcon /></IconButton>
+) : null}
+```
 
 ## Database Documentation
 
@@ -152,18 +222,21 @@ cd backend
 # Install dependencies (first time)
 pip install -r requirements.txt
 
+# IMPORTANT: Always activate virtual environment before running Python commands
+source venv/bin/activate
+
 # Database migrations
-python manage.py makemigrations
-python manage.py migrate
+source venv/bin/activate && python manage.py makemigrations
+source venv/bin/activate && python manage.py migrate
 
 # Run development server on port 8002
-python manage.py runserver 8002
+source venv/bin/activate && python manage.py runserver 8002
 
 # Create superuser
-python manage.py createsuperuser
+source venv/bin/activate && python manage.py createsuperuser
 
 # Collect static files
-python manage.py collectstatic
+source venv/bin/activate && python manage.py collectstatic
 ```
 
 ### Frontend
@@ -236,7 +309,7 @@ All ViewSets use **two-layer permission checking**:
 
 **Example Permission Classes**:
 - `RequiresBeneficiaryManagement`: Needs `BENEFICIARY_MANAGEMENT` feature + appropriate role
-- `RequiresTransferManagement`: Needs `TRANSFER_MANAGEMENT` feature + appropriate role
+- `RequiresTransferAndTemplateManagement`: Needs `TRANSFER_AND_TEMPLATE_MANAGEMENT` feature + appropriate role
 - `RequiresExportGeneration`: Needs export features (`EXPORT_XML_SEPA`, `EXPORT_CSV_KH`) + appropriate role
 
 ### Key API Endpoints
@@ -250,11 +323,11 @@ All ViewSets use **two-layer permission checking**:
 - `POST /api/auth/force_logout/`: Admin force logout other users
 
 #### Core Business Operations  
-- `POST /api/transfers/bulk_create/`: Bulk transfer creation - **Requires TRANSFER_MANAGEMENT**
+- `POST /api/transfers/bulk_create/`: Bulk transfer creation - **Requires TRANSFER_AND_TEMPLATE_MANAGEMENT**
 - `POST /api/transfers/generate_xml/`: XML file generation - **Requires EXPORT_XML_SEPA**
 - `POST /api/transfers/generate_csv/`: CSV file generation - **Requires EXPORT_CSV_KH**
-- `POST /api/templates/{id}/load_transfers/`: Generate transfers from template - **Requires TRANSFER_MANAGEMENT**
-- `POST /api/import/excel/`: Import beneficiaries from Excel files - **Requires BULK_OPERATIONS**
+- `POST /api/templates/{id}/load_transfers/`: Generate transfers from template - **Requires TRANSFER_AND_TEMPLATE_MANAGEMENT**
+- `POST /api/import/excel/`: Import beneficiaries from Excel files - **Requires TRANSFER_AND_TEMPLATE_MANAGEMENT**
 
 ## Export Generation
 

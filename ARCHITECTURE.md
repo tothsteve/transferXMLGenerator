@@ -14,13 +14,14 @@ Transfer Generator is a multi-tenant Django + React application designed for Hun
 │                 │    │                 │    │   (Railway)     │    │   (Hungary)     │
 │ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │
 │ │Auth Context │ │◄──►│ │JWT Auth     │ │    │ │Company Data │ │    │ │Invoice API  │ │
-│ └─────────────┘ │    │ └─────────────┘ │    │ └─────────────┘ │    │ └─────────────┘ │
-│ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │
-│ │Company      │ │◄──►│ │Company      │ │◄──►│ │User Data    │ │    │ │Tax Authority│ │
-│ │Context      │ │    │ │Middleware   │ │    │ └─────────────┘ │    │ │Integration  │ │
-│ └─────────────┘ │    │ └─────────────┘ │    │ ┌─────────────┐ │    │ └─────────────┘ │
-│ ┌─────────────┐ │    │ ┌─────────────┐ │    │ │Transfer     │ │    └─────────────────┘
-│ │Business     │ │◄──►│ │Business     │ │◄──►│ │Data         │ │             ▲
+│ │+ Features   │ │    │ │+ Features   │ │    │ │+ Permissions│ │    │ └─────────────┘ │
+│ └─────────────┘ │    │ └─────────────┘ │    │ └─────────────┘ │    │ ┌─────────────┐ │
+│ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │    │ │Tax Authority│ │
+│ │Permission   │ │◄──►│ │Permission   │ │◄──►│ │User Roles   │ │    │ │Integration  │ │
+│ │System       │ │    │ │Middleware   │ │    │ └─────────────┘ │    │ └─────────────┘ │
+│ └─────────────┘ │    │ └─────────────┘ │    │ ┌─────────────┐ │    └─────────────────┘
+│ ┌─────────────┐ │    │ ┌─────────────┐ │    │ │Transfer     │ │             ▲
+│ │Business     │ │◄──►│ │Business     │ │◄──►│ │Data         │ │             │
 │ │Components   │ │    │ │Logic        │ │    │ └─────────────┘ │             │
 │ └─────────────┘ │    │ └─────────────┘ │    │ ┌─────────────┐ │             │
 │                 │    │ ┌─────────────┐ │    │ │NAV Invoice  │ │             │
@@ -121,12 +122,60 @@ TransferBatch(company, created_at, xml_content, file_name)
 
 ### Permission System
 
+#### Two-Layer Architecture
+The system implements **feature-based permissions** combined with **role-based access control**:
+
 ```python
-# Role-based permissions
+# Layer 1: Company Feature Enablement
+- FeatureTemplate: Master catalog of available features (15 features)
+- CompanyFeature: Which features are enabled per company
+- Categories: EXPORT, SYNC, TRACKING, REPORTING, INTEGRATION, GENERAL
+
+# Layer 2: Role-Based Access Control  
+- ADMIN: Full access to all enabled company features
+- FINANCIAL: Transfer operations, beneficiary management, exports
+- ACCOUNTANT: Invoice/expense management (NAV integration)
+- USER: Read-only access to basic features
+```
+
+#### Permission Classes
+```python
+# Feature-Based Permissions (New)
+- RequireTransferAndTemplateManagement: Transfers, templates, PDF imports
+- RequireBeneficiaryManagement: Full beneficiary CRUD operations
+- RequireBatchManagement: Transfer batch operations (admin only)
+- RequireNavSync: NAV invoice synchronization
+- RequireExportFeatures: XML/CSV export generation
+
+# Legacy Permissions (Still Used)
 - IsAuthenticated: All authenticated endpoints
-- IsCompanyAdmin: User management, company settings
-- IsCompanyMember: Company-scoped data access
-- HasCompanyAccess: Validates company membership
+- IsCompanyAdmin: User management, force logout
+- IsCompanyMember: Company-scoped data access validation
+```
+
+#### Current Active Features
+```python
+# Auto-enabled for new companies (7 features)
+EXPORT_XML_SEPA             # SEPA XML generation
+EXPORT_CSV_KH               # KH Bank CSV export
+BENEFICIARY_MANAGEMENT      # Full beneficiary CRUD
+BENEFICIARY_VIEW           # Read-only beneficiary access
+TRANSFER_AND_TEMPLATE_MANAGEMENT  # Transfers + templates + PDF import
+TRANSFER_VIEW              # Read-only transfer access
+BATCH_MANAGEMENT           # Transfer batch operations
+BATCH_VIEW                 # Read-only batch access
+
+# Manual activation required (8 features)
+NAV_SYNC                   # Requires NAV API credentials
+EXPORT_CSV_CUSTOM          # Custom CSV formats
+EXPENSE_TRACKING           # Business expense management (planned)
+INVOICE_MANAGEMENT         # Manual invoice entries (planned)
+BANK_STATEMENT_IMPORT      # Bank reconciliation (planned)
+MULTI_CURRENCY             # USD/EUR support (planned)
+REPORTING                  # Advanced reports (planned)
+API_ACCESS                 # External API access (planned)
+WEBHOOK_NOTIFICATIONS      # Webhook system (planned)
+BULK_OPERATIONS           # Bulk import/export (planned)
 ```
 
 ## Frontend Architecture (React + TypeScript)
@@ -151,7 +200,8 @@ src/
 ├── contexts/                # React contexts
 │   └── AuthContext.tsx      # Authentication state
 ├── hooks/                   # Custom React hooks
-│   └── useAuth.ts          # Authentication hooks
+│   ├── useAuth.ts          # Authentication hooks
+│   └── usePermissions.ts   # Feature-based permission checks
 ├── services/               # API service layer
 │   └── api.ts              # API client
 └── utils/                  # Utility functions
@@ -160,8 +210,16 @@ src/
 
 ### State Management
 
-#### Authentication Context
+#### Authentication Context (Updated)
 ```typescript
+interface Company {
+  id: number;
+  name: string;
+  tax_id: string;
+  user_role: 'ADMIN' | 'FINANCIAL' | 'ACCOUNTANT' | 'USER';
+  enabled_features: string[];  // New: Features enabled for this company
+}
+
 interface AuthState {
   isAuthenticated: boolean;
   user: User | null;
@@ -172,6 +230,46 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
 }
+```
+
+#### Frontend Permission System (New)
+```typescript
+// usePermissions Hook - Two-layer permission checking
+const usePermissions = () => {
+  const enabledFeatures = currentCompany?.enabled_features || [];
+  const userRole = currentCompany?.user_role || 'USER';
+  
+  return {
+    // Feature checks
+    hasFeature: (code: string) => enabledFeatures.includes(code),
+    
+    // Permission checks (feature + role)
+    canViewBeneficiaries: hasFeature('BENEFICIARY_VIEW') || hasFeature('BENEFICIARY_MANAGEMENT'),
+    canManageBeneficiaries: hasPermission('BENEFICIARY_MANAGEMENT', 'manage'),
+    canViewTransfers: hasFeature('TRANSFER_VIEW') || hasFeature('TRANSFER_AND_TEMPLATE_MANAGEMENT'),
+    canManageTransfers: hasPermission('TRANSFER_AND_TEMPLATE_MANAGEMENT', 'manage'),
+    canAccessPDFImport: hasPermission('TRANSFER_AND_TEMPLATE_MANAGEMENT', 'manage'),
+    
+    // User context
+    userRole,
+    enabledFeatures,
+    isAdmin: userRole === 'ADMIN'
+  };
+};
+
+// Usage in components
+const permissions = usePermissions();
+
+// Menu visibility (Sidebar.tsx)
+navigation.filter(item => {
+  if (!item.requiredPermission) return true;
+  return permissions[item.requiredPermission] === true;
+});
+
+// Action button visibility (Planned)
+{permissions.canManageBeneficiaries && (
+  <Button startIcon={<AddIcon />}>Új kedvezményezett</Button>
+)}
 ```
 
 #### Component Flow

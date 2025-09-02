@@ -24,7 +24,7 @@ from .serializers import (
 from .utils import generate_xml
 from .pdf_processor import PDFTransactionProcessor
 from .kh_export import KHBankExporter
-from .permissions import IsCompanyMember, IsCompanyAdmin, IsCompanyAdminOrReadOnly, RequireBeneficiaryManagement, RequireTransferManagement, RequireBatchManagement, RequireNavSync, RequireExportFeatures, require_feature_api
+from .permissions import IsCompanyMember, IsCompanyAdmin, IsCompanyAdminOrReadOnly, RequireBeneficiaryManagement, RequireTransferManagement, RequireTransferAndTemplateManagement, RequireBatchManagement, RequireNavSync, RequireExportFeatures, require_feature_api
 from .services.bank_account_service import BankAccountService
 from .services.beneficiary_service import BeneficiaryService
 from .services.template_service import TemplateService
@@ -148,7 +148,7 @@ class TransferTemplateViewSet(viewsets.ModelViewSet):
     gyors betöltését és ismételt használatát.
     """
     serializer_class = TransferTemplateSerializer
-    permission_classes = [IsAuthenticated, IsCompanyMember]
+    permission_classes = [IsAuthenticated, IsCompanyMember, RequireTransferAndTemplateManagement]
     
     def get_queryset(self):
         if not hasattr(self.request, 'company') or not self.request.company:
@@ -582,7 +582,7 @@ class ExcelImportView(APIView):
     - Csak a Név és Számlaszám kötelező
     """
     parser_classes = [MultiPartParser]
-    permission_classes = [IsAuthenticated, IsCompanyMember]
+    permission_classes = [IsAuthenticated, IsCompanyMember, RequireTransferAndTemplateManagement]
     
     @swagger_auto_schema(
         operation_description="Excel fájl feltöltése kedvezményezettek importálásához",

@@ -6,7 +6,8 @@ export interface Company {
   id: number;
   name: string;
   tax_id: string;
-  user_role: 'ADMIN' | 'USER';
+  user_role: 'ADMIN' | 'FINANCIAL' | 'ACCOUNTANT' | 'USER';
+  enabled_features: string[];
 }
 
 export interface User {

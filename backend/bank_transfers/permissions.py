@@ -256,8 +256,8 @@ class RequireTransferManagement(FeatureBasedPermission):
         
         # Check for write operations vs read operations
         if request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
-            # Write operations require TRANSFER_MANAGEMENT
-            required_feature = 'TRANSFER_MANAGEMENT'
+            # Write operations require TRANSFER_AND_TEMPLATE_MANAGEMENT
+            required_feature = 'TRANSFER_AND_TEMPLATE_MANAGEMENT'
             
             # Check both company feature enablement AND user role permission
             return (
@@ -267,17 +267,21 @@ class RequireTransferManagement(FeatureBasedPermission):
         else:
             # Read operations - allow either management or view-only
             company_has_feature = (
-                FeatureChecker.is_feature_enabled(request.company, 'TRANSFER_MANAGEMENT') or
+                FeatureChecker.is_feature_enabled(request.company, 'TRANSFER_AND_TEMPLATE_MANAGEMENT') or
                 FeatureChecker.is_feature_enabled(request.company, 'TRANSFER_VIEW')
             )
             
             user_has_permission = (
-                'TRANSFER_MANAGEMENT' in user_allowed_features or
+                'TRANSFER_AND_TEMPLATE_MANAGEMENT' in user_allowed_features or
                 'TRANSFER_VIEW' in user_allowed_features or
                 '*' in user_allowed_features
             )
             
             return company_has_feature and user_has_permission
+
+
+# Alias for cleaner naming
+RequireTransferAndTemplateManagement = RequireTransferManagement
 
 
 class RequireBatchManagement(FeatureBasedPermission):

@@ -24,6 +24,7 @@ import {
   Description as TemplateIcon
 } from '@mui/icons-material';
 import { TransferTemplate } from '../../types/api';
+import { usePermissions } from '../../hooks/usePermissions';
 
 interface TemplateListProps {
   templates: TransferTemplate[];
@@ -42,6 +43,8 @@ const TemplateList: React.FC<TemplateListProps> = ({
   onView,
   onLoadTemplate,
 }) => {
+  const permissions = usePermissions();
+  
   if (isLoading) {
     return (
       <Box 
@@ -205,35 +208,51 @@ const TemplateList: React.FC<TemplateListProps> = ({
 
           </CardContent>
           <CardActions sx={{ p: 3, pt: 0 }}>
-            <Button
-              variant="contained"
-              startIcon={<PlayIcon />}
-              onClick={() => onLoadTemplate(template.id)}
-              disabled={!template.is_active}
-              sx={{ 
-                flex: 1,
-                borderRadius: 2,
-                background: template.is_active 
-                  ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)'
-                  : 'linear-gradient(135deg, #9ca3af 0%, #d1d5db 100%)',
-                boxShadow: template.is_active 
-                  ? '0 4px 12px rgba(5, 150, 105, 0.3)'
-                  : 'none',
-                color: template.is_active ? 'white' : '#6b7280',
-                '&:hover': template.is_active ? {
-                  background: 'linear-gradient(135deg, #047857 0%, #059669 100%)',
-                  transform: 'translateY(-1px)',
-                  boxShadow: '0 6px 16px rgba(5, 150, 105, 0.4)',
-                } : {},
-                '&:disabled': {
-                  background: 'linear-gradient(135deg, #9ca3af 0%, #d1d5db 100%)',
+            {permissions.canManageTransfers ? (
+              <Button
+                variant="contained"
+                startIcon={<PlayIcon />}
+                onClick={() => onLoadTemplate(template.id)}
+                disabled={!template.is_active}
+                sx={{ 
+                  flex: 1,
+                  borderRadius: 2,
+                  background: template.is_active 
+                    ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)'
+                    : 'linear-gradient(135deg, #9ca3af 0%, #d1d5db 100%)',
+                  boxShadow: template.is_active 
+                    ? '0 4px 12px rgba(5, 150, 105, 0.3)'
+                    : 'none',
+                  color: template.is_active ? 'white' : '#6b7280',
+                  '&:hover': template.is_active ? {
+                    background: 'linear-gradient(135deg, #047857 0%, #059669 100%)',
+                    transform: 'translateY(-1px)',
+                    boxShadow: '0 6px 16px rgba(5, 150, 105, 0.4)',
+                  } : {},
+                  '&:disabled': {
+                    background: 'linear-gradient(135deg, #9ca3af 0%, #d1d5db 100%)',
+                    color: '#9ca3af',
+                    cursor: 'not-allowed'
+                  }
+                }}
+              >
+                {template.is_active ? 'Betöltés' : 'Inaktív'}
+              </Button>
+            ) : (
+              <Button
+                variant="outlined"
+                disabled
+                sx={{ 
+                  flex: 1,
+                  borderRadius: 2,
                   color: '#9ca3af',
+                  borderColor: '#d1d5db',
                   cursor: 'not-allowed'
-                }
-              }}
-            >
-              {template.is_active ? 'Betöltés' : 'Inaktív'}
-            </Button>
+                }}
+              >
+                Csak megtekintés
+              </Button>
+            )}
             <Stack direction="row" spacing={0.5}>
               <IconButton
                 onClick={() => onView(template)}
@@ -250,36 +269,40 @@ const TemplateList: React.FC<TemplateListProps> = ({
               >
                 <ViewIcon fontSize="small" />
               </IconButton>
-              <IconButton
-                onClick={() => onEdit(template)}
-                size="small"
-                title="Szerkesztés"
-                sx={{
-                  bgcolor: alpha('#d97706', 0.1),
-                  color: 'warning.main',
-                  '&:hover': {
-                    bgcolor: alpha('#d97706', 0.2),
-                    transform: 'scale(1.05)',
-                  }
-                }}
-              >
-                <EditIcon fontSize="small" />
-              </IconButton>
-              <IconButton
-                onClick={() => onDelete(template.id)}
-                size="small"
-                title="Törlés"
-                sx={{
-                  bgcolor: alpha('#dc2626', 0.1),
-                  color: 'error.main',
-                  '&:hover': {
-                    bgcolor: alpha('#dc2626', 0.2),
-                    transform: 'scale(1.05)',
-                  }
-                }}
-              >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
+              {permissions.canManageTemplates && (
+                <>
+                  <IconButton
+                    onClick={() => onEdit(template)}
+                    size="small"
+                    title="Szerkesztés"
+                    sx={{
+                      bgcolor: alpha('#d97706', 0.1),
+                      color: 'warning.main',
+                      '&:hover': {
+                        bgcolor: alpha('#d97706', 0.2),
+                        transform: 'scale(1.05)',
+                      }
+                    }}
+                  >
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton
+                    onClick={() => onDelete(template.id)}
+                    size="small"
+                    title="Törlés"
+                    sx={{
+                      bgcolor: alpha('#dc2626', 0.1),
+                      color: 'error.main',
+                      '&:hover': {
+                        bgcolor: alpha('#dc2626', 0.2),
+                        transform: 'scale(1.05)',
+                      }
+                    }}
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </>
+              )}
             </Stack>
           </CardActions>
         </Card>

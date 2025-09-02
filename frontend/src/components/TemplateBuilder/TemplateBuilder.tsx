@@ -27,6 +27,7 @@ import { TransferTemplate } from '../../types/api';
 import TemplateList from './TemplateList';
 import TemplateForm from './TemplateForm';
 import TemplateView from './TemplateView';
+import { usePermissions } from '../../hooks/usePermissions';
 
 interface TemplateFormData {
   name: string;
@@ -40,6 +41,7 @@ interface TemplateFormData {
 }
 
 const TemplateBuilder: React.FC = () => {
+  const permissions = usePermissions();
   const [showForm, setShowForm] = useState(false);
   const [showView, setShowView] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TransferTemplate | null>(null);
@@ -296,13 +298,15 @@ const TemplateBuilder: React.FC = () => {
                 </Stack>
               }
             />
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setShowForm(true)}
-            >
-              Új sablon
-            </Button>
+            {permissions.canManageTemplates && (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => setShowForm(true)}
+              >
+                Új sablon
+              </Button>
+            )}
           </Stack>
         </Stack>
       </Box>

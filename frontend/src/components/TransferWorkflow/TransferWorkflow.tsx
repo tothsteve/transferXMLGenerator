@@ -36,6 +36,7 @@ import TemplateSelector from './TemplateSelector';
 import TransferTable from './TransferTable';
 import AddTransferModal from './AddTransferModal';
 import XMLPreview from './XMLPreview';
+import { usePermissions } from '../../hooks/usePermissions';
 
 interface TransferData extends Omit<Transfer, 'id' | 'is_processed' | 'created_at'> {
   id?: number;
@@ -44,6 +45,7 @@ interface TransferData extends Omit<Transfer, 'id' | 'is_processed' | 'created_a
 }
 
 const TransferWorkflow: React.FC = () => {
+  const permissions = usePermissions();
   const location = useLocation();
   const [selectedTemplate, setSelectedTemplate] = useState<TransferTemplate | null>(null);
   const [transfers, setTransfers] = useState<TransferData[]>([]);
@@ -599,47 +601,51 @@ const TransferWorkflow: React.FC = () => {
               </Typography>
             </Box>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-              <Button
-                variant="contained"
-                color="success"
-                startIcon={<DownloadIcon />}
-                onClick={handleGenerateXML}
-                disabled={isGenerating || transfers.length === 0}
-                sx={{ 
-                  minWidth: 160,
-                  background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
-                  boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)',
-                  '&:hover': {
-                    background: 'linear-gradient(135deg, #047857 0%, #059669 100%)',
-                    transform: 'translateY(-1px)',
-                    boxShadow: '0 6px 16px rgba(5, 150, 105, 0.4)',
-                  }
-                }}
-              >
-                {bulkCreateMutation.isPending ? 'Új átutalások mentése...' : 
-                 bulkUpdateMutation.isPending ? 'Változások mentése...' :
-                 generateXmlMutation.isPending ? 'Generálás...' : 
-                 'Generálás'}
-              </Button>
-              <Button
-                variant="contained"
-                color="primary"
-                startIcon={<DownloadIcon />}
-                onClick={handleGenerateKHExport}
-                disabled={isGenerating || transfers.length === 0}
-                sx={{ 
-                  minWidth: 160,
-                  background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
-                  boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)',
-                  '&:hover': {
-                    background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)',
-                    transform: 'translateY(-1px)',
-                    boxShadow: '0 6px 16px rgba(25, 118, 210, 0.4)',
-                  }
-                }}
-              >
-                {generateKHExportMutation.isPending ? 'KH Export...' : 'KH Bank Export'}
-              </Button>
+              {permissions.canExportXML && (
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={<DownloadIcon />}
+                  onClick={handleGenerateXML}
+                  disabled={isGenerating || transfers.length === 0}
+                  sx={{ 
+                    minWidth: 160,
+                    background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                    boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #047857 0%, #059669 100%)',
+                      transform: 'translateY(-1px)',
+                      boxShadow: '0 6px 16px rgba(5, 150, 105, 0.4)',
+                    }
+                  }}
+                >
+                  {bulkCreateMutation.isPending ? 'Új átutalások mentése...' : 
+                   bulkUpdateMutation.isPending ? 'Változások mentése...' :
+                   generateXmlMutation.isPending ? 'Generálás...' : 
+                   'Generálás'}
+                </Button>
+              )}
+              {permissions.canExportCSV && (
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<DownloadIcon />}
+                  onClick={handleGenerateKHExport}
+                  disabled={isGenerating || transfers.length === 0}
+                  sx={{ 
+                    minWidth: 160,
+                    background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+                    boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)',
+                      transform: 'translateY(-1px)',
+                      boxShadow: '0 6px 16px rgba(25, 118, 210, 0.4)',
+                    }
+                  }}
+                >
+                  {generateKHExportMutation.isPending ? 'KH Export...' : 'KH Bank Export'}
+                </Button>
+              )}
             </Stack>
           </Stack>
         </Box>

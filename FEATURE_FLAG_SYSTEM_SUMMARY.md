@@ -36,9 +36,13 @@ Successfully implemented a comprehensive **two-layer permission architecture** c
 | Role | Beneficiaries | Transfers | Templates | Batches | NAV Invoices | Exports |
 |------|---------------|-----------|-----------|---------|---------------|---------|
 | **ADMIN** | Full CRUD | Full CRUD | Full CRUD | Full CRUD | Full CRUD | All formats |
-| **FINANCIAL** | Full CRUD | Full CRUD | Full CRUD | View only | View only | SEPA XML |
+| **FINANCIAL** | Full CRUD | Full CRUD | Full CRUD | View only | View only | SEPA XML/CSV |
 | **ACCOUNTANT** | View only | View only | View only | View only | Full CRUD | None |
 | **USER** | View only | View only | View only | View only | View only | None |
+
+**Updated Feature**: `TRANSFER_MANAGEMENT` → `TRANSFER_AND_TEMPLATE_MANAGEMENT`
+- **Unified Permission**: Templates, transfers, and PDF imports now share the same permission
+- **Logical Grouping**: Templates are "transfer creation tools" so they follow transfer permissions
 
 ---
 
@@ -119,6 +123,60 @@ All core ViewSets now use feature checking:
 
 ### **6. General Features (1)**
 - **`BULK_OPERATIONS`**: Bulk import/export operations (Excel, CSV)
+
+---
+
+## 🎨 **FRONTEND PERMISSION SYSTEM**
+
+### **React TypeScript Implementation**
+
+#### Updated Company Interface
+```typescript
+interface Company {
+  id: number;
+  name: string;
+  tax_id: string;
+  user_role: 'ADMIN' | 'FINANCIAL' | 'ACCOUNTANT' | 'USER';
+  enabled_features: string[];  // Features enabled for this company
+}
+```
+
+#### Permission Hook (`usePermissions`)
+- **Two-layer checking**: Company features + user role permissions
+- **Convenience methods**: Pre-computed permission checks for common operations
+- **Type safety**: Full TypeScript integration with feature codes
+
+```typescript
+const {
+  canViewBeneficiaries,     // BENEFICIARY_VIEW or BENEFICIARY_MANAGEMENT
+  canManageBeneficiaries,   // BENEFICIARY_MANAGEMENT + ADMIN/FINANCIAL role
+  canViewTransfers,         // TRANSFER_VIEW or TRANSFER_AND_TEMPLATE_MANAGEMENT  
+  canManageTransfers,       // TRANSFER_AND_TEMPLATE_MANAGEMENT + ADMIN/FINANCIAL role
+  canAccessPDFImport,       // TRANSFER_AND_TEMPLATE_MANAGEMENT + ADMIN/FINANCIAL role
+  userRole,
+  enabledFeatures
+} = usePermissions();
+```
+
+#### Menu-Level Security (Sidebar)
+- **Conditional rendering**: Menu items only appear if user has required permissions
+- **Performance optimized**: Single permission check per menu item
+- **User experience**: Clean interface showing only accessible features
+
+**Menu Visibility Logic:**
+| Menu Item | Required Permission | Visible When |
+|-----------|-------------------|--------------|
+| Kedvezményezettek | `canViewBeneficiaries` | BENEFICIARY features enabled |
+| Sablonok | `canViewTemplates` | TRANSFER features enabled |
+| PDF Importálás | `canAccessPDFImport` | TRANSFER_AND_TEMPLATE_MANAGEMENT + ADMIN/FINANCIAL |
+| Átutalások | `canViewTransfers` | TRANSFER features enabled |
+| Kötegek | `canViewBatches` | BATCH features enabled |
+| NAV Számlák | `canAccessNavInvoices` | NAV_SYNC enabled |
+
+#### Action Button Security (Planned)
+- **Component-level permissions**: Add/Edit/Delete buttons conditional on manage permissions
+- **Graceful degradation**: View-only mode for users without management rights
+- **Consistent UX**: Permission-denied states handled uniformly
 
 ---
 

@@ -31,8 +31,10 @@ import { Beneficiary } from '../../types/api';
 import BeneficiaryTable from './BeneficiaryTable';
 import BeneficiaryForm from './BeneficiaryForm';
 import ExcelImport from './ExcelImport';
+import { usePermissions } from '../../hooks/usePermissions';
 
 const BeneficiaryManager: React.FC = () => {
+  const permissions = usePermissions();
   const [searchTerm, setSearchTerm] = useState('');
   const [showActive, setShowActive] = useState<boolean | undefined>();
   const [showFrequent, setShowFrequent] = useState<boolean | undefined>();
@@ -161,20 +163,24 @@ const BeneficiaryManager: React.FC = () => {
             </Typography>
           </Box>
           <Stack direction="row" spacing={2}>
-            <Button
-              variant="outlined"
-              startIcon={<UploadIcon />}
-              onClick={() => setShowImport(true)}
-            >
-              Excel importálás
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setShowForm(true)}
-            >
-              Új kedvezményezett
-            </Button>
+            {permissions.canManageBeneficiaries && (
+              <Button
+                variant="outlined"
+                startIcon={<UploadIcon />}
+                onClick={() => setShowImport(true)}
+              >
+                Excel importálás
+              </Button>
+            )}
+            {permissions.canManageBeneficiaries && (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => setShowForm(true)}
+              >
+                Új kedvezményezett
+              </Button>
+            )}
           </Stack>
         </Stack>
       </Box>

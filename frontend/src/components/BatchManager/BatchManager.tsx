@@ -35,8 +35,10 @@ import {
   useDownloadBatchXml,
 } from '../../hooks/api';
 import { TransferBatch } from '../../types/api';
+import { usePermissions } from '../../hooks/usePermissions';
 
 const BatchManager: React.FC = () => {
+  const permissions = usePermissions();
   const [downloadingBatchId, setDownloadingBatchId] = useState<number | null>(null);
   const { data: batchesData, isLoading, error } = useBatches();
   const markUsedMutation = useMarkBatchUsedInBank();
@@ -236,20 +238,30 @@ const BatchManager: React.FC = () => {
                           </span>
                         </Tooltip>
                         
-                        <Tooltip title={batch.used_in_bank ? 'Nem felhasználtként jelölés' : 'Felhasználtként jelölés'}>
-                          <FormControlLabel
-                            control={
-                              <Switch
-                                checked={batch.used_in_bank}
-                                onChange={() => handleUsageToggle(batch)}
-                                disabled={markUsedMutation.isPending || markUnusedMutation.isPending}
-                                size="small"
-                              />
-                            }
-                            label=""
-                            sx={{ m: 0 }}
+                        {permissions.canManageBatches ? (
+                          <Tooltip title={batch.used_in_bank ? 'Nem felhasználtként jelölés' : 'Felhasználtként jelölés'}>
+                            <FormControlLabel
+                              control={
+                                <Switch
+                                  checked={batch.used_in_bank}
+                                  onChange={() => handleUsageToggle(batch)}
+                                  disabled={markUsedMutation.isPending || markUnusedMutation.isPending}
+                                  size="small"
+                                />
+                              }
+                              label=""
+                              sx={{ m: 0 }}
+                            />
+                          </Tooltip>
+                        ) : (
+                          <Chip
+                            icon={batch.used_in_bank ? <CheckCircleIcon /> : <AccessTimeIcon />}
+                            label={batch.used_in_bank ? 'Felhasználva' : 'Várakozik'}
+                            color={batch.used_in_bank ? 'success' : 'warning'}
+                            variant="outlined"
+                            size="small"
                           />
-                        </Tooltip>
+                        )}
                       </Stack>
                     </TableCell>
                   </TableRow>

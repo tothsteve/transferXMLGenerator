@@ -113,10 +113,11 @@ class CustomTokenObtainPairSerializer(serializers.Serializer):
 class CompanySerializer(serializers.ModelSerializer):
     """Cég serializer"""
     user_role = serializers.SerializerMethodField()
+    enabled_features = serializers.SerializerMethodField()
     
     class Meta:
         model = Company
-        fields = ['id', 'name', 'tax_id', 'user_role']
+        fields = ['id', 'name', 'tax_id', 'user_role', 'enabled_features']
     
     def get_user_role(self, obj):
         user = self.context.get('user')
@@ -124,6 +125,15 @@ class CompanySerializer(serializers.ModelSerializer):
             membership = CompanyUser.objects.filter(user=user, company=obj).first()
             return membership.role if membership else None
         return None
+    
+    def get_enabled_features(self, obj):
+        """Get list of enabled features for this company"""
+        from .models import CompanyFeature
+        enabled_features = CompanyFeature.objects.filter(
+            company=obj,
+            is_enabled=True
+        ).values_list('feature_template__feature_code', flat=True)
+        return list(enabled_features)
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
