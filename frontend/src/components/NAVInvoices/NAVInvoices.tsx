@@ -264,7 +264,7 @@ const NAVInvoices: React.FC = () => {
     for (const invoice of selectedInvoiceObjects) {
       const hasAccountNumber = invoice.supplier_bank_account_number && invoice.supplier_bank_account_number.trim() !== '';
       const hasAmount = invoice.invoice_gross_amount && invoice.invoice_gross_amount > 0;
-      const hasPartnerName = invoice.partner_name && invoice.partner_name.trim() !== '';
+      const hasPartnerName = (invoice.partner_name && invoice.partner_name.trim() !== '') || (invoice.supplier_name && invoice.supplier_name.trim() !== '');
       
       if (hasAccountNumber && hasAmount && hasPartnerName) {
         validInvoices.push(invoice);
@@ -295,7 +295,7 @@ const NAVInvoices: React.FC = () => {
     // Create transfer data structure compatible with TransferWorkflow
     const transfersData = validInvoices.map((invoice, index) => ({
       beneficiary_id: null, // Will need to be set manually or matched
-      beneficiary_name: invoice.partner_name,
+      beneficiary_name: invoice.partner_name || invoice.supplier_name,
       account_number: invoice.supplier_bank_account_number!,
       amount: Math.floor(invoice.invoice_gross_amount).toString(), // Convert to int as requested
       currency: invoice.currency_code === 'HUF' ? 'HUF' : invoice.currency_code,
