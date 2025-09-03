@@ -90,8 +90,8 @@ class TransferSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'originator_account', 'originator_account_id',
             'beneficiary', 'beneficiary_id', 'amount', 'currency',
-            'execution_date', 'remittance_info', 'template', 'order',
-            'is_processed', 'notes', 'created_at', 'updated_at'
+            'execution_date', 'remittance_info', 'template', 'nav_invoice',
+            'order', 'is_processed', 'notes', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
 
@@ -212,7 +212,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'customer_tax_number', 'issue_date', 'issue_date_formatted', 'fulfillment_date',
             'payment_due_date', 'currency_code', 'invoice_net_amount', 'invoice_vat_amount',
             'invoice_gross_amount', 'invoice_gross_amount_formatted', 'sync_status',
-            'sync_status_display', 'line_items', 'line_items_count', 'created_at', 'updated_at'
+            'sync_status_display', 'line_items', 'line_items_count', 'payment_status',
+            'payment_status_date', 'auto_marked_paid', 'created_at', 'updated_at'
         ]
         read_only_fields = ['__all__']
     

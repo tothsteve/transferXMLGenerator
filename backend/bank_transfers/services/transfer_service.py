@@ -200,10 +200,36 @@ class TransferBatchService:
     
     @staticmethod
     def mark_batch_as_used(batch):
-        """Mark batch as used in bank"""
+        """Mark batch as used in bank and auto-mark linked NAV invoices as paid"""
         batch.used_in_bank = True
         batch.bank_usage_date = timezone.now()
         batch.save()
+        
+        # Auto-mark linked NAV invoices as paid
+        updated_invoices = []
+        
+        try:
+            with transaction.atomic():
+                # Get all transfers in this batch that have linked NAV invoices
+                transfers_with_invoices = batch.transfers.filter(
+                    nav_invoice__isnull=False
+                ).select_related('nav_invoice')
+                
+                for transfer in transfers_with_invoices:
+                    invoice = transfer.nav_invoice
+                    # Only auto-mark unpaid invoices
+                    if invoice.payment_status == 'UNPAID':
+                        invoice.mark_as_paid(
+                            payment_date=batch.bank_usage_date.date() if batch.bank_usage_date else timezone.now().date(),
+                            auto_marked=True
+                        )
+                        updated_invoices.append(invoice)
+                        
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to update NAV invoices for batch {batch.id}: {e}")
+        
         return batch
     
     @staticmethod

@@ -496,7 +496,7 @@ class TransferViewSet(viewsets.ModelViewSet):
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class TransferBatchViewSet(viewsets.ReadOnlyModelViewSet):
+class TransferBatchViewSet(viewsets.ModelViewSet):
     """
     Utalási kötegek megtekintése
     
@@ -571,6 +571,44 @@ class TransferBatchViewSet(viewsets.ReadOnlyModelViewSet):
             'used_in_bank': batch.used_in_bank,
             'bank_usage_date': batch.bank_usage_date
         })
+    
+    @swagger_auto_schema(
+        operation_description="Utalási köteg törlése (csak akkor engedélyezett, ha nincs bankban felhasználva)",
+        responses={
+            204: 'Batch successfully deleted',
+            400: 'Batch cannot be deleted - already used in bank',
+            404: 'Batch not found'
+        }
+    )
+    def destroy(self, request, *args, **kwargs):
+        """
+        Utalási köteg törlése
+        
+        A törlés csak akkor engedélyezett, ha a köteg nincs még bankban felhasználva.
+        
+        Megjegyzés: A jogosultság ellenőrzést a RequireBatchManagement permission osztály végzi,
+        amely biztosítja, hogy csak BATCH_MANAGEMENT jogosultsággal rendelkező felhasználók
+        törölhessenek kötegeket (BATCH_VIEW jogosultság nem elég).
+        """
+        batch = self.get_object()
+        
+        # Check if batch has been used in bank
+        if batch.used_in_bank:
+            return Response({
+                'error': 'A köteg nem törölhető, mert már fel lett használva a bankban.',
+                'detail': 'Cannot delete batch that has been used in bank.',
+                'used_in_bank': True,
+                'bank_usage_date': batch.bank_usage_date
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Batch can be safely deleted
+        batch_name = batch.name
+        batch.delete()
+        
+        return Response({
+            'detail': f'A köteg "{batch_name}" sikeresen törölve.',
+            'message': f'Batch "{batch_name}" successfully deleted.'
+        }, status=status.HTTP_204_NO_CONTENT)
 
 class ExcelImportView(APIView):
     """
