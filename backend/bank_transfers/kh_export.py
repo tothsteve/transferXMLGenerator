@@ -204,6 +204,6 @@ class KHBankExporter:
             # Clean batch name for filename
             safe_name = "".join(c for c in batch_name if c.isalnum() or c in (' ', '_', '-')).strip()
             safe_name = safe_name.replace(' ', '_')
-            return f"{safe_name}_KH_{timestamp}.HUF.csv"
+            return f"{safe_name}_{timestamp}.HUF.csv"
         else:
             return f"KH_export_{timestamp}.HUF.csv"

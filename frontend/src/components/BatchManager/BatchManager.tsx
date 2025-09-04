@@ -27,12 +27,14 @@ import {
   AccessTime as AccessTimeIcon,
   Description as DescriptionIcon,
   SwapHoriz as SwapHorizIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import {
   useBatches,
   useMarkBatchUsedInBank,
   useMarkBatchUnusedInBank,
   useDownloadBatchXml,
+  useDeleteBatch,
 } from '../../hooks/api';
 import { TransferBatch } from '../../types/api';
 
@@ -42,6 +44,7 @@ const BatchManager: React.FC = () => {
   const markUsedMutation = useMarkBatchUsedInBank();
   const markUnusedMutation = useMarkBatchUnusedInBank();
   const downloadMutation = useDownloadBatchXml();
+  const deleteMutation = useDeleteBatch();
 
   const batches = batchesData?.results || [];
 
@@ -81,6 +84,19 @@ const BatchManager: React.FC = () => {
       console.error('Error downloading file:', error);
     } finally {
       setDownloadingBatchId(null);
+    }
+  };
+
+  const handleDelete = async (batch: TransferBatch) => {
+    if (!window.confirm(`Biztosan törölni szeretnéd a(z) "${batch.name}" köteget? Ez a művelet nem vonható vissza.`)) {
+      return;
+    }
+
+    try {
+      await deleteMutation.mutateAsync(batch.id);
+    } catch (error) {
+      console.error('Error deleting batch:', error);
+      alert('Hiba történt a köteg törlése során.');
     }
   };
 
@@ -232,6 +248,19 @@ const BatchManager: React.FC = () => {
                               ) : (
                                 <DownloadIcon />
                               )}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        
+                        <Tooltip title="Köteg törlése">
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleDelete(batch)}
+                              disabled={deleteMutation.isPending}
+                              color="error"
+                            >
+                              <DeleteIcon />
                             </IconButton>
                           </span>
                         </Tooltip>

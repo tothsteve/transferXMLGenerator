@@ -538,9 +538,9 @@ class Invoice(TimestampedModel):
     
     # Payment status tracking fields
     PAYMENT_STATUS_CHOICES = [
-        ('UNPAID', 'Nem fizetve'),
+        ('UNPAID', 'Fizetésre vár'),
+        ('PREPARED', 'Előkészítve'),
         ('PAID', 'Kifizetve'),
-        ('OVERDUE', 'Lejárt'),
     ]
     
     payment_status = models.CharField(
@@ -630,6 +630,14 @@ class Invoice(TimestampedModel):
         self.payment_status_date = payment_date or timezone.now().date()
         self.auto_marked_paid = auto_marked
         self.save()
+    
+    def mark_as_prepared(self, prepared_date=None):
+        """Mark invoice as prepared (transfer created)"""
+        from django.utils import timezone
+        self.payment_status = 'PREPARED'
+        self.payment_status_date = prepared_date or timezone.now().date()
+        self.auto_marked_paid = False
+        self.save()
         
     def mark_as_unpaid(self):
         """Mark invoice as unpaid (undo payment)"""
@@ -637,6 +645,18 @@ class Invoice(TimestampedModel):
         self.payment_status_date = None
         self.auto_marked_paid = False
         self.save()
+    
+    def is_overdue(self):
+        """Check if invoice is overdue (unpaid and past due date)"""
+        if self.payment_status != 'UNPAID':
+            return False
+        
+        if not self.payment_due_date:
+            return False
+            
+        from django.utils import timezone
+        today = timezone.now().date()
+        return self.payment_due_date < today
     
     def __str__(self):
         return f"{self.nav_invoice_number} - {self.supplier_name} ({self.invoice_direction})"

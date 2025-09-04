@@ -1,9 +1,9 @@
 # Database Schema Documentation
 ## Transfer XML Generator - Hungarian Banking System
 
-**Last Updated:** 2025-08-31  
+**Last Updated:** 2025-01-15  
 **Database:** PostgreSQL (Production on Railway) / SQL Server (Local Development)  
-**Schema Version:** Multi-Company Architecture with Feature Flags and Comprehensive NAV Integration (Migration 0028)  
+**Schema Version:** Multi-Company Architecture with Feature Flags and NAV Invoice Payment Status Tracking (Migration 0032)  
 
 > **Note:** This documentation is the **single source of truth** for database schema. All database comment scripts should be generated from this document.
 
@@ -482,6 +482,9 @@ The system implements a **multi-tenant architecture** where:
 | `nav_invoice_xml` | TEXT | | **Complete XML invoice data from NAV system** |
 | `nav_invoice_hash` | VARCHAR(200) | | Hash/checksum of invoice XML for integrity verification |
 | `ins_cus_user` | VARCHAR(100) | | NAV system user who inserted/modified the record |
+| `payment_status` | VARCHAR(20) | NOT NULL, DEFAULT 'UNPAID' | Payment status tracking: 'UNPAID', 'PREPARED', 'PAID' |
+| `payment_status_date` | DATE | NULL | Date when payment status was last changed |
+| `auto_marked_paid` | BOOLEAN | DEFAULT FALSE | Whether invoice was automatically marked as paid by batch processing |
 | `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Local creation timestamp |
 | `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last local modification timestamp |
 
@@ -492,15 +495,20 @@ The system implements a **multi-tenant architecture** where:
 - Index on `issue_date` for date-based filtering
 - Index on `direction` for inbound/outbound filtering
 - Index on `nav_transaction_id` for NAV transaction lookup
+- Index on `payment_status` for payment status filtering
 
 **Constraints:**
 - `currency` CHECK constraint: VALUES ('HUF', 'EUR', 'USD')
 - `direction` CHECK constraint: VALUES ('INBOUND', 'OUTBOUND')
+- `payment_status` CHECK constraint: VALUES ('UNPAID', 'PREPARED', 'PAID')
 
 **Business Rules:**
 - `nav_invoice_xml` contains the complete base64-decoded XML invoice data from NAV
 - Gross amounts are extracted from XML when available, otherwise calculated from net + VAT
 - Invoice numbers must be unique within company scope
+- **Payment Status Workflow**: UNPAID → PREPARED (when transfer created) → PAID (when batch marked as used in bank)
+- `payment_status_date` automatically updated when status changes
+- `auto_marked_paid` is TRUE when invoice is automatically marked as PAID during batch processing
 
 ---
 

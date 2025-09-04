@@ -6,6 +6,7 @@ import {
   bankAccountsApi,
   batchesApi,
   uploadApi,
+  navInvoicesApi,
 } from '../services/api';
 import {
   Beneficiary,
@@ -309,6 +310,40 @@ export function useDownloadBatchXml() {
       const response = await batchesApi.downloadXml(batchId);
       return response;
     },
+  });
+}
+
+export function useDeleteBatch() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (batchId: number) => batchesApi.delete(batchId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.batches });
+    },
+  });
+}
+
+// NAV Invoices Hooks
+export function useBulkMarkUnpaid() {
+  return useMutation({
+    mutationFn: (invoice_ids: number[]) => navInvoicesApi.bulkMarkUnpaid(invoice_ids),
+  });
+}
+
+export function useBulkMarkPrepared() {
+  return useMutation({
+    mutationFn: (invoice_ids: number[]) => navInvoicesApi.bulkMarkPrepared(invoice_ids),
+  });
+}
+
+export function useBulkMarkPaid() {
+  return useMutation({
+    mutationFn: (data: { 
+      invoice_ids?: number[], 
+      payment_date?: string,
+      invoices?: { invoice_id: number, payment_date: string }[]
+    }) => navInvoicesApi.bulkMarkPaid(data),
   });
 }
 

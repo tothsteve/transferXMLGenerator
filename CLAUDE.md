@@ -12,7 +12,7 @@ This is a Django + React application for generating XML and CSV files for bank t
 - **Multi-tenant isolation** with company-scoped data and **feature flag system**
 - **Role-based access control** with 4-level permissions (ADMIN, FINANCIAL, ACCOUNTANT, USER)
 - **Key models**: Company, CompanyUser, FeatureTemplate, CompanyFeature, BankAccount, Beneficiary, TransferTemplate, Transfer, TransferBatch
-- **NAV integration** with invoice synchronization and XML storage
+- **NAV integration** with invoice synchronization, XML storage, and **payment status tracking**
 - **Export generation** via `utils.generate_xml()` and `kh_export.py` - creates HUF transaction XML files and KH Bank CSV files
 - **Feature-gated functionality** with company-specific feature enablement
 - **Excel import** functionality for bulk beneficiary creation
@@ -29,6 +29,7 @@ This is a Django + React application for generating XML and CSV files for bank t
 - **Settings management** for default bank account configuration with full CRUD operations
 - **React Query integration** for optimistic updates, caching, and error handling
 - **Modern UI components** with form validation, loading states, and Hungarian localization
+- **NAV invoice payment status management** with bulk update operations and flexible date selection
 
 ## ✅ IMPLEMENTED: Multi-Company Feature Flag System
 
@@ -92,6 +93,46 @@ The system implements a sophisticated **two-layer permission architecture**:
 - Companies can enable/disable features independently
 - Admin users can force logout other users for security
 - Complete audit trail for feature enablement and user actions
+
+## ✅ IMPLEMENTED: NAV Invoice Payment Status Tracking
+
+### Payment Status Workflow
+The system implements comprehensive **payment status tracking** for NAV invoices with automated status updates:
+
+1. **UNPAID** (Fizetésre vár) - Default status for all invoices
+2. **PREPARED** (Előkészítve) - When transfer is created from invoice
+3. **PAID** (Kifizetve) - When batch is marked as "used in bank"
+
+### Key Features
+
+#### **Automated Status Updates**
+- **Transfer Creation**: Invoice automatically marked as PREPARED when transfer is generated
+- **Batch Processing**: Invoice automatically marked as PAID when batch is used in bank
+- **Dynamic Overdue Detection**: No static OVERDUE status - calculated based on payment_due_date vs current date
+
+#### **Bulk Payment Status Management**
+- **Bulk Mark Unpaid**: Reset multiple invoices to "Fizetésre vár" status
+- **Bulk Mark Prepared**: Mark multiple invoices as "Előkészítve" status
+- **Bulk Mark Paid**: Mark multiple invoices as "Kifizetve" with flexible date options:
+  - **Payment Due Date Option**: Use each invoice's individual payment_due_date
+  - **Custom Date Option**: Set a single custom payment date for all selected invoices
+
+#### **API Endpoints**
+- `POST /api/nav-invoices/bulk_mark_unpaid/` - Bulk mark as unpaid
+- `POST /api/nav-invoices/bulk_mark_prepared/` - Bulk mark as prepared  
+- `POST /api/nav-invoices/bulk_mark_paid/` - Bulk mark as paid with flexible date options
+
+#### **Frontend Features**
+- **Visual Status Indicators**: Icons with tooltips showing payment status and date
+- **Bulk Action Bar**: Appears when invoices are selected with status update buttons
+- **Flexible Date Selection**: Checkbox to choose between payment due dates vs custom date
+- **Hungarian Localization**: All UI elements in Hungarian with proper date formatting
+
+### Database Implementation
+- `payment_status` field with CHECK constraint for valid statuses
+- `payment_status_date` for tracking when status was last changed
+- `auto_marked_paid` flag to track automated vs manual status changes
+- Indexed for efficient filtering by payment status
 
 ## Database Documentation
 

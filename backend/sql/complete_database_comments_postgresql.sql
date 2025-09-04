@@ -221,6 +221,9 @@ COMMENT ON COLUMN bank_transfers_invoice.nav_invoice_hash IS 'Hash value of invo
 COMMENT ON COLUMN bank_transfers_invoice.nav_invoice_xml IS 'Complete XML representation of invoice for NAV';
 COMMENT ON COLUMN bank_transfers_invoice.sync_status IS 'Current sync status with NAV (PENDING, SYNCED, ERROR)';
 COMMENT ON COLUMN bank_transfers_invoice.storno_of_id IS 'Reference to original invoice if this is a storno';
+COMMENT ON COLUMN bank_transfers_invoice.payment_status IS 'Payment status tracking: UNPAID (Fizetésre vár), PREPARED (Előkészítve), PAID (Kifizetve)';
+COMMENT ON COLUMN bank_transfers_invoice.payment_status_date IS 'Date when payment status was last changed';
+COMMENT ON COLUMN bank_transfers_invoice.auto_marked_paid IS 'Whether invoice was automatically marked as paid during batch processing (TRUE=automatic, FALSE=manual)';
 COMMENT ON COLUMN bank_transfers_invoice.created_at IS 'Invoice creation timestamp in local system';
 COMMENT ON COLUMN bank_transfers_invoice.updated_at IS 'Last modification timestamp in local system';
 

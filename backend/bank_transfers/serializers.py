@@ -84,13 +84,14 @@ class TransferSerializer(serializers.ModelSerializer):
     beneficiary_id = serializers.IntegerField(write_only=True)
     originator_account = BankAccountSerializer(read_only=True)
     originator_account_id = serializers.IntegerField(write_only=True)
+    nav_invoice_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     
     class Meta:
         model = Transfer
         fields = [
             'id', 'originator_account', 'originator_account_id',
             'beneficiary', 'beneficiary_id', 'amount', 'currency',
-            'execution_date', 'remittance_info', 'template', 'nav_invoice',
+            'execution_date', 'remittance_info', 'template', 'nav_invoice', 'nav_invoice_id',
             'order', 'is_processed', 'notes', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
@@ -298,9 +299,9 @@ class InvoiceListSerializer(serializers.ModelSerializer):
     invoice_vat_amount_formatted = serializers.SerializerMethodField()
     invoice_gross_amount_formatted = serializers.SerializerMethodField()
     
-    # Payment status
-    payment_status = serializers.SerializerMethodField()
-    is_paid = serializers.SerializerMethodField()
+    # Payment status (using new database fields)
+    payment_status_date_formatted = serializers.SerializerMethodField()
+    is_overdue = serializers.SerializerMethodField()
     
     class Meta:
         model = Invoice
@@ -323,7 +324,8 @@ class InvoiceListSerializer(serializers.ModelSerializer):
             
             # Business
             'invoice_operation', 'payment_method', 'original_invoice_number',
-            'payment_status', 'is_paid', 'invoice_category',
+            'payment_status', 'payment_status_date', 'payment_status_date_formatted', 
+            'auto_marked_paid', 'is_overdue', 'invoice_category',
             'supplier_bank_account_number', 'customer_bank_account_number',
             
             # System
@@ -376,20 +378,13 @@ class InvoiceListSerializer(serializers.ModelSerializer):
         else:
             return f"{obj.invoice_gross_amount:,.2f} {obj.currency_code}"
     
-    def get_payment_status(self, obj):
-        if obj.payment_date:
-            return 'Fizetve'
-        elif obj.payment_due_date:
-            from datetime import date
-            if obj.payment_due_date < date.today():
-                return 'Lejárt'
-            else:
-                return 'Fizetendő'
-        else:
-            return 'Nincs határidő'
+    def get_payment_status_date_formatted(self, obj):
+        if obj.payment_status_date:
+            return obj.payment_status_date.strftime('%Y-%m-%d')
+        return None
     
-    def get_is_paid(self, obj):
-        return obj.payment_date is not None
+    def get_is_overdue(self, obj):
+        return obj.is_overdue()
 
 
 class InvoiceDetailSerializer(serializers.ModelSerializer):
@@ -487,17 +482,10 @@ class InvoiceDetailSerializer(serializers.ModelSerializer):
         else:
             return f"{obj.invoice_gross_amount:,.2f} {obj.currency_code}"
     
-    def get_payment_status(self, obj):
-        if obj.payment_date:
-            return 'Fizetve'
-        elif obj.payment_due_date:
-            from datetime import date
-            if obj.payment_due_date < date.today():
-                return 'Lejárt'
-            else:
-                return 'Fizetendő'
-        else:
-            return 'Nincs határidő'
+    def get_payment_status_date_formatted(self, obj):
+        if obj.payment_status_date:
+            return obj.payment_status_date.strftime('%Y-%m-%d')
+        return None
 
 
 class InvoiceSyncLogSerializer(serializers.ModelSerializer):
