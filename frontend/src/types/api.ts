@@ -45,6 +45,7 @@ export interface Transfer {
   currency: 'HUF' | 'EUR' | 'USD';
   execution_date: string;
   remittance_info: string;
+  nav_invoice?: number | null; // Optional link to NAV invoice
   is_processed: boolean;
   created_at?: string;
 }

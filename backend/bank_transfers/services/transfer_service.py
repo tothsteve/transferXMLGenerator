@@ -42,6 +42,8 @@ class TransferService:
         """Create multiple transfers in a transaction with optional batch"""
         with transaction.atomic():
             transfers = []
+            nav_invoices_to_update = []
+            
             for transfer_data in transfers_data:
                 # Handle nested data properly - if transfer_data contains instances, get the data
                 if hasattr(transfer_data, '__dict__'):
@@ -50,8 +52,31 @@ class TransferService:
                 else:
                     data_dict = transfer_data
                 
+                # Debug: Log nav_invoice data
+                nav_invoice_value = data_dict.get('nav_invoice')
+                if nav_invoice_value:
+                    print(f"Creating transfer with nav_invoice: {nav_invoice_value}")
+                
                 transfer = Transfer.objects.create(**data_dict)
                 transfers.append(transfer)
+                
+                # Track NAV invoices that need status update
+                if transfer.nav_invoice_id:
+                    print(f"Transfer {transfer.id} linked to NAV invoice {transfer.nav_invoice_id}")
+                    nav_invoices_to_update.append(transfer.nav_invoice_id)
+            
+            # Update linked NAV invoices to PREPARED status
+            if nav_invoices_to_update:
+                from ..models import Invoice
+                from django.utils import timezone
+                
+                invoices = Invoice.objects.filter(
+                    id__in=nav_invoices_to_update,
+                    payment_status='UNPAID'  # Only update if currently unpaid
+                )
+                
+                for invoice in invoices:
+                    invoice.mark_as_prepared()
             
             # Create batch if name provided
             batch = None
@@ -200,10 +225,36 @@ class TransferBatchService:
     
     @staticmethod
     def mark_batch_as_used(batch):
-        """Mark batch as used in bank"""
+        """Mark batch as used in bank and auto-mark linked NAV invoices as paid"""
         batch.used_in_bank = True
         batch.bank_usage_date = timezone.now()
         batch.save()
+        
+        # Auto-mark linked NAV invoices as paid
+        updated_invoices = []
+        
+        try:
+            with transaction.atomic():
+                # Get all transfers in this batch that have linked NAV invoices
+                transfers_with_invoices = batch.transfers.filter(
+                    nav_invoice__isnull=False
+                ).select_related('nav_invoice')
+                
+                for transfer in transfers_with_invoices:
+                    invoice = transfer.nav_invoice
+                    # Only auto-mark unpaid and prepared invoices (skip already paid invoices)
+                    if invoice.payment_status in ['UNPAID', 'PREPARED']:
+                        invoice.mark_as_paid(
+                            payment_date=batch.bank_usage_date.date() if batch.bank_usage_date else timezone.now().date(),
+                            auto_marked=True
+                        )
+                        updated_invoices.append(invoice)
+                        
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to update NAV invoices for batch {batch.id}: {e}")
+        
         return batch
     
     @staticmethod

@@ -26,6 +26,9 @@ import {
   TableHead,
   TableRow,
   CircularProgress,
+  Select,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -35,9 +38,14 @@ import {
   Visibility as ViewIcon,
   SwapHoriz,
   Add as AddIcon,
+  HourglassEmpty as UnpaidIcon,
+  Schedule as PreparedIcon,
+  CheckCircle as PaidIcon,
+  Clear as ClearIcon,
 } from '@mui/icons-material';
 import { useToastContext } from '../../context/ToastContext';
 import { navInvoicesApi } from '../../services/api';
+import { useBulkMarkUnpaid, useBulkMarkPrepared, useBulkMarkPaid } from '../../hooks/api';
 import NAVInvoiceTable from './NAVInvoiceTable';
 
 interface Invoice {
@@ -76,6 +84,10 @@ interface Invoice {
   payment_method: string | null;
   original_invoice_number: string | null;
   payment_status: string;
+  payment_status_date: string | null;
+  payment_status_date_formatted: string | null;
+  auto_marked_paid: boolean;
+  is_overdue: boolean;
   is_paid: boolean;
   
   // System
@@ -118,15 +130,21 @@ const NAVInvoices: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [directionFilter, setDirectionFilter] = useState<string>('');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('');
   const [hideStornoInvoices, setHideStornoInvoices] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
   const [sortField, setSortField] = useState<string>('issue_date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [inboundTransferFilter, setInboundTransferFilter] = useState(false);
   
   // Selection states
   const [selectedInvoices, setSelectedInvoices] = useState<number[]>([]);
+  
+  // Payment date state for bulk update (format: YYYY-MM-DD)
+  const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [usePaymentDueDate, setUsePaymentDueDate] = useState<boolean>(true);
   
   // Modal states
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -136,6 +154,11 @@ const NAVInvoices: React.FC = () => {
   
   const { success: showSuccess, error: showError } = useToastContext();
   const navigate = useNavigate();
+  
+  // Bulk payment status update hooks
+  const bulkMarkUnpaidMutation = useBulkMarkUnpaid();
+  const bulkMarkPreparedMutation = useBulkMarkPrepared();
+  const bulkMarkPaidMutation = useBulkMarkPaid();
 
   // Load invoices
   const loadInvoices = async () => {
@@ -144,10 +167,11 @@ const NAVInvoices: React.FC = () => {
       
       const params = {
         page: currentPage,
-        page_size: 20,
+        page_size: pageSize,
         search: searchTerm || undefined,
         direction: inboundTransferFilter ? 'INBOUND' : (directionFilter || undefined),
         payment_method: inboundTransferFilter ? 'TRANSFER' : undefined,
+        payment_status: paymentStatusFilter || undefined,
         ordering: `${sortDirection === 'desc' ? '-' : ''}${sortField}`,
         hide_storno_invoices: hideStornoInvoices,
       };
@@ -197,7 +221,7 @@ const NAVInvoices: React.FC = () => {
     loadInvoices();
     // Clear selections when filters or page change
     setSelectedInvoices([]);
-  }, [searchTerm, directionFilter, currentPage, sortField, sortDirection, hideStornoInvoices, inboundTransferFilter]);
+  }, [searchTerm, directionFilter, paymentStatusFilter, currentPage, pageSize, sortField, sortDirection, hideStornoInvoices, inboundTransferFilter]);
 
   const handleViewInvoice = async (invoice: Invoice) => {
     setInvoiceDetailsOpen(true);
@@ -220,6 +244,7 @@ const NAVInvoices: React.FC = () => {
   const clearFilters = () => {
     setSearchTerm('');
     setDirectionFilter('');
+    setPaymentStatusFilter('');
     setInboundTransferFilter(false);
     setHideStornoInvoices(true); // Reset to default (hide STORNO invoices)
     setCurrentPage(1);
@@ -229,6 +254,11 @@ const NAVInvoices: React.FC = () => {
 
   const refetch = () => {
     loadInvoices();
+  };
+
+  const handlePageSizeChange = (event: any) => {
+    setPageSize(event.target.value);
+    setCurrentPage(1); // Reset to first page when changing page size
   };
 
   // Selection handlers
@@ -301,6 +331,7 @@ const NAVInvoices: React.FC = () => {
       currency: invoice.currency_code === 'HUF' ? 'HUF' : invoice.currency_code,
       execution_date: invoice.payment_due_date || new Date().toISOString().split('T')[0], // Use payment due date or today
       remittance_info: invoice.nav_invoice_number,
+      nav_invoice: invoice.id, // Link to NAV invoice for automatic payment tracking
       order: index + 1,
       fromNAVInvoice: true // Flag to indicate this came from NAV invoice
     }));
@@ -321,7 +352,66 @@ const NAVInvoices: React.FC = () => {
     showSuccess(successMessage);
   };
 
-  const totalPages = Math.ceil(totalCount / 20);
+  // Bulk payment status update handlers
+  const handleBulkMarkUnpaid = async () => {
+    if (selectedInvoices.length === 0) return;
+    
+    try {
+      await bulkMarkUnpaidMutation.mutateAsync(selectedInvoices);
+      showSuccess(`${selectedInvoices.length} számla megjelölve "Fizetésre vár" státuszként`);
+      setSelectedInvoices([]);
+      await loadInvoices(); // Refresh the list
+    } catch (error: any) {
+      showError(error?.response?.data?.error || 'Hiba történt a státusz frissítésekor');
+    }
+  };
+
+  const handleBulkMarkPrepared = async () => {
+    if (selectedInvoices.length === 0) return;
+    
+    try {
+      await bulkMarkPreparedMutation.mutateAsync(selectedInvoices);
+      showSuccess(`${selectedInvoices.length} számla megjelölve "Előkészítve" státuszként`);
+      setSelectedInvoices([]);
+      await loadInvoices(); // Refresh the list
+    } catch (error: any) {
+      showError(error?.response?.data?.error || 'Hiba történt a státusz frissítésekor');
+    }
+  };
+
+  const handleBulkMarkPaid = async () => {
+    if (selectedInvoices.length === 0) return;
+    
+    try {
+      let requestData;
+      
+      if (usePaymentDueDate) {
+        // Option 2: Use individual payment_due_date for each invoice
+        const selectedInvoiceObjects = invoices.filter(invoice => selectedInvoices.includes(invoice.id));
+        requestData = {
+          invoices: selectedInvoiceObjects.map(invoice => ({
+            invoice_id: invoice.id,
+            payment_date: invoice.payment_due_date || new Date().toISOString().split('T')[0]
+          }))
+        };
+      } else {
+        // Option 1: Use single custom date for all invoices
+        requestData = {
+          invoice_ids: selectedInvoices,
+          payment_date: paymentDate || undefined
+        };
+      }
+      
+      await bulkMarkPaidMutation.mutateAsync(requestData);
+      showSuccess(`${selectedInvoices.length} számla megjelölve "Kifizetve" státuszként`);
+      setSelectedInvoices([]);
+      await loadInvoices(); // Refresh the list
+    } catch (error: any) {
+      showError(error?.response?.data?.error || 'Hiba történt a státusz frissítésekor');
+    }
+  };
+
+  const totalPages = Math.ceil(totalCount / pageSize);
 
   // Filter menu state
   const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(null);
@@ -434,6 +524,46 @@ const NAVInvoices: React.FC = () => {
               <FormControlLabel
                 control={
                   <Checkbox
+                    checked={Boolean(paymentStatusFilter === 'UNPAID')}
+                    onChange={(e) => setPaymentStatusFilter(e.target.checked ? 'UNPAID' : '')}
+                    size="small"
+                  />
+                }
+                label="Csak fizetésre váró"
+                sx={{ m: 0 }}
+              />
+            </MenuItem>
+            <MenuItem disableRipple sx={{ '&:hover': { backgroundColor: 'transparent' } }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={Boolean(paymentStatusFilter === 'PREPARED')}
+                    onChange={(e) => setPaymentStatusFilter(e.target.checked ? 'PREPARED' : '')}
+                    size="small"
+                  />
+                }
+                label="Csak előkészített"
+                sx={{ m: 0 }}
+              />
+            </MenuItem>
+            <MenuItem disableRipple sx={{ '&:hover': { backgroundColor: 'transparent' } }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={Boolean(paymentStatusFilter === 'PAID')}
+                    onChange={(e) => setPaymentStatusFilter(e.target.checked ? 'PAID' : '')}
+                    size="small"
+                  />
+                }
+                label="Csak kifizetett"
+                sx={{ m: 0 }}
+              />
+            </MenuItem>
+            <Divider />
+            <MenuItem disableRipple sx={{ '&:hover': { backgroundColor: 'transparent' } }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
                     checked={hideStornoInvoices}
                     onChange={(e) => setHideStornoInvoices(e.target.checked)}
                     size="small"
@@ -470,8 +600,8 @@ const NAVInvoices: React.FC = () => {
         </Stack>
 
         {/* Active filters display - Same pattern as BeneficiaryManager */}
-        {(searchTerm || directionFilter || !hideStornoInvoices || inboundTransferFilter) && (
-          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+        {(searchTerm || directionFilter || paymentStatusFilter || !hideStornoInvoices || inboundTransferFilter) && (
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ mt: 2 }}>
             <Typography variant="body2" color="text.secondary">
               Aktív szűrők:
             </Typography>
@@ -491,6 +621,16 @@ const NAVInvoices: React.FC = () => {
                 variant="outlined"
               />
             )}
+            {paymentStatusFilter && (
+              <Chip
+                label={paymentStatusFilter === 'UNPAID' ? 'Fizetésre vár' : 
+                       paymentStatusFilter === 'PREPARED' ? 'Előkészítve' : 
+                       'Kifizetve'}
+                size="small"
+                color="info"
+                variant="outlined"
+              />
+            )}
             {inboundTransferFilter && (
               <Chip
                 label="Bejövő átutalások"
@@ -507,6 +647,22 @@ const NAVInvoices: React.FC = () => {
                 variant="outlined"
               />
             )}
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<ClearIcon />}
+              onClick={() => {
+                setSearchTerm('');
+                setDirectionFilter('');
+                setPaymentStatusFilter('');
+                setHideStornoInvoices(true);
+                setInboundTransferFilter(false);
+                setCurrentPage(1);
+              }}
+              sx={{ ml: 1 }}
+            >
+              Összes szűrő törlése
+            </Button>
           </Stack>
         )}
       </Box>
@@ -523,19 +679,96 @@ const NAVInvoices: React.FC = () => {
         )}
       </Stack>
 
-      {/* Action button for selected invoices */}
+      {/* Action buttons for selected invoices */}
       {selectedInvoices.length > 0 && (
-        <Box sx={{ mb: 1 }}>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<AddIcon />}
-            onClick={handleGenerateTransfers}
-            sx={{ fontWeight: 'medium' }}
-          >
-            Eseti utalás generálás ({selectedInvoices.length})
-          </Button>
-        </Box>
+        <Paper elevation={1} sx={{ p: 2, mb: 1, backgroundColor: 'action.hover' }}>
+          <Typography variant="subtitle2" sx={{ mb: 1.5, color: 'primary.main', fontWeight: 'medium' }}>
+            Tömeges műveletek ({selectedInvoices.length} számla kiválasztva)
+          </Typography>
+          
+          <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
+            {/* Generate transfers button */}
+            <Button
+              variant="contained"
+              color="primary"
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={handleGenerateTransfers}
+            >
+              Eseti utalás generálás
+            </Button>
+            
+            {/* Payment status buttons */}
+            <Button
+              variant="outlined"
+              color="warning"
+              size="small"
+              startIcon={<UnpaidIcon />}
+              onClick={handleBulkMarkUnpaid}
+              disabled={bulkMarkUnpaidMutation.isPending}
+            >
+              {bulkMarkUnpaidMutation.isPending ? 'Frissítés...' : 'Fizetésre vár'}
+            </Button>
+            
+            <Button
+              variant="outlined"
+              color="info"
+              size="small"
+              startIcon={<PreparedIcon />}
+              onClick={handleBulkMarkPrepared}
+              disabled={bulkMarkPreparedMutation.isPending}
+            >
+              {bulkMarkPreparedMutation.isPending ? 'Frissítés...' : 'Előkészítve'}
+            </Button>
+            
+            <Stack direction="column" spacing={1}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={usePaymentDueDate}
+                    onChange={(e) => setUsePaymentDueDate(e.target.checked)}
+                    size="small"
+                  />
+                }
+                label="Fizetési határidőre állítás"
+                sx={{ fontSize: '0.875rem' }}
+              />
+              
+              <Stack direction="row" spacing={1} alignItems="center">
+                {!usePaymentDueDate && (
+                  <TextField
+                    label="Fizetés dátuma"
+                    type="date"
+                    value={paymentDate}
+                    onChange={(e) => setPaymentDate(e.target.value)}
+                    size="small"
+                    sx={{ minWidth: '150px' }}
+                    InputLabelProps={{
+                      shrink: true,
+                    }}
+                  />
+                )}
+                
+                <Button
+                  variant="outlined"
+                  color="success"
+                  size="small"
+                  startIcon={<PaidIcon />}
+                  onClick={handleBulkMarkPaid}
+                  disabled={bulkMarkPaidMutation.isPending}
+                >
+                  {bulkMarkPaidMutation.isPending ? 'Frissítés...' : 'Kifizetve'}
+                </Button>
+                
+                {usePaymentDueDate && (
+                  <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic', maxWidth: '200px' }}>
+                    Minden számla saját fizetési határidejével lesz megjelölve
+                  </Typography>
+                )}
+              </Stack>
+            </Stack>
+          </Stack>
+        </Paper>
       )}
 
       {/* Table - Same pattern as BeneficiaryManager */}
@@ -554,12 +787,34 @@ const NAVInvoices: React.FC = () => {
         />
       </Paper>
 
-      {/* Pagination - Same pattern as BeneficiaryManager */}
+      {/* Pagination with Page Size Selector */}
       {totalPages > 1 && (
         <Box sx={{ mt: 1, p: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="body2" color="text.secondary">
-            Oldal {currentPage} / {totalPages}
-          </Typography>
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Typography variant="body2" color="text.secondary">
+              Oldal {currentPage} / {totalPages}
+            </Typography>
+            <FormControl size="small" sx={{ minWidth: '80px' }}>
+              <InputLabel id="page-size-select-label">Méret</InputLabel>
+              <Select
+                labelId="page-size-select-label"
+                value={pageSize}
+                label="Méret"
+                onChange={handlePageSizeChange}
+                size="small"
+              >
+                <MenuItem value={10}>10</MenuItem>
+                <MenuItem value={20}>20</MenuItem>
+                <MenuItem value={50}>50</MenuItem>
+                <MenuItem value={100}>100</MenuItem>
+                <MenuItem value={200}>200</MenuItem>
+                <MenuItem value={500}>500</MenuItem>
+              </Select>
+            </FormControl>
+            <Typography variant="body2" color="text.secondary">
+              elemek oldalanként
+            </Typography>
+          </Stack>
           <Pagination
             count={totalPages}
             page={currentPage}

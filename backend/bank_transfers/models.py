@@ -240,6 +240,9 @@ class Transfer(TimestampedModel):
     execution_date = models.DateField(verbose_name="Teljesítési dátum")
     remittance_info = models.CharField(max_length=500, verbose_name="Közlemény")
     template = models.ForeignKey(TransferTemplate, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Sablon")
+    nav_invoice = models.ForeignKey('Invoice', on_delete=models.SET_NULL, null=True, blank=True, 
+                                  related_name='generated_transfers', verbose_name="NAV számla",
+                                  help_text="A NAV számla, amelyből ez az átutalás generálva lett (opcionális)")
     order = models.IntegerField(default=0, verbose_name="Sorrend", help_text="Átutalások sorrendje XML generáláskor")
     is_processed = models.BooleanField(default=False, verbose_name="Feldolgozva")
     notes = models.TextField(blank=True, verbose_name="Megjegyzések")
@@ -533,6 +536,32 @@ class Invoice(TimestampedModel):
     payment_date = models.DateField(null=True, blank=True, verbose_name="Fizetési dátum")
     invoice_appearance = models.CharField(max_length=20, null=True, blank=True, verbose_name="Számla megjelenés (PAPER/ELECTRONIC)")
     
+    # Payment status tracking fields
+    PAYMENT_STATUS_CHOICES = [
+        ('UNPAID', 'Fizetésre vár'),
+        ('PREPARED', 'Előkészítve'),
+        ('PAID', 'Kifizetve'),
+    ]
+    
+    payment_status = models.CharField(
+        max_length=20,
+        choices=PAYMENT_STATUS_CHOICES,
+        default='UNPAID',
+        verbose_name="Fizetési állapot",
+        help_text="A számla aktuális fizetési státusza"
+    )
+    payment_status_date = models.DateField(
+        null=True, 
+        blank=True,
+        verbose_name="Fizetési állapot dátuma",
+        help_text="A számla kifizetésének dátuma (PAID státusz esetén)"
+    )
+    auto_marked_paid = models.BooleanField(
+        default=False,
+        verbose_name="Automatikusan jelölve",
+        help_text="Igaz, ha automatikusan lett megjelölve fizetettként köteg feldolgozáskor"
+    )
+    
     # Bank account information (extracted from XML)
     supplier_bank_account_number = models.CharField(max_length=50, null=True, blank=True, verbose_name="Szállító bankszámlaszáma")
     customer_bank_account_number = models.CharField(max_length=50, null=True, blank=True, verbose_name="Vevő bankszámlaszáma")
@@ -593,6 +622,41 @@ class Invoice(TimestampedModel):
         
         # Check if this invoice has been storno'd
         return not self.storno_invoices.exists()
+    
+    def mark_as_paid(self, payment_date=None, auto_marked=False):
+        """Mark invoice as paid"""
+        from django.utils import timezone
+        self.payment_status = 'PAID'
+        self.payment_status_date = payment_date or timezone.now().date()
+        self.auto_marked_paid = auto_marked
+        self.save()
+    
+    def mark_as_prepared(self, prepared_date=None):
+        """Mark invoice as prepared (transfer created)"""
+        from django.utils import timezone
+        self.payment_status = 'PREPARED'
+        self.payment_status_date = prepared_date or timezone.now().date()
+        self.auto_marked_paid = False
+        self.save()
+        
+    def mark_as_unpaid(self):
+        """Mark invoice as unpaid (undo payment)"""
+        self.payment_status = 'UNPAID'
+        self.payment_status_date = None
+        self.auto_marked_paid = False
+        self.save()
+    
+    def is_overdue(self):
+        """Check if invoice is overdue (unpaid and past due date)"""
+        if self.payment_status != 'UNPAID':
+            return False
+        
+        if not self.payment_due_date:
+            return False
+            
+        from django.utils import timezone
+        today = timezone.now().date()
+        return self.payment_due_date < today
     
     def __str__(self):
         return f"{self.nav_invoice_number} - {self.supplier_name} ({self.invoice_direction})"
