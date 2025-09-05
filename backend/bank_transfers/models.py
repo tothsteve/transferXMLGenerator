@@ -565,6 +565,20 @@ class Invoice(TimestampedModel):
     nav_invoice_xml = models.TextField(null=True, blank=True, verbose_name="NAV számla XML")
     nav_invoice_hash = models.CharField(max_length=200, null=True, blank=True, verbose_name="NAV számla hash")
     
+    # Payment tracking
+    PAYMENT_STATUS_CHOICES = [
+        ('UNPAID', 'Fizetésre vár'),
+        ('PREPARED', 'Előkészítve'),
+        ('PAID', 'Kifizetve'),
+    ]
+    payment_status = models.CharField(
+        max_length=10, 
+        choices=PAYMENT_STATUS_CHOICES, 
+        default='UNPAID', 
+        verbose_name="Fizetési állapot"
+    )
+    auto_marked_paid = models.BooleanField(default=False, verbose_name="Automatikusan fizetettnek jelölve")
+    
     # Sync metadata
     sync_status = models.CharField(max_length=10, choices=SYNC_STATUS_CHOICES, default='SUCCESS')
     
@@ -593,6 +607,13 @@ class Invoice(TimestampedModel):
         
         # Check if this invoice has been storno'd
         return not self.storno_invoices.exists()
+    
+    @property
+    def is_paid(self):
+        """
+        Returns True if the invoice is marked as paid.
+        """
+        return self.payment_status == 'PAID'
     
     def __str__(self):
         return f"{self.nav_invoice_number} - {self.supplier_name} ({self.invoice_direction})"

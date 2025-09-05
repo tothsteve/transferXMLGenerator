@@ -26,7 +26,17 @@ import {
   TableHead,
   TableRow,
   CircularProgress,
+  Select,
+  FormControl,
+  InputLabel,
+  Collapse,
+  IconButton,
 } from '@mui/material';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
+import { hu } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import {
   Search as SearchIcon,
@@ -35,6 +45,10 @@ import {
   Visibility as ViewIcon,
   SwapHoriz,
   Add as AddIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
 } from '@mui/icons-material';
 import { useToastContext } from '../../context/ToastContext';
 import { navInvoicesApi } from '../../services/api';
@@ -113,6 +127,27 @@ interface InvoiceLineItem {
   product_code_value: string;
 }
 
+interface InvoiceTotals {
+  inbound: {
+    net: number;
+    vat: number;
+    gross: number;
+    count: number;
+  };
+  outbound: {
+    net: number;
+    vat: number;
+    gross: number;
+    count: number;
+  };
+  total: {
+    net: number;
+    vat: number;
+    gross: number;
+    count: number;
+  };
+}
+
 const NAVInvoices: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -125,8 +160,80 @@ const NAVInvoices: React.FC = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [inboundTransferFilter, setInboundTransferFilter] = useState(false);
   
+  // Date interval filters
+  const [dateFilterType, setDateFilterType] = useState<'issue_date' | 'fulfillment_date' | ''>('');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
+
+  // Helper functions for date range presets using date-fns
+  const getMonthRange = (date: Date) => {
+    return {
+      from: format(startOfMonth(date), 'yyyy-MM-dd'),
+      to: format(endOfMonth(date), 'yyyy-MM-dd')
+    };
+  };
+
+  const getCurrentMonthRange = () => getMonthRange(new Date());
+  
+  const getPreviousMonthRange = () => getMonthRange(subMonths(new Date(), 1));
+
+  const getNextMonthRange = () => getMonthRange(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1));
+
+  // Get current base date from dateFrom field or fallback to current date
+  const getCurrentBaseDate = () => {
+    if (dateFrom) {
+      return new Date(dateFrom + 'T00:00:00');
+    }
+    return new Date();
+  };
+
+  // Apply date range preset
+  const applyDatePreset = (preset: 'current' | 'previous' | 'next') => {
+    let range;
+    if (preset === 'current') {
+      range = getCurrentMonthRange();
+    } else if (preset === 'previous') {
+      range = getPreviousMonthRange();
+    } else {
+      range = getNextMonthRange();
+    }
+    setDateFrom(range.from);
+    setDateTo(range.to);
+  };
+
+  // Navigate to previous/next month based on current selected date
+  const navigateMonth = (direction: 'previous' | 'next') => {
+    const baseDate = getCurrentBaseDate();
+    const targetDate = direction === 'previous' 
+      ? subMonths(baseDate, 1)
+      : new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
+    
+    const range = getMonthRange(targetDate);
+    setDateFrom(range.from);
+    setDateTo(range.to);
+  };
+
+  // Handle date filter type change with automatic date range setting
+  const handleDateFilterTypeChange = (value: 'issue_date' | 'fulfillment_date' | '') => {
+    setDateFilterType(value);
+    
+    if (value !== '') {
+      // Set default date range to previous month
+      const range = getPreviousMonthRange();
+      setDateFrom(range.from);
+      setDateTo(range.to);
+    } else {
+      // Clear dates when no date type is selected
+      setDateFrom('');
+      setDateTo('');
+    }
+  };
+  
   // Selection states
   const [selectedInvoices, setSelectedInvoices] = useState<number[]>([]);
+  
+  // Totals collapse state
+  const [totalsCollapsed, setTotalsCollapsed] = useState(false);
   
   // Modal states
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -150,6 +257,11 @@ const NAVInvoices: React.FC = () => {
         payment_method: inboundTransferFilter ? 'TRANSFER' : undefined,
         ordering: `${sortDirection === 'desc' ? '-' : ''}${sortField}`,
         hide_storno_invoices: hideStornoInvoices,
+        // Date interval filters
+        ...(dateFilterType === 'issue_date' && dateFrom && { issue_date_from: dateFrom }),
+        ...(dateFilterType === 'issue_date' && dateTo && { issue_date_to: dateTo }),
+        ...(dateFilterType === 'fulfillment_date' && dateFrom && { fulfillment_date_from: dateFrom }),
+        ...(dateFilterType === 'fulfillment_date' && dateTo && { fulfillment_date_to: dateTo }),
       };
 
       const response = await navInvoicesApi.getAll(params);
@@ -197,7 +309,7 @@ const NAVInvoices: React.FC = () => {
     loadInvoices();
     // Clear selections when filters or page change
     setSelectedInvoices([]);
-  }, [searchTerm, directionFilter, currentPage, sortField, sortDirection, hideStornoInvoices, inboundTransferFilter]);
+  }, [searchTerm, directionFilter, currentPage, sortField, sortDirection, hideStornoInvoices, inboundTransferFilter, dateFilterType, dateFrom, dateTo]);
 
   const handleViewInvoice = async (invoice: Invoice) => {
     setInvoiceDetailsOpen(true);
@@ -222,6 +334,7 @@ const NAVInvoices: React.FC = () => {
     setDirectionFilter('');
     setInboundTransferFilter(false);
     setHideStornoInvoices(true); // Reset to default (hide STORNO invoices)
+    handleDateFilterTypeChange(''); // Use the handler to properly clear dates
     setCurrentPage(1);
     setSortField('issue_date');
     setSortDirection('desc');
@@ -229,6 +342,66 @@ const NAVInvoices: React.FC = () => {
 
   const refetch = () => {
     loadInvoices();
+  };
+
+  // Calculate totals for selected or filtered invoices
+  const calculateTotals = (): InvoiceTotals | null => {
+    let invoicesToCalculate: Invoice[] = [];
+    
+    // If there are selected invoices, calculate totals for selected only
+    if (selectedInvoices.length > 0) {
+      invoicesToCalculate = invoices.filter(invoice => selectedInvoices.includes(invoice.id));
+    } else {
+      // If no selection but there are filters active, calculate totals for all visible invoices
+      const hasActiveFilters = searchTerm || directionFilter || !hideStornoInvoices || inboundTransferFilter || dateFilterType;
+      if (hasActiveFilters) {
+        invoicesToCalculate = invoices;
+      }
+    }
+
+    // Initialize totals structure
+    const totals = {
+      inbound: { net: 0, vat: 0, gross: 0, count: 0 },
+      outbound: { net: 0, vat: 0, gross: 0, count: 0 },
+      total: { net: 0, vat: 0, gross: 0, count: 0 }
+    };
+
+    // Calculate sums by direction
+    invoicesToCalculate.forEach((invoice) => {
+      const net = Number(invoice.invoice_net_amount) || 0;
+      const vat = Number(invoice.invoice_vat_amount) || 0;
+      const gross = Number(invoice.invoice_gross_amount) || 0;
+
+      if (invoice.invoice_direction === 'INBOUND') {
+        totals.inbound.net += net;
+        totals.inbound.vat += vat;
+        totals.inbound.gross += gross;
+        totals.inbound.count += 1;
+      } else if (invoice.invoice_direction === 'OUTBOUND') {
+        totals.outbound.net += net;
+        totals.outbound.vat += vat;
+        totals.outbound.gross += gross;
+        totals.outbound.count += 1;
+      }
+
+      // Add to total regardless of direction
+      totals.total.net += net;
+      totals.total.vat += vat;
+      totals.total.gross += gross;
+      totals.total.count += 1;
+    });
+
+    return totals.total.count > 0 ? totals : null;
+  };
+
+  const totals = calculateTotals();
+
+  // Format amount helper function
+  const formatAmount = (amount: number, currency: string) => {
+    if (currency === 'HUF') {
+      return `${amount.toLocaleString('hu-HU', { maximumFractionDigits: 0 })} Ft`;
+    }
+    return `${amount.toLocaleString('hu-HU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
   };
 
   // Selection handlers
@@ -333,13 +506,6 @@ const NAVInvoices: React.FC = () => {
 
   const handleFilterClose = () => {
     setFilterAnchorEl(null);
-  };
-
-  const formatAmount = (amount: number, currency: string) => {
-    if (currency === 'HUF') {
-      return `${amount.toLocaleString('hu-HU', { maximumFractionDigits: 0 })} Ft`;
-    }
-    return `${amount.toLocaleString('hu-HU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
   };
 
   return (
@@ -451,7 +617,7 @@ const NAVInvoices: React.FC = () => {
         </Stack>
 
         {/* Quick Filter Buttons */}
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mt: 1 }}>
           <Button
             variant={inboundTransferFilter ? "contained" : "outlined"}
             color="primary"
@@ -467,10 +633,94 @@ const NAVInvoices: React.FC = () => {
           >
             Bejövő átutalások
           </Button>
+
+          {/* Date Interval Filter */}
+          <Stack direction="row" spacing={1} alignItems="center">
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel>Dátum típus</InputLabel>
+              <Select
+                value={dateFilterType}
+                label="Dátum típus"
+                onChange={(e) => handleDateFilterTypeChange(e.target.value as 'issue_date' | 'fulfillment_date' | '')}
+              >
+                <MenuItem value="">Nincs</MenuItem>
+                <MenuItem value="issue_date">Kiállítás</MenuItem>
+                <MenuItem value="fulfillment_date">Teljesítés</MenuItem>
+              </Select>
+            </FormControl>
+            
+            {dateFilterType && (
+              <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={hu}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <TextField
+                    label="Dátum-tól"
+                    type="date"
+                    size="small"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ minWidth: 140 }}
+                  />
+                  <TextField
+                    label="Dátum-ig"
+                    type="date"
+                    size="small"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ minWidth: 140 }}
+                  />
+                  
+                  {/* Month Navigation Stepper */}
+                  <Stack direction="row" spacing={0.5} alignItems="center">
+                    <IconButton
+                      size="small"
+                      onClick={() => navigateMonth('previous')}
+                      sx={{ 
+                        border: '1px solid',
+                        borderColor: 'primary.main',
+                        borderRadius: 1,
+                        '&:hover': { bgcolor: 'primary.50' }
+                      }}
+                    >
+                      <ChevronLeftIcon fontSize="small" />
+                    </IconButton>
+                    
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={() => applyDatePreset('current')}
+                      sx={{ 
+                        whiteSpace: 'nowrap', 
+                        fontSize: '0.75rem',
+                        minWidth: '90px',
+                        py: 0.5
+                      }}
+                    >
+                      Aktuális hónap
+                    </Button>
+                    
+                    <IconButton
+                      size="small"
+                      onClick={() => navigateMonth('next')}
+                      sx={{ 
+                        border: '1px solid',
+                        borderColor: 'primary.main',
+                        borderRadius: 1,
+                        '&:hover': { bgcolor: 'primary.50' }
+                      }}
+                    >
+                      <ChevronRightIcon fontSize="small" />
+                    </IconButton>
+                  </Stack>
+                </Stack>
+              </LocalizationProvider>
+            )}
+          </Stack>
         </Stack>
 
         {/* Active filters display - Same pattern as BeneficiaryManager */}
-        {(searchTerm || directionFilter || !hideStornoInvoices || inboundTransferFilter) && (
+        {(searchTerm || directionFilter || !hideStornoInvoices || inboundTransferFilter || dateFilterType) && (
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
             <Typography variant="body2" color="text.secondary">
               Aktív szűrők:
@@ -507,6 +757,20 @@ const NAVInvoices: React.FC = () => {
                 variant="outlined"
               />
             )}
+            {dateFilterType && (dateFrom || dateTo) && (
+              <Chip
+                label={`${dateFilterType === 'issue_date' ? 'Kiállítás' : 'Teljesítés'}: ${
+                  dateFrom && dateTo 
+                    ? `${dateFrom} - ${dateTo}` 
+                    : dateFrom 
+                      ? `${dateFrom}-tól` 
+                      : `${dateTo}-ig`
+                }`}
+                size="small"
+                color="secondary"
+                variant="outlined"
+              />
+            )}
           </Stack>
         )}
       </Box>
@@ -522,6 +786,118 @@ const NAVInvoices: React.FC = () => {
           </Typography>
         )}
       </Stack>
+
+      {/* Totals Summary Card */}
+      {totals && (
+        <Paper 
+          elevation={2} 
+          sx={{ 
+            p: 2, 
+            mb: 1, 
+            bgcolor: 'primary.50',
+            border: '1px solid',
+            borderColor: 'primary.200'
+          }}
+        >
+          <Stack spacing={2}>
+            {/* Header with collapse button */}
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                {selectedInvoices.length > 0 
+                  ? `${selectedInvoices.length} kiválasztott számla összesen:`
+                  : `${totals.total.count} szűrt számla összesen:`
+                }
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={() => setTotalsCollapsed(!totalsCollapsed)}
+                sx={{ ml: 1 }}
+              >
+                {totalsCollapsed ? <ExpandMoreIcon /> : <ExpandLessIcon />}
+              </IconButton>
+            </Stack>
+            
+            {/* Collapsible direction-specific totals */}
+            <Collapse in={!totalsCollapsed}>
+              <Stack spacing={2}>
+                {/* Outbound totals - First row */}
+                {totals.outbound.count > 0 && (
+                  <Stack direction="row" spacing={4} alignItems="center" flexWrap="wrap">
+                    <Box sx={{ minWidth: 120 }}>
+                      <Typography variant="body2" color="primary.main" sx={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
+                        Kimenő ({totals.outbound.count} db):
+                      </Typography>
+                    </Box>
+                    <Stack direction="row" spacing={3}>
+                      <Box sx={{ textAlign: 'center', minWidth: 100 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', display: 'block' }}>
+                          Nettó
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                          {formatAmount(totals.outbound.net, 'HUF')}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ textAlign: 'center', minWidth: 100 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', display: 'block' }}>
+                          ÁFA
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'warning.main' }}>
+                          {formatAmount(totals.outbound.vat, 'HUF')}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ textAlign: 'center', minWidth: 100 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', display: 'block' }}>
+                          Bruttó
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                          {formatAmount(totals.outbound.gross, 'HUF')}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </Stack>
+                )}
+                
+                {/* Inbound totals - Second row */}
+                {totals.inbound.count > 0 && (
+                  <Stack direction="row" spacing={4} alignItems="center" flexWrap="wrap">
+                    <Box sx={{ minWidth: 120 }}>
+                      <Typography variant="body2" color="secondary.main" sx={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
+                        Bejövő ({totals.inbound.count} db):
+                      </Typography>
+                    </Box>
+                    <Stack direction="row" spacing={3}>
+                      <Box sx={{ textAlign: 'center', minWidth: 100 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', display: 'block' }}>
+                          Nettó
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                          {formatAmount(totals.inbound.net, 'HUF')}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ textAlign: 'center', minWidth: 100 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', display: 'block' }}>
+                          ÁFA
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'warning.main' }}>
+                          {formatAmount(totals.inbound.vat, 'HUF')}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ textAlign: 'center', minWidth: 100 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', display: 'block' }}>
+                          Bruttó
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'secondary.main' }}>
+                          {formatAmount(totals.inbound.gross, 'HUF')}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </Stack>
+                )}
+              </Stack>
+            </Collapse>
+          </Stack>
+        </Paper>
+      )}
 
       {/* Action button for selected invoices */}
       {selectedInvoices.length > 0 && (
