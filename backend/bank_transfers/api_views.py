@@ -13,13 +13,13 @@ from drf_yasg import openapi
 import json
 from datetime import date
 
-from .models import BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch, CompanyUser, Invoice, InvoiceLineItem, InvoiceSyncLog
+from .models import BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch, CompanyUser, Invoice, InvoiceLineItem, InvoiceSyncLog, TrustedPartner
 from .serializers import (
     BankAccountSerializer, BeneficiarySerializer, TransferTemplateSerializer,
     TemplateBeneficiarySerializer, TransferSerializer, TransferBatchSerializer,
     TransferCreateFromTemplateSerializer, BulkTransferSerializer,
     ExcelImportSerializer, XMLGenerateSerializer, InvoiceListSerializer, 
-    InvoiceDetailSerializer, InvoiceSyncLogSerializer
+    InvoiceDetailSerializer, InvoiceSyncLogSerializer, TrustedPartnerSerializer
 )
 from .utils import generate_xml
 from .pdf_processor import PDFTransactionProcessor
@@ -1158,3 +1158,115 @@ class InvoiceSyncLogViewSet(viewsets.ReadOnlyModelViewSet):
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
+
+
+class TrustedPartnerViewSet(viewsets.ModelViewSet):
+    """
+    Megbízható partnerek kezelése automatikus fizetés feldolgozáshoz
+    
+    list: Az összes megbízható partner listája
+    create: Új megbízható partner hozzáadása
+    retrieve: Egy konkrét partner részletei
+    update: Partner módosítása
+    destroy: Partner törlése
+    available_partners: Elérhető partnerek NAV számlákból
+    
+    Jogosultság: Authentikált felhasználó
+    """
+    serializer_class = TrustedPartnerSerializer
+    permission_classes = [IsAuthenticated, IsCompanyMember]
+    filterset_fields = ['is_active', 'auto_pay']
+    search_fields = ['partner_name', 'tax_number']
+    ordering_fields = ['partner_name', 'tax_number', 'invoice_count', 'last_invoice_date', 'created_at']
+    ordering = ['partner_name']
+    
+    def get_queryset(self):
+        """Company-scoped queryset"""
+        return TrustedPartner.objects.filter(company=self.request.company)
+    
+    def perform_create(self, serializer):
+        """Auto-set company and update statistics"""
+        partner = serializer.save(company=self.request.company)
+        partner.update_statistics()
+    
+    def perform_update(self, serializer):
+        """Update statistics after modification"""
+        partner = serializer.save()
+        partner.update_statistics()
+    
+    @swagger_auto_schema(
+        operation_summary="Megbízható partnerek listája",
+        operation_description="List of trusted partners for automatic payment processing"
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+    
+    @swagger_auto_schema(
+        operation_summary="Új megbízható partner",
+        operation_description="Create a new trusted partner"
+    )
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+    
+    @swagger_auto_schema(
+        operation_summary="Partner részletei",
+        operation_description="Get detailed information about a specific trusted partner"
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+    
+    @swagger_auto_schema(
+        operation_summary="Partner módosítása",
+        operation_description="Update a trusted partner's information"
+    )
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
+    
+    @swagger_auto_schema(
+        operation_summary="Partner törlése",
+        operation_description="Delete a trusted partner"
+    )
+    def destroy(self, request, *args, **kwargs):
+        return super().destroy(request, *args, **kwargs)
+    
+    @action(detail=False, methods=['get'])
+    def available_partners(self, request):
+        """
+        Get available partners from NAV invoices that can be added as trusted partners
+        """
+        from django.db.models import Count, Max
+        
+        # Get distinct suppliers from invoices that are not already trusted partners
+        existing_tax_numbers = set(
+            TrustedPartner.objects.filter(company=request.company)
+            .values_list('tax_number', flat=True)
+        )
+        
+        # Query distinct suppliers from NAV invoices
+        available = Invoice.objects.filter(
+            company=request.company,
+            supplier_tax_number__isnull=False,
+            supplier_name__isnull=False
+        ).exclude(
+            supplier_tax_number__in=existing_tax_numbers
+        ).values(
+            'supplier_name', 'supplier_tax_number'
+        ).annotate(
+            invoice_count=Count('id'),
+            last_invoice_date=Max('issue_date')
+        ).order_by('supplier_name')
+        
+        # Format the response
+        partners_data = []
+        for item in available:
+            partners_data.append({
+                'partner_name': item['supplier_name'],
+                'tax_number': item['supplier_tax_number'],
+                'invoice_count': item['invoice_count'],
+                'last_invoice_date': item['last_invoice_date'].strftime('%Y-%m-%d') if item['last_invoice_date'] else None,
+            })
+        
+        return Response({
+            'count': len(partners_data),
+            'results': partners_data
+        })

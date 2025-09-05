@@ -2,7 +2,7 @@ from rest_framework import serializers
 from decimal import Decimal
 from .models import (
     BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch, Company,
-    NavConfiguration, Invoice, InvoiceLineItem, InvoiceSyncLog
+    NavConfiguration, Invoice, InvoiceLineItem, InvoiceSyncLog, TrustedPartner
 )
 from .hungarian_account_validator import validate_and_format_hungarian_account_number
 
@@ -542,3 +542,56 @@ class InvoiceStatsSerializer(serializers.Serializer):
         if last_sync:
             return last_sync.strftime('%Y-%m-%d %H:%M:%S')
         return 'Még nem szinkronizált'
+
+
+class TrustedPartnerSerializer(serializers.ModelSerializer):
+    """Serializer for TrustedPartner model with validation."""
+    
+    # Add read-only formatted fields
+    last_invoice_date_formatted = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = TrustedPartner
+        fields = [
+            'id', 'partner_name', 'tax_number', 'is_active', 'auto_pay', 'notes',
+            'invoice_count', 'last_invoice_date', 'last_invoice_date_formatted',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['invoice_count', 'last_invoice_date', 'created_at', 'updated_at']
+    
+    def get_last_invoice_date_formatted(self, obj):
+        """Format the last invoice date for display"""
+        if obj.last_invoice_date:
+            return obj.last_invoice_date.strftime('%Y-%m-%d')
+        return 'Nincs számla'
+    
+    def validate_tax_number(self, value):
+        """Validate tax number format (Hungarian format)"""
+        if value and not value.replace('-', '').replace(' ', '').isdigit():
+            raise serializers.ValidationError('Az adószám csak számokat tartalmazhat')
+        return value
+    
+    def validate(self, data):
+        """Custom validation for unique partner per company"""
+        request = self.context.get('request')
+        if request and hasattr(request, 'company'):
+            company = request.company
+            tax_number = data.get('tax_number')
+            
+            # Check for duplicate tax number in the same company
+            if tax_number:
+                queryset = TrustedPartner.objects.filter(
+                    company=company,
+                    tax_number=tax_number
+                )
+                
+                # Exclude current instance during updates
+                if self.instance:
+                    queryset = queryset.exclude(pk=self.instance.pk)
+                
+                if queryset.exists():
+                    raise serializers.ValidationError({
+                        'tax_number': 'Ez az adószám már szerepel a megbízható partnerek között'
+                    })
+        
+        return data

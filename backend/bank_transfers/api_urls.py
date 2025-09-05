@@ -4,7 +4,8 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from .api_views import (
     BankAccountViewSet, BeneficiaryViewSet, TransferTemplateViewSet,
     TransferViewSet, TransferBatchViewSet, ExcelImportView,
-    CompanyUsersView, CompanyUserDetailView, InvoiceViewSet, InvoiceSyncLogViewSet
+    CompanyUsersView, CompanyUserDetailView, InvoiceViewSet, InvoiceSyncLogViewSet,
+    TrustedPartnerViewSet
 )
 from .authentication import AuthenticationViewSet
 from .views.nav_views import (
@@ -24,6 +25,9 @@ router.register(r'nav/configurations', NavConfigurationViewSet, basename='navcon
 router.register(r'nav/invoices', InvoiceViewSet, basename='invoice')
 router.register(r'nav/line-items', InvoiceLineItemViewSet, basename='invoicelineitem')
 router.register(r'nav/sync-logs', InvoiceSyncLogViewSet, basename='invoicesynclog')
+
+# Trusted Partners endpoints
+router.register(r'trusted-partners', TrustedPartnerViewSet, basename='trustedpartner')
 
 urlpatterns = [
     path('', include(router.urls)),
