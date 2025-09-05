@@ -163,6 +163,9 @@ export const batchesApi = {
   getById: (id: number) =>
     apiClient.get<TransferBatch>(`/batches/${id}/`),
   
+  delete: (id: number) =>
+    apiClient.delete(`/batches/${id}/`),
+  
   downloadXml: (id: number) =>
     apiClient.get(`/batches/${id}/download_xml/`, { responseType: 'blob' }),
   
@@ -216,6 +219,20 @@ export const navInvoicesApi = {
   
   getStats: () =>
     apiClient.get('/nav/invoices/stats/'),
+  
+  // Bulk payment status update endpoints
+  bulkMarkUnpaid: (invoice_ids: number[]) =>
+    apiClient.post('/nav/invoices/bulk_mark_unpaid/', { invoice_ids }),
+  
+  bulkMarkPrepared: (invoice_ids: number[]) =>
+    apiClient.post('/nav/invoices/bulk_mark_prepared/', { invoice_ids }),
+  
+  bulkMarkPaid: (data: { 
+    invoice_ids?: number[], 
+    payment_date?: string,
+    invoices?: { invoice_id: number, payment_date: string }[]
+  }) =>
+    apiClient.post('/nav/invoices/bulk_mark_paid/', data),
 };
 
 export default apiClient;

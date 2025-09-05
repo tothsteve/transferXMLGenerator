@@ -91,6 +91,7 @@ const TransferWorkflow: React.FC = () => {
         currency: transfer.currency as 'HUF' | 'EUR' | 'USD',
         execution_date: transfer.execution_date,
         remittance_info: transfer.remittance_info,
+        nav_invoice: transfer.nav_invoice, // Link to NAV invoice for payment tracking
         order: transfer.order,
         is_processed: false,
       }));
@@ -179,14 +180,18 @@ const TransferWorkflow: React.FC = () => {
     // Handle preloaded transfers from NAV invoices
     else if (state?.preloadedTransfers && state.source === 'nav_invoices' && defaultAccount) {
       console.log('Loading preloaded transfers from NAV invoices:', state.preloadedTransfers);
+      console.log(`Number of preloaded transfers: ${state.preloadedTransfers.length}`);
       
       const navTransfers = state.preloadedTransfers.map((transfer, index) => ({
         ...transfer,
         tempId: `nav-${index}`,
         originator_account: defaultAccount.id,
+        nav_invoice: transfer.nav_invoice, // Link to NAV invoice for payment tracking
         // Keep beneficiary_id as null initially - will be resolved before saving
       }));
       
+      console.log('Processed NAV transfers:', navTransfers);
+      console.log(`Number of processed NAV transfers: ${navTransfers.length}`);
       setTransfers(navTransfers);
       
       // Clear the location state to prevent re-loading on refresh
@@ -268,63 +273,107 @@ const TransferWorkflow: React.FC = () => {
 
   // Helper function to resolve beneficiaries for NAV transfers
   const resolveBeneficiariesForTransfers = async (transfersToProcess: TransferData[]) => {
+    console.log(`[resolveBeneficiariesForTransfers] Starting with ${transfersToProcess.length} transfers`);
     const resolvedTransfers = [...transfersToProcess];
+    const createdBeneficiaries = new Map<string, number>(); // account_number -> beneficiary_id
     
-    for (let i = 0; i < resolvedTransfers.length; i++) {
-      const transfer = resolvedTransfers[i] as any;
+    // First, collect all unique beneficiaries that need to be resolved
+    const beneficiariesToResolve = new Map<string, { name: string; account_number: string }>();
+    
+    for (const transfer of resolvedTransfers) {
+      const navTransfer = transfer as any;
       
       // Skip if beneficiary is already set
-      if (transfer.beneficiary) continue;
+      if (navTransfer.beneficiary) continue;
       
       // Skip if we don't have the required NAV transfer data
-      if (!transfer.beneficiary_name || !transfer.account_number) continue;
+      if (!navTransfer.beneficiary_name || !navTransfer.account_number) continue;
       
-      console.log(`Resolving beneficiary for NAV transfer: ${transfer.beneficiary_name}`);
+      // Use account number as unique key to avoid duplicates
+      const accountKey = navTransfer.account_number;
+      if (!beneficiariesToResolve.has(accountKey)) {
+        beneficiariesToResolve.set(accountKey, {
+          name: navTransfer.beneficiary_name,
+          account_number: navTransfer.account_number
+        });
+      }
+    }
+    
+    console.log(`Need to resolve ${beneficiariesToResolve.size} unique beneficiaries from NAV transfers`);
+    
+    // Resolve each unique beneficiary
+    for (const [accountKey, beneficiaryInfo] of Array.from(beneficiariesToResolve.entries())) {
+      console.log(`Resolving beneficiary: ${beneficiaryInfo.name} (${beneficiaryInfo.account_number})`);
       
       // Try to find existing beneficiary by account number (most reliable match)
       let matchingBeneficiary = beneficiaries.find(b => 
-        b.account_number === transfer.account_number && b.is_active
+        b.account_number === beneficiaryInfo.account_number && b.is_active
       );
       
       // If not found by account number, try to find by name
       if (!matchingBeneficiary) {
         matchingBeneficiary = beneficiaries.find(b => 
-          b.name.toLowerCase() === transfer.beneficiary_name!.toLowerCase() && b.is_active
+          b.name.toLowerCase() === beneficiaryInfo.name.toLowerCase() && b.is_active
         );
       }
       
       if (matchingBeneficiary) {
         // Use existing beneficiary
-        resolvedTransfers[i] = {
-          ...transfer,
-          beneficiary: matchingBeneficiary.id,
-        };
-        console.log(`Matched existing beneficiary for ${transfer.beneficiary_name}:`, matchingBeneficiary);
+        createdBeneficiaries.set(accountKey, matchingBeneficiary.id);
+        console.log(`Matched existing beneficiary for ${beneficiaryInfo.name}:`, matchingBeneficiary);
       } else {
-        // Create new beneficiary
+        // Create new beneficiary (only once per unique account)
         try {
-          console.log(`Creating new beneficiary for NAV transfer: ${transfer.beneficiary_name}`);
+          console.log(`Creating new beneficiary: ${beneficiaryInfo.name}`);
           const newBeneficiary = await createBeneficiaryMutation.mutateAsync({
-            name: transfer.beneficiary_name!,
-            account_number: transfer.account_number!,
+            name: beneficiaryInfo.name,
+            account_number: beneficiaryInfo.account_number,
             description: 'NAV számla alapján automatikusan létrehozva',
             is_active: true,
             is_frequent: false,
             remittance_information: '',
           });
           
-          resolvedTransfers[i] = {
-            ...transfer,
-            beneficiary: newBeneficiary.data.id,
-          };
-          console.log(`Created new beneficiary for ${transfer.beneficiary_name}:`, newBeneficiary.data);
+          createdBeneficiaries.set(accountKey, newBeneficiary.data.id);
+          console.log(`Created new beneficiary for ${beneficiaryInfo.name}:`, newBeneficiary.data);
         } catch (error) {
-          console.error(`Failed to create beneficiary for ${transfer.beneficiary_name}:`, error);
-          throw new Error(`Nem sikerült létrehozni a kedvezményezettet: ${transfer.beneficiary_name}`);
+          console.error(`Failed to create beneficiary for ${beneficiaryInfo.name}:`, error);
+          throw new Error(`Nem sikerült létrehozni a kedvezményezettet: ${beneficiaryInfo.name}`);
         }
       }
     }
     
+    // Now assign resolved beneficiary IDs to all transfers
+    console.log(`[resolveBeneficiariesForTransfers] Assigning beneficiary IDs to ${resolvedTransfers.length} transfers`);
+    for (let i = 0; i < resolvedTransfers.length; i++) {
+      const transfer = resolvedTransfers[i] as any;
+      
+      // Skip if beneficiary is already set
+      if (transfer.beneficiary) {
+        console.log(`[resolveBeneficiariesForTransfers] Transfer ${i} already has beneficiary: ${transfer.beneficiary}`);
+        continue;
+      }
+      
+      // Skip if we don't have the required NAV transfer data
+      if (!transfer.beneficiary_name || !transfer.account_number) {
+        console.log(`[resolveBeneficiariesForTransfers] Transfer ${i} missing required data:`, { beneficiary_name: transfer.beneficiary_name, account_number: transfer.account_number });
+        continue;
+      }
+      
+      const beneficiaryId = createdBeneficiaries.get(transfer.account_number);
+      if (beneficiaryId) {
+        console.log(`[resolveBeneficiariesForTransfers] Assigning beneficiary ID ${beneficiaryId} to transfer ${i} for account ${transfer.account_number}`);
+        resolvedTransfers[i] = {
+          ...transfer,
+          beneficiary: beneficiaryId,
+        };
+      } else {
+        console.log(`[resolveBeneficiariesForTransfers] No beneficiary ID found for transfer ${i} account ${transfer.account_number}`);
+      }
+    }
+    
+    console.log(`[resolveBeneficiariesForTransfers] Returning ${resolvedTransfers.length} resolved transfers`);
+    console.log('[resolveBeneficiariesForTransfers] Final resolved transfers:', resolvedTransfers);
     return resolvedTransfers;
   };
 
@@ -370,6 +419,7 @@ const TransferWorkflow: React.FC = () => {
           currency: t.currency,
           execution_date: t.execution_date,
           remittance_info: t.remittance_info,
+          nav_invoice_id: t.nav_invoice, // Include NAV invoice link
           order: transfers.indexOf(t), // Preserve the order from the UI
         }));
         

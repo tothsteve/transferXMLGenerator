@@ -24,6 +24,10 @@ import {
   CreditCard as CardIcon,
   Receipt as ReceiptIcon,
   AttachMoney as CashIcon,
+  CheckCircle as PaidIcon,
+  Schedule as UnpaidIcon,
+  Warning as OverdueIcon,
+  Assignment as PreparedIcon,
 } from '@mui/icons-material';
 
 interface Invoice {
@@ -58,6 +62,10 @@ interface Invoice {
   payment_method: string | null;
   original_invoice_number: string | null;
   payment_status: string;
+  payment_status_date: string | null;
+  payment_status_date_formatted: string | null;
+  auto_marked_paid: boolean;
+  is_overdue: boolean;
   is_paid: boolean;
   invoice_category?: string | null;
   
@@ -239,6 +247,40 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
     }
   };
 
+  const getPaymentStatusIcon = (paymentStatus: string, paymentStatusDate: string | null, isOverdue: boolean) => {
+    const statusDate = paymentStatusDate ? `Dátum: ${paymentStatusDate}` : 'Nincs dátum';
+    
+    switch (paymentStatus?.toUpperCase()) {
+      case 'PAID':
+        return (
+          <Tooltip title={`Kifizetve - ${statusDate}`}>
+            <PaidIcon color="success" fontSize="small" />
+          </Tooltip>
+        );
+      case 'PREPARED':
+        return (
+          <Tooltip title={`Előkészítve - ${statusDate}`}>
+            <PreparedIcon color="info" fontSize="small" />
+          </Tooltip>
+        );
+      case 'UNPAID':
+      default:
+        if (isOverdue) {
+          return (
+            <Tooltip title={`Lejárt - ${statusDate}`}>
+              <OverdueIcon color="error" fontSize="small" />
+            </Tooltip>
+          );
+        } else {
+          return (
+            <Tooltip title={`Fizetésre vár - ${statusDate}`}>
+              <UnpaidIcon color="warning" fontSize="small" />
+            </Tooltip>
+          );
+        }
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -262,6 +304,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
               <TableCell sx={{ backgroundColor: 'background.paper' }}>Teljesítés</TableCell>
               <TableCell sx={{ backgroundColor: 'background.paper' }}>Fizetési határidő</TableCell>
               <TableCell align="center" sx={{ backgroundColor: 'background.paper' }}>Fizetési mód</TableCell>
+              <TableCell align="center" sx={{ backgroundColor: 'background.paper' }}>Fizetési állapot</TableCell>
               <TableCell align="right" sx={{ backgroundColor: 'background.paper' }}>Nettó</TableCell>
               <TableCell align="right" sx={{ backgroundColor: 'background.paper' }}>ÁFA</TableCell>
               <TableCell align="right" sx={{ backgroundColor: 'background.paper' }}>Bruttó</TableCell>
@@ -272,7 +315,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
           <TableBody>
             {Array.from({ length: 10 }).map((_, index) => (
               <TableRow key={index}>
-                {Array.from({ length: showStornoColumn ? 13 : 12 }).map((_, cellIndex) => (
+                {Array.from({ length: showStornoColumn ? 14 : 13 }).map((_, cellIndex) => (
                   <TableCell key={cellIndex}><Skeleton /></TableCell>
                 ))}
               </TableRow>
@@ -328,6 +371,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
             {renderHeaderCell('fulfillment_date', 'Teljesítés')}
             {renderHeaderCell('payment_due_date', 'Fizetési határidő')}
             {renderHeaderCell('payment_method', 'Fizetési mód', 'center')}
+            {renderHeaderCell('payment_status', 'Fizetési állapot', 'center')}
             {renderHeaderCell('invoice_net_amount', 'Nettó', 'right')}
             {renderHeaderCell('invoice_vat_amount', 'ÁFA', 'right')}
             {renderHeaderCell('invoice_gross_amount', 'Bruttó', 'right')}
@@ -399,6 +443,9 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
               </TableCell>
               <TableCell align="center">
                 {getPaymentMethodIcon(invoice.payment_method, invoice.invoice_category)}
+              </TableCell>
+              <TableCell align="center">
+                {getPaymentStatusIcon(invoice.payment_status, invoice.payment_status_date_formatted, invoice.is_overdue)}
               </TableCell>
               <TableCell align="right">
                 <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>

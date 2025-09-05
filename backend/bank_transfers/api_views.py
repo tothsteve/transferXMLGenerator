@@ -496,7 +496,7 @@ class TransferViewSet(viewsets.ModelViewSet):
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class TransferBatchViewSet(viewsets.ReadOnlyModelViewSet):
+class TransferBatchViewSet(viewsets.ModelViewSet):
     """
     Utalási kötegek megtekintése
     
@@ -571,6 +571,44 @@ class TransferBatchViewSet(viewsets.ReadOnlyModelViewSet):
             'used_in_bank': batch.used_in_bank,
             'bank_usage_date': batch.bank_usage_date
         })
+    
+    @swagger_auto_schema(
+        operation_description="Utalási köteg törlése (csak akkor engedélyezett, ha nincs bankban felhasználva)",
+        responses={
+            204: 'Batch successfully deleted',
+            400: 'Batch cannot be deleted - already used in bank',
+            404: 'Batch not found'
+        }
+    )
+    def destroy(self, request, *args, **kwargs):
+        """
+        Utalási köteg törlése
+        
+        A törlés csak akkor engedélyezett, ha a köteg nincs még bankban felhasználva.
+        
+        Megjegyzés: A jogosultság ellenőrzést a RequireBatchManagement permission osztály végzi,
+        amely biztosítja, hogy csak BATCH_MANAGEMENT jogosultsággal rendelkező felhasználók
+        törölhessenek kötegeket (BATCH_VIEW jogosultság nem elég).
+        """
+        batch = self.get_object()
+        
+        # Check if batch has been used in bank
+        if batch.used_in_bank:
+            return Response({
+                'error': 'A köteg nem törölhető, mert már fel lett használva a bankban.',
+                'detail': 'Cannot delete batch that has been used in bank.',
+                'used_in_bank': True,
+                'bank_usage_date': batch.bank_usage_date
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Batch can be safely deleted
+        batch_name = batch.name
+        batch.delete()
+        
+        return Response({
+            'detail': f'A köteg "{batch_name}" sikeresen törölve.',
+            'message': f'Batch "{batch_name}" successfully deleted.'
+        }, status=status.HTTP_204_NO_CONTENT)
 
 class ExcelImportView(APIView):
     """
@@ -772,13 +810,21 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         
         # Payment status filtering
         payment_status = self.request.query_params.get('payment_status', None)
-        if payment_status == 'paid':
-            queryset = queryset.filter(payment_date__isnull=False)
-        elif payment_status == 'unpaid':
-            queryset = queryset.filter(payment_date__isnull=True)
-        elif payment_status == 'overdue':
-            from datetime import date
-            queryset = queryset.filter(payment_date__isnull=True, payment_due_date__lt=date.today())
+        if payment_status:
+            if payment_status.upper() == 'PAID':
+                queryset = queryset.filter(payment_status='PAID')
+            elif payment_status.upper() == 'UNPAID':
+                queryset = queryset.filter(payment_status='UNPAID')
+            elif payment_status.upper() == 'PREPARED':
+                queryset = queryset.filter(payment_status='PREPARED')
+            # Legacy support for old format
+            elif payment_status == 'paid':
+                queryset = queryset.filter(payment_date__isnull=False)
+            elif payment_status == 'unpaid':
+                queryset = queryset.filter(payment_date__isnull=True)
+            elif payment_status == 'overdue':
+                from datetime import date
+                queryset = queryset.filter(payment_date__isnull=True, payment_due_date__lt=date.today())
         
         # Amount range filtering
         amount_from = self.request.query_params.get('amount_from', None)
@@ -890,6 +936,197 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         }
         
         return Response(stats)
+    
+    @swagger_auto_schema(
+        operation_summary="Számlák tömeges megjelölése fizetésre várként",
+        operation_description="Mark multiple invoices as unpaid (Fizetésre vár)",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'invoice_ids': openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(type=openapi.TYPE_INTEGER),
+                    description="List of invoice IDs to mark as unpaid"
+                )
+            },
+            required=['invoice_ids']
+        )
+    )
+    @action(detail=False, methods=['post'])
+    def bulk_mark_unpaid(self, request):
+        """Mark multiple invoices as unpaid"""
+        invoice_ids = request.data.get('invoice_ids', [])
+        
+        if not invoice_ids:
+            return Response({'error': 'invoice_ids kötelező'}, status=400)
+        
+        invoices = Invoice.objects.filter(
+            id__in=invoice_ids,
+            company=request.company
+        )
+        
+        updated_count = 0
+        for invoice in invoices:
+            if invoice.payment_status != 'UNPAID':
+                invoice.payment_status = 'UNPAID'
+                invoice.payment_status_date = timezone.now().date()
+                invoice.auto_marked_paid = False
+                invoice.save()
+                updated_count += 1
+        
+        return Response({
+            'message': f'{updated_count} számla megjelölve fizetésre várként',
+            'updated_count': updated_count
+        })
+    
+    @swagger_auto_schema(
+        operation_summary="Számlák tömeges megjelölése előkészítettként", 
+        operation_description="Mark multiple invoices as prepared (Előkészítve)",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'invoice_ids': openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(type=openapi.TYPE_INTEGER),
+                    description="List of invoice IDs to mark as prepared"
+                )
+            },
+            required=['invoice_ids']
+        )
+    )
+    @action(detail=False, methods=['post'])
+    def bulk_mark_prepared(self, request):
+        """Mark multiple invoices as prepared"""
+        invoice_ids = request.data.get('invoice_ids', [])
+        
+        if not invoice_ids:
+            return Response({'error': 'invoice_ids kötelező'}, status=400)
+        
+        invoices = Invoice.objects.filter(
+            id__in=invoice_ids,
+            company=request.company
+        )
+        
+        updated_count = 0
+        for invoice in invoices:
+            if invoice.payment_status != 'PREPARED':
+                invoice.mark_as_prepared()
+                updated_count += 1
+        
+        return Response({
+            'message': f'{updated_count} számla megjelölve előkészítettként',
+            'updated_count': updated_count
+        })
+    
+    @swagger_auto_schema(
+        operation_summary="Számlák tömeges megjelölése kifizetettként",
+        operation_description="Mark multiple invoices as paid (Kifizetve). Supports both single date for all invoices and individual dates per invoice.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'invoice_ids': openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(type=openapi.TYPE_INTEGER),
+                    description="List of invoice IDs to mark as paid (used when payment_date is provided)"
+                ),
+                'payment_date': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    format=openapi.FORMAT_DATE,
+                    description="Single payment date (YYYY-MM-DD) for all invoices, defaults to today"
+                ),
+                'invoices': openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            'invoice_id': openapi.Schema(type=openapi.TYPE_INTEGER, description="Invoice ID"),
+                            'payment_date': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_DATE, description="Payment date for this invoice (YYYY-MM-DD)")
+                        },
+                        required=['invoice_id', 'payment_date']
+                    ),
+                    description="List of invoices with individual payment dates"
+                )
+            },
+            required=[]
+        )
+    )
+    @action(detail=False, methods=['post'])
+    def bulk_mark_paid(self, request):
+        """Mark multiple invoices as paid with flexible date options"""
+        invoice_ids = request.data.get('invoice_ids', [])
+        payment_date_str = request.data.get('payment_date')
+        invoices_with_dates = request.data.get('invoices', [])
+        
+        # Validate input - must provide either invoice_ids or invoices
+        if not invoice_ids and not invoices_with_dates:
+            return Response({'error': 'invoice_ids vagy invoices kötelező'}, status=400)
+        
+        updated_count = 0
+        errors = []
+        
+        try:
+            # Option 1: Single date for multiple invoices
+            if invoice_ids:
+                # Parse single payment date
+                payment_date = None
+                if payment_date_str:
+                    try:
+                        from datetime import datetime
+                        payment_date = datetime.strptime(payment_date_str, '%Y-%m-%d').date()
+                    except ValueError:
+                        return Response({'error': 'Érvénytelen dátum formátum. Használj YYYY-MM-DD formátumot.'}, status=400)
+                
+                invoices = Invoice.objects.filter(
+                    id__in=invoice_ids,
+                    company=request.company
+                )
+                
+                for invoice in invoices:
+                    if invoice.payment_status != 'PAID':
+                        invoice.mark_as_paid(payment_date=payment_date, auto_marked=False)
+                        updated_count += 1
+            
+            # Option 2: Individual dates for each invoice
+            if invoices_with_dates:
+                from datetime import datetime
+                
+                for item in invoices_with_dates:
+                    invoice_id = item.get('invoice_id')
+                    item_payment_date_str = item.get('payment_date')
+                    
+                    if not invoice_id or not item_payment_date_str:
+                        errors.append(f'Invoice ID és payment_date kötelező minden elemhez')
+                        continue
+                    
+                    # Parse individual payment date
+                    try:
+                        item_payment_date = datetime.strptime(item_payment_date_str, '%Y-%m-%d').date()
+                    except ValueError:
+                        errors.append(f'Érvénytelen dátum formátum invoice {invoice_id}-hez: {item_payment_date_str}')
+                        continue
+                    
+                    # Find and update invoice
+                    try:
+                        invoice = Invoice.objects.get(id=invoice_id, company=request.company)
+                        if invoice.payment_status != 'PAID':
+                            invoice.mark_as_paid(payment_date=item_payment_date, auto_marked=False)
+                            updated_count += 1
+                    except Invoice.DoesNotExist:
+                        errors.append(f'Számla nem található: {invoice_id}')
+                        continue
+        
+        except Exception as e:
+            return Response({'error': f'Hiba történt: {str(e)}'}, status=500)
+        
+        response_data = {
+            'message': f'{updated_count} számla megjelölve kifizetettként',
+            'updated_count': updated_count
+        }
+        
+        if errors:
+            response_data['errors'] = errors
+        
+        return Response(response_data)
 
 
 class InvoiceSyncLogViewSet(viewsets.ReadOnlyModelViewSet):
