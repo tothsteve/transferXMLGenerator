@@ -172,7 +172,7 @@ const NAVInvoices: React.FC = () => {
   const [inboundTransferFilter, setInboundTransferFilter] = useState(false);
   
   // Date interval filters
-  const [dateFilterType, setDateFilterType] = useState<'issue_date' | 'fulfillment_date' | ''>('');
+  const [dateFilterType, setDateFilterType] = useState<'issue_date' | 'fulfillment_date' | 'payment_due_date' | ''>('');
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
 
@@ -225,7 +225,7 @@ const NAVInvoices: React.FC = () => {
   };
 
   // Handle date filter type change with automatic date range setting
-  const handleDateFilterTypeChange = (value: 'issue_date' | 'fulfillment_date' | '') => {
+  const handleDateFilterTypeChange = (value: 'issue_date' | 'fulfillment_date' | 'payment_due_date' | '') => {
     setDateFilterType(value);
     
     if (value !== '') {
@@ -283,6 +283,8 @@ const NAVInvoices: React.FC = () => {
         ...(dateFilterType === 'issue_date' && dateTo && { issue_date_to: dateTo }),
         ...(dateFilterType === 'fulfillment_date' && dateFrom && { fulfillment_date_from: dateFrom }),
         ...(dateFilterType === 'fulfillment_date' && dateTo && { fulfillment_date_to: dateTo }),
+        ...(dateFilterType === 'payment_due_date' && dateFrom && { payment_due_date_from: dateFrom }),
+        ...(dateFilterType === 'payment_due_date' && dateTo && { payment_due_date_to: dateTo }),
       };
 
       const response = await navInvoicesApi.getAll(params);
@@ -768,11 +770,12 @@ const NAVInvoices: React.FC = () => {
               <Select
                 value={dateFilterType}
                 label="Dátum típus"
-                onChange={(e) => handleDateFilterTypeChange(e.target.value as 'issue_date' | 'fulfillment_date' | '')}
+                onChange={(e) => handleDateFilterTypeChange(e.target.value as 'issue_date' | 'fulfillment_date' | 'payment_due_date' | '')}
               >
                 <MenuItem value="">Nincs</MenuItem>
                 <MenuItem value="issue_date">Kiállítás</MenuItem>
                 <MenuItem value="fulfillment_date">Teljesítés</MenuItem>
+                <MenuItem value="payment_due_date">Fizetési határidő</MenuItem>
               </Select>
             </FormControl>
             
@@ -896,7 +899,11 @@ const NAVInvoices: React.FC = () => {
             )}
             {dateFilterType && (dateFrom || dateTo) && (
               <Chip
-                label={`${dateFilterType === 'issue_date' ? 'Kiállítás' : 'Teljesítés'}: ${
+                label={`${
+                  dateFilterType === 'issue_date' ? 'Kiállítás' : 
+                  dateFilterType === 'fulfillment_date' ? 'Teljesítés' : 
+                  'Fizetési határidő'
+                }: ${
                   dateFrom && dateTo 
                     ? `${dateFrom} - ${dateTo}` 
                     : dateFrom 
@@ -963,83 +970,89 @@ const NAVInvoices: React.FC = () => {
               </IconButton>
             </Stack>
             
-            {/* Collapsible direction-specific totals */}
+            {/* Collapsible direction-specific totals - Compact Table Design */}
             <Collapse in={!totalsCollapsed}>
-              <Stack spacing={2}>
-                {/* Outbound totals - First row */}
+              <Box sx={{ 
+                border: '1px solid', 
+                borderColor: 'divider', 
+                borderRadius: 1, 
+                overflow: 'hidden',
+                mt: 1
+              }}>
+                {/* Table Header */}
+                <Box sx={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: '120px 1fr 1fr 1fr', 
+                  gap: 1,
+                  bgcolor: 'grey.50',
+                  p: 1,
+                  borderBottom: '1px solid',
+                  borderBottomColor: 'divider'
+                }}>
+                  <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.75rem' }}>
+                    Irány
+                  </Typography>
+                  <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.75rem', textAlign: 'center' }}>
+                    Nettó
+                  </Typography>
+                  <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.75rem', textAlign: 'center' }}>
+                    ÁFA
+                  </Typography>
+                  <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.75rem', textAlign: 'center' }}>
+                    Bruttó
+                  </Typography>
+                </Box>
+                
+                {/* Outbound Row */}
                 {totals.outbound.count > 0 && (
-                  <Stack direction="row" spacing={4} alignItems="center" flexWrap="wrap">
-                    <Box sx={{ minWidth: 120 }}>
-                      <Typography variant="body2" color="primary.main" sx={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
-                        Kimenő ({totals.outbound.count} db):
-                      </Typography>
-                    </Box>
-                    <Stack direction="row" spacing={3}>
-                      <Box sx={{ textAlign: 'center', minWidth: 100 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', display: 'block' }}>
-                          Nettó
-                        </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.main' }}>
-                          {formatAmount(totals.outbound.net, 'HUF')}
-                        </Typography>
-                      </Box>
-                      <Box sx={{ textAlign: 'center', minWidth: 100 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', display: 'block' }}>
-                          ÁFA
-                        </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'warning.main' }}>
-                          {formatAmount(totals.outbound.vat, 'HUF')}
-                        </Typography>
-                      </Box>
-                      <Box sx={{ textAlign: 'center', minWidth: 100 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', display: 'block' }}>
-                          Bruttó
-                        </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                          {formatAmount(totals.outbound.gross, 'HUF')}
-                        </Typography>
-                      </Box>
-                    </Stack>
-                  </Stack>
+                  <Box sx={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: '120px 1fr 1fr 1fr', 
+                    gap: 1,
+                    p: 1,
+                    borderBottom: totals.inbound.count > 0 ? '1px solid' : 'none',
+                    borderBottomColor: 'divider',
+                    '&:hover': { bgcolor: 'action.hover' }
+                  }}>
+                    <Typography variant="body2" color="primary.main" sx={{ fontSize: '0.75rem', fontWeight: 'medium' }}>
+                      Kimenő ({totals.outbound.count})
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.75rem', textAlign: 'center', color: 'success.main', fontWeight: 'medium' }}>
+                      {formatAmount(totals.outbound.net, 'HUF')}
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.75rem', textAlign: 'center', color: 'warning.main', fontWeight: 'medium' }}>
+                      {formatAmount(totals.outbound.vat, 'HUF')}
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.75rem', textAlign: 'center', color: 'primary.main', fontWeight: 'bold' }}>
+                      {formatAmount(totals.outbound.gross, 'HUF')}
+                    </Typography>
+                  </Box>
                 )}
                 
-                {/* Inbound totals - Second row */}
+                {/* Inbound Row */}
                 {totals.inbound.count > 0 && (
-                  <Stack direction="row" spacing={4} alignItems="center" flexWrap="wrap">
-                    <Box sx={{ minWidth: 120 }}>
-                      <Typography variant="body2" color="secondary.main" sx={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
-                        Bejövő ({totals.inbound.count} db):
-                      </Typography>
-                    </Box>
-                    <Stack direction="row" spacing={3}>
-                      <Box sx={{ textAlign: 'center', minWidth: 100 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', display: 'block' }}>
-                          Nettó
-                        </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.main' }}>
-                          {formatAmount(totals.inbound.net, 'HUF')}
-                        </Typography>
-                      </Box>
-                      <Box sx={{ textAlign: 'center', minWidth: 100 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', display: 'block' }}>
-                          ÁFA
-                        </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'warning.main' }}>
-                          {formatAmount(totals.inbound.vat, 'HUF')}
-                        </Typography>
-                      </Box>
-                      <Box sx={{ textAlign: 'center', minWidth: 100 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', display: 'block' }}>
-                          Bruttó
-                        </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'secondary.main' }}>
-                          {formatAmount(totals.inbound.gross, 'HUF')}
-                        </Typography>
-                      </Box>
-                    </Stack>
-                  </Stack>
+                  <Box sx={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: '120px 1fr 1fr 1fr', 
+                    gap: 1,
+                    p: 1,
+                    '&:hover': { bgcolor: 'action.hover' }
+                  }}>
+                    <Typography variant="body2" color="secondary.main" sx={{ fontSize: '0.75rem', fontWeight: 'medium' }}>
+                      Bejövő ({totals.inbound.count})
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.75rem', textAlign: 'center', color: 'success.main', fontWeight: 'medium' }}>
+                      {formatAmount(totals.inbound.net, 'HUF')}
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.75rem', textAlign: 'center', color: 'warning.main', fontWeight: 'medium' }}>
+                      {formatAmount(totals.inbound.vat, 'HUF')}
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.75rem', textAlign: 'center', color: 'secondary.main', fontWeight: 'bold' }}>
+                      {formatAmount(totals.inbound.gross, 'HUF')}
+                    </Typography>
+                  </Box>
                 )}
-              </Stack>
+              </Box>
             </Collapse>
           </Stack>
         </Paper>
