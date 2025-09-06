@@ -14,6 +14,7 @@ import {
   Tooltip,
   Checkbox,
 } from '@mui/material';
+import PaymentStatusBadge from '../PaymentStatusBadge';
 import {
   Visibility as ViewIcon,
   KeyboardArrowUp as ArrowUpIcon,
@@ -61,7 +62,12 @@ interface Invoice {
   invoice_operation: string | null;
   payment_method: string | null;
   original_invoice_number: string | null;
-  payment_status: string;
+  payment_status: {
+    status: string;
+    label: string;
+    icon: string;
+    class: string;
+  };
   payment_status_date: string | null;
   payment_status_date_formatted: string | null;
   auto_marked_paid: boolean;
@@ -445,7 +451,11 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
                 {getPaymentMethodIcon(invoice.payment_method, invoice.invoice_category)}
               </TableCell>
               <TableCell align="center">
-                {getPaymentStatusIcon(invoice.payment_status, invoice.payment_status_date_formatted, invoice.is_overdue)}
+                <PaymentStatusBadge 
+                  paymentStatus={invoice.payment_status}
+                  paymentStatusDate={invoice.payment_status_date_formatted || undefined}
+                  size="small"
+                />
               </TableCell>
               <TableCell align="right">
                 <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
