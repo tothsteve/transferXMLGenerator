@@ -483,13 +483,53 @@ class InvoiceDetailSerializer(serializers.ModelSerializer):
             return f"{obj.invoice_gross_amount:,.2f} {obj.currency_code}"
     
     def get_payment_status(self, obj):
-        """Return the payment status display value."""
-        status_map = {
-            'UNPAID': 'Fizetésre vár',
-            'PREPARED': 'Előkészítve', 
-            'PAID': 'Kifizetve'
+        """Return enhanced payment status with type differentiation."""
+        if obj.payment_status == 'UNPAID':
+            return {
+                'status': 'UNPAID',
+                'label': 'Fizetésre vár',
+                'icon': 'pending',
+                'class': 'status-unpaid'
+            }
+        elif obj.payment_status == 'PREPARED':
+            return {
+                'status': 'PREPARED',
+                'label': 'Előkészítve', 
+                'icon': 'schedule',
+                'class': 'status-prepared'
+            }
+        elif obj.payment_status == 'PAID':
+            # Check if paid through system (has related transfer)
+            has_transfer = hasattr(obj, 'transfer_set') and obj.transfer_set.exists()
+            
+            if obj.auto_marked_paid:
+                return {
+                    'status': 'PAID_TRUSTED',
+                    'label': 'Kifizetve (Megbízható partner)',
+                    'icon': 'verified',
+                    'class': 'status-paid-trusted'
+                }
+            elif has_transfer:
+                return {
+                    'status': 'PAID_SYSTEM',
+                    'label': 'Kifizetve (Bankba átadva)',
+                    'icon': 'account_balance',
+                    'class': 'status-paid-system'
+                }
+            else:
+                return {
+                    'status': 'PAID_MANUAL',
+                    'label': 'Kifizetve (Kézi)',
+                    'icon': 'done',
+                    'class': 'status-paid-manual'
+                }
+        
+        return {
+            'status': 'UNKNOWN',
+            'label': 'Ismeretlen',
+            'icon': 'help',
+            'class': 'status-unknown'
         }
-        return status_map.get(obj.payment_status, obj.payment_status)
     
     def get_payment_status_date_formatted(self, obj):
         if obj.payment_status_date:

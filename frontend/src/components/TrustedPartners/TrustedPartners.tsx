@@ -203,7 +203,7 @@ const TrustedPartners: React.FC = () => {
                   </TableCell>
                   <TableCell align="center">
                     <Switch
-                      checked={partner.is_active}
+                      checked={partner.is_active ?? false}
                       onChange={() => handleToggleActive(partner)}
                       color="primary"
                       size="small"
@@ -211,11 +211,11 @@ const TrustedPartners: React.FC = () => {
                   </TableCell>
                   <TableCell align="center">
                     <Switch
-                      checked={partner.auto_pay}
+                      checked={partner.auto_pay ?? false}
                       onChange={() => handleToggleAutoPay(partner)}
                       color="success"
                       size="small"
-                      disabled={!partner.is_active}
+                      disabled={!(partner.is_active ?? false)}
                     />
                   </TableCell>
                   <TableCell align="center">

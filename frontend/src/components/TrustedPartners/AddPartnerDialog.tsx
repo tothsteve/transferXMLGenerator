@@ -100,12 +100,11 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
 
   // Fetch available partners from invoices
   const { data: availablePartnersResponse, isLoading: availablePartnersLoading } = useQuery({
-    queryKey: ['availablePartners', { page: availablePartnersPage + 1, page_size: availablePartnersRowsPerPage, search: availablePartnersSearch, ordering: availablePartnersOrdering }],
+    queryKey: ['availablePartners', { page: availablePartnersPage + 1, page_size: availablePartnersRowsPerPage, search: availablePartnersSearch }],
     queryFn: () => trustedPartnersApi.getAvailablePartners({ 
       page: availablePartnersPage + 1, 
       page_size: availablePartnersRowsPerPage,
       search: availablePartnersSearch || undefined,
-      ordering: availablePartnersOrdering,
     }),
     enabled: open && tabValue === 1, // Only fetch when dialog is open and on "From Invoices" tab
   });
