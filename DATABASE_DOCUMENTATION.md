@@ -3,7 +3,7 @@
 
 **Last Updated:** 2025-01-15  
 **Database:** PostgreSQL (Production on Railway) / SQL Server (Local Development)  
-**Schema Version:** Multi-Company Architecture with Feature Flags and NAV Invoice Payment Status Tracking (Migration 0032)  
+**Schema Version:** Multi-Company Architecture with Feature Flags, NAV Invoice Payment Status Tracking, and Trusted Partners Auto-Payment System (Migration 0033)  
 
 > **Note:** This documentation is the **single source of truth** for database schema. All database comment scripts should be generated from this document.
 
@@ -726,6 +726,54 @@ def has_permission(request, required_feature):
 
 ---
 
+## 17. **bank_transfers_trustedpartner**
+**Table Comment:** *Company-scoped trusted partners for automatic NAV invoice payment processing. When invoices are received from trusted partners, they are automatically marked as PAID.*
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for trusted partner record |
+| `company_id` | INTEGER | NOT NULL, FK(bank_transfers_company.id) | Company owner of this trusted partner |
+| `partner_name` | VARCHAR(200) | NOT NULL | Full name of the trusted partner (supplier/organization) |
+| `tax_number` | VARCHAR(20) | NOT NULL | Hungarian tax identification number of the partner |
+| `is_active` | BOOLEAN | DEFAULT TRUE | Active status - inactive partners are ignored during auto-processing |
+| `auto_pay` | BOOLEAN | DEFAULT TRUE | Auto-payment enabled - when TRUE, invoices are automatically marked as PAID |
+| `invoice_count` | INTEGER | DEFAULT 0 | Statistics: Total number of invoices processed from this partner |
+| `last_invoice_date` | DATE | NULL | Statistics: Date of the most recent invoice from this partner |
+| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Partner registration timestamp |
+| `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
+
+**Indexes:**
+- Primary key on `id`
+- Index on `company_id` for company-scoped queries
+- Index on `company_id, is_active` for active partner filtering
+- Index on `company_id, auto_pay` for auto-payment filtering
+- Index on `company_id, -last_invoice_date` for recent activity sorting
+- Unique index on `company_id, tax_number` for preventing duplicates
+
+**Constraints:**
+- Unique constraint on `(company_id, tax_number)` - prevents duplicate tax numbers within a company
+
+**Business Rules:**
+- **Auto-Payment Processing**: During NAV sync, invoices from trusted partners (where `is_active=TRUE` and `auto_pay=TRUE`) are automatically marked as `payment_status='PAID'`
+- **Tax Number Matching**: Supports flexible Hungarian tax number format matching:
+  - **8-digit format**: Base tax number (e.g., "12345678")
+  - **11-digit format**: Full tax number with check digits (e.g., "12345678-2-16")
+  - **13-digit format**: Tax number with dashes (e.g., "12345678-2-16")
+- **Smart Matching Algorithm**: Three-level matching approach for reliable partner identification:
+  1. **Exact match**: Direct tax number comparison
+  2. **Normalized match**: Remove dashes and spaces, compare full numbers
+  3. **Base match**: Compare first 8 digits for cross-format compatibility
+- **Statistics Tracking**: `invoice_count` and `last_invoice_date` are automatically updated when invoices are processed from this partner
+- **Company Isolation**: All trusted partners are company-scoped with complete data isolation
+
+**Integration with NAV Invoice Processing:**
+- When NAV invoices are synchronized (`invoice_sync_service.py`), the system checks if the supplier's tax number matches any active trusted partner
+- If a match is found and `auto_pay=TRUE`, the invoice is immediately marked as `payment_status='PAID'` instead of the default `UNPAID`
+- The `auto_marked_paid` flag is set to TRUE to track automated vs manual payment status changes
+- Partner statistics are updated with invoice count and last invoice date
+
+---
+
 ## Performance Optimizations
 
 ### Database Indexes
@@ -754,7 +802,8 @@ def has_permission(request, required_feature):
 - **0019**: Added XML storage fields (`nav_invoice_xml`, `nav_invoice_hash`)
 - **0020**: Added feature flag system (`FeatureTemplate`, `CompanyFeature`)
 - **0021**: Enhanced CompanyUser with role-based permissions (`role`, `custom_permissions`, `permission_restrictions`)
-- **Current**: Full multi-tenant isolation with feature flags, role-based access control, and complete NAV integration
+- **0033**: Added trusted partners auto-payment system (`TrustedPartner` table) with NAV integration
+- **Current**: Full multi-tenant isolation with feature flags, role-based access control, complete NAV integration, and trusted partners auto-payment system
 
 ---
 
@@ -778,10 +827,12 @@ def has_permission(request, required_feature):
 - **SQL Server (Local)**: `/backend/sql/complete_database_comments_sqlserver.sql`
 - **PostgreSQL (Production)**: `/backend/sql/complete_database_comments_postgresql.sql`
 
-Both scripts provide complete table and column comments for all 14 tables and their columns, including:
+Both scripts provide complete table and column comments for all 17 tables and their columns, including:
 - Multi-company architecture tables (Company, CompanyUser, UserProfile)
 - Core transfer system (BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch)
 - NAV integration system (NavConfiguration, Invoice, InvoiceLineItem, InvoiceSyncLog)
+- Trusted partners auto-payment system (TrustedPartner)
+- Feature flag system (FeatureTemplate, CompanyFeature)
 
 ### Script Features:
 - **Complete coverage**: All current models and fields documented

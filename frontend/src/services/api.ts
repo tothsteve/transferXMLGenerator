@@ -12,6 +12,8 @@ import {
   GenerateKHExportResponse,
   LoadTemplateResponse,
   ExcelImportResponse,
+  TrustedPartner,
+  AvailablePartner,
 } from '../types/api';
 
 const API_BASE_URL = process.env.NODE_ENV === 'production' 
@@ -233,6 +235,37 @@ export const navInvoicesApi = {
     invoices?: { invoice_id: number, payment_date: string }[]
   }) =>
     apiClient.post('/nav/invoices/bulk_mark_paid/', data),
+};
+
+// Trusted Partners API
+export const trustedPartnersApi = {
+  getAll: (params?: { 
+    search?: string; 
+    is_active?: boolean;
+    auto_pay?: boolean;
+    ordering?: string;
+    page?: number;
+    page_size?: number;
+  }) =>
+    apiClient.get<ApiResponse<TrustedPartner>>('/trusted-partners/', { params }),
+  
+  getById: (id: number) =>
+    apiClient.get<TrustedPartner>(`/trusted-partners/${id}/`),
+  
+  create: (data: Omit<TrustedPartner, 'id' | 'invoice_count' | 'last_invoice_date' | 'created_at' | 'updated_at'>) =>
+    apiClient.post<TrustedPartner>('/trusted-partners/', data),
+  
+  update: (id: number, data: Partial<Omit<TrustedPartner, 'id' | 'invoice_count' | 'last_invoice_date' | 'created_at' | 'updated_at'>>) =>
+    apiClient.put<TrustedPartner>(`/trusted-partners/${id}/`, data),
+  
+  partialUpdate: (id: number, data: Partial<Omit<TrustedPartner, 'id' | 'invoice_count' | 'last_invoice_date' | 'created_at' | 'updated_at'>>) =>
+    apiClient.patch<TrustedPartner>(`/trusted-partners/${id}/`, data),
+  
+  delete: (id: number) =>
+    apiClient.delete(`/trusted-partners/${id}/`),
+  
+  getAvailablePartners: (params?: { search?: string; page?: number; page_size?: number; ordering?: string; }) =>
+    apiClient.get<ApiResponse<AvailablePartner>>('/trusted-partners/available_partners/', { params }),
 };
 
 export default apiClient;

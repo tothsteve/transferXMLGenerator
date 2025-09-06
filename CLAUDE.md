@@ -11,8 +11,8 @@ This is a Django + React application for generating XML and CSV files for bank t
 - **SQL Server database** connection (port 1435, database: 'administration')  
 - **Multi-tenant isolation** with company-scoped data and **feature flag system**
 - **Role-based access control** with 4-level permissions (ADMIN, FINANCIAL, ACCOUNTANT, USER)
-- **Key models**: Company, CompanyUser, FeatureTemplate, CompanyFeature, BankAccount, Beneficiary, TransferTemplate, Transfer, TransferBatch
-- **NAV integration** with invoice synchronization, XML storage, and **payment status tracking**
+- **Key models**: Company, CompanyUser, FeatureTemplate, CompanyFeature, BankAccount, Beneficiary, TransferTemplate, Transfer, TransferBatch, TrustedPartner
+- **NAV integration** with invoice synchronization, XML storage, **payment status tracking**, and **trusted partners auto-payment system**
 - **Export generation** via `utils.generate_xml()` and `kh_export.py` - creates HUF transaction XML files and KH Bank CSV files
 - **Feature-gated functionality** with company-specific feature enablement
 - **Excel import** functionality for bulk beneficiary creation
@@ -26,10 +26,11 @@ This is a Django + React application for generating XML and CSV files for bank t
 - **Multi-company architecture** with company context and role-based permissions
 - **Responsive dashboard** with sidebar navigation and modern design
 - **Complete CRUD operations** for beneficiaries, templates, transfers, and batches
-- **Settings management** for default bank account configuration with full CRUD operations
+- **Settings management** for default bank account configuration and trusted partners with full CRUD operations
 - **React Query integration** for optimistic updates, caching, and error handling
 - **Modern UI components** with form validation, loading states, and Hungarian localization
 - **NAV invoice payment status management** with bulk update operations and flexible date selection
+- **Trusted partners management** with automated NAV invoice payment processing
 
 ## ✅ IMPLEMENTED: Multi-Company Feature Flag System
 
@@ -133,6 +134,131 @@ The system implements comprehensive **payment status tracking** for NAV invoices
 - `payment_status_date` for tracking when status was last changed
 - `auto_marked_paid` flag to track automated vs manual status changes
 - Indexed for efficient filtering by payment status
+
+## ✅ IMPLEMENTED: Trusted Partners Auto-Payment System
+
+### Business Logic
+The **Trusted Partners** feature allows companies to designate specific suppliers as "trusted", enabling **automatic payment status updates** during NAV invoice synchronization. When a new invoice is received from a trusted partner, it is automatically marked as **PAID** instead of the default **UNPAID** status.
+
+### Key Features
+
+#### **Partner Management**
+- **Company-scoped trusted partners** with name and tax number identification
+- **Active/Inactive status control** to temporarily disable trusted partners
+- **Auto-payment toggle** per partner for granular control
+- **Statistics tracking**: invoice count and last invoice date per partner
+- **Source integration**: Partners can be selected from existing NAV invoice suppliers
+
+#### **Automated Payment Processing**
+- **NAV Sync Integration**: During invoice synchronization, invoices from trusted partners are automatically marked as PAID
+- **Flexible Tax Number Matching**: Supports multiple Hungarian tax number formats:
+  - **8-digit format**: Base company tax number (e.g., "12345678")
+  - **11-digit format**: Full tax number with check digits (e.g., "12345678-2-16")
+  - **13-digit format**: Tax number with dashes (e.g., "12345678-2-16")
+- **Smart Matching Algorithm**: Three-level matching approach for reliability:
+  1. **Exact match**: Direct tax number comparison
+  2. **Normalized match**: Remove dashes and spaces, compare full numbers
+  3. **Base match**: Compare first 8 digits for cross-format compatibility
+
+#### **User Interface**
+- **Settings Integration**: Accessible through "Beállítások" (Settings) menu with tabbed interface
+- **Dual Input Methods**: 
+  - Manual partner entry with name and tax number
+  - Selection from existing NAV invoice suppliers with search and sort
+- **Advanced Search**: Case-insensitive search by partner name or tax number
+- **Flexible Sorting**: Sortable by partner name, tax number, invoice count, or last invoice date
+- **Toggle Controls**: Individual switches for active status and auto-payment functionality
+- **Real-time Statistics**: Display invoice count and last invoice date per partner
+
+### API Endpoints
+
+#### **Trusted Partners Management**
+- `GET /api/trusted-partners/` - List company's trusted partners with pagination and search
+- `POST /api/trusted-partners/` - Create new trusted partner
+- `PUT /api/trusted-partners/{id}/` - Update trusted partner details
+- `DELETE /api/trusted-partners/{id}/` - Remove trusted partner
+- `GET /api/trusted-partners/available_partners/` - Get available suppliers from NAV invoices with search and ordering
+
+#### **Search and Filtering Parameters**
+- `search` - Case-insensitive search by partner name or tax number
+- `ordering` - Sort by: `partner_name`, `tax_number`, `invoice_count`, `-last_invoice_date` (default)
+- `active` - Filter by active status (true/false)
+- `auto_pay` - Filter by auto-payment status (true/false)
+
+### Database Schema
+
+#### **TrustedPartner Model**
+```python
+class TrustedPartner(TimestampedModel):
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='trusted_partners')
+    partner_name = models.CharField(max_length=200, verbose_name="Partner neve")
+    tax_number = models.CharField(max_length=20, verbose_name="Adószám")
+    is_active = models.BooleanField(default=True, verbose_name="Aktív")
+    auto_pay = models.BooleanField(default=True, verbose_name="Automatikus fizetés")
+    invoice_count = models.IntegerField(default=0, verbose_name="Számlák száma")
+    last_invoice_date = models.DateField(null=True, blank=True, verbose_name="Utolsó számla dátuma")
+    
+    class Meta:
+        unique_together = [['company', 'tax_number']]
+        indexes = [
+            models.Index(fields=['company', 'is_active']),
+            models.Index(fields=['company', 'auto_pay']),
+            models.Index(fields=['company', '-last_invoice_date']),
+        ]
+```
+
+### Technical Implementation
+
+#### **Tax Number Normalization**
+The system handles various Hungarian tax number formats through normalization:
+
+```python
+def _normalize_tax_number(self, tax_number: str) -> str:
+    """Remove dashes and spaces, keeping only digits"""
+    return ''.join(filter(str.isdigit, tax_number))
+
+def _get_base_tax_number(self, tax_number: str) -> str:
+    """Extract first 8 digits for base matching"""
+    normalized = self._normalize_tax_number(tax_number)
+    return normalized[:8] if len(normalized) >= 8 else normalized
+```
+
+#### **Auto-Payment Logic**
+During NAV invoice synchronization (`invoice_sync_service.py`):
+
+```python
+# Check for trusted partners
+trusted_partners = TrustedPartner.objects.filter(
+    company=company,
+    is_active=True,
+    auto_pay=True
+)
+
+for partner in trusted_partners:
+    # Three-level matching approach
+    if (invoice_tax == partner.tax_number or  # Exact match
+        normalized_invoice == normalized_partner or  # Normalized match  
+        base_invoice == base_partner):  # Base match
+        
+        invoice.payment_status = 'PAID'
+        invoice.payment_status_date = timezone.now().date()
+        invoice.auto_marked_paid = True
+        break
+```
+
+#### **Frontend Components**
+- **`TrustedPartners.tsx`**: Main management interface with data table and controls
+- **`AddPartnerDialog.tsx`**: Modal dialog with tabbed interface for adding partners
+- **`Settings.tsx`**: Enhanced with tabbed interface for Bank Account and Trusted Partners
+- **Search and Sort Integration**: Case-insensitive search with flexible column sorting
+
+### Implementation Notes
+- **Company Isolation**: All trusted partners are company-scoped with proper access control
+- **Performance Optimization**: Database indexes on commonly filtered fields
+- **Data Integrity**: Unique constraint prevents duplicate tax numbers per company
+- **Hungarian Localization**: All UI elements and field labels in Hungarian
+- **Error Handling**: Comprehensive validation for tax number formats and duplicate prevention
+- **Statistics Maintenance**: Automatic tracking of invoice count and last invoice date per partner
 
 ## Database Documentation
 
@@ -268,6 +394,7 @@ else:
 - `TransferTemplateViewSet`: Template management with beneficiary associations - **Feature gated**
 - `TransferViewSet`: Individual transfers with bulk creation and XML/CSV export generation - **Feature gated**
 - `TransferBatchViewSet`: Read-only batches created during XML/CSV export generation - **Feature gated**
+- `TrustedPartnerViewSet`: Trusted partners management with automatic NAV invoice payment processing
 
 ### Authentication & Permission System
 All ViewSets use **two-layer permission checking**:
@@ -296,6 +423,13 @@ All ViewSets use **two-layer permission checking**:
 - `POST /api/transfers/generate_csv/`: CSV file generation - **Requires EXPORT_CSV_KH**
 - `POST /api/templates/{id}/load_transfers/`: Generate transfers from template - **Requires TRANSFER_MANAGEMENT**
 - `POST /api/import/excel/`: Import beneficiaries from Excel files - **Requires BULK_OPERATIONS**
+
+#### Trusted Partners Management
+- `GET /api/trusted-partners/`: List trusted partners with search and filtering
+- `POST /api/trusted-partners/`: Create new trusted partner
+- `PUT /api/trusted-partners/{id}/`: Update trusted partner details
+- `DELETE /api/trusted-partners/{id}/`: Remove trusted partner
+- `GET /api/trusted-partners/available_partners/`: Get available suppliers from NAV invoices
 
 ## Export Generation
 
