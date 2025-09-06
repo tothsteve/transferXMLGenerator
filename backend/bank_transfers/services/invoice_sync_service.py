@@ -638,6 +638,9 @@ class InvoiceSyncService:
         for line_data in line_items:
             self._create_line_item_from_nav_data(invoice, line_data)
         
+        # Check if supplier is a trusted partner and auto-mark as paid
+        self._check_trusted_partner_auto_payment(invoice)
+        
         logger.info(f"Új számla létrehozva: {invoice.nav_invoice_number}")
         return invoice
     
@@ -671,6 +674,10 @@ class InvoiceSyncService:
             invoice.line_items.all().delete()
             for line_data in line_items:
                 self._create_line_item_from_nav_data(invoice, line_data)
+        
+        # Check if supplier is a trusted partner and auto-mark as paid (only if not already paid)
+        if invoice.payment_status == 'UNPAID':
+            self._check_trusted_partner_auto_payment(invoice)
         
         logger.info(f"Számla frissítve: {invoice.nav_invoice_number}")
     
@@ -712,6 +719,83 @@ class InvoiceSyncService:
             return Decimal(str(value))
         except (ValueError, TypeError):
             return Decimal('0.00')
+    
+    def _normalize_tax_number(self, tax_number: str) -> str:
+        """Normalize tax number by removing dashes and spaces, keeping only digits."""
+        if not tax_number:
+            return ""
+        return ''.join(filter(str.isdigit, tax_number))
+    
+    def _get_base_tax_number(self, tax_number: str) -> str:
+        """Get the base 8-digit tax number from any format."""
+        normalized = self._normalize_tax_number(tax_number)
+        if len(normalized) >= 8:
+            return normalized[:8]  # First 8 digits
+        return normalized
+    
+    def _check_trusted_partner_auto_payment(self, invoice: Invoice):
+        """Check if supplier is a trusted partner and auto-mark invoice as paid."""
+        if not invoice.supplier_tax_number:
+            return
+            
+        try:
+            from ..models import TrustedPartner
+            
+            # Get base tax numbers for comparison
+            invoice_tax_normalized = self._normalize_tax_number(invoice.supplier_tax_number)
+            invoice_tax_base = self._get_base_tax_number(invoice.supplier_tax_number)
+            
+            if not invoice_tax_base or len(invoice_tax_base) < 8:
+                return
+            
+            # Check if supplier is a trusted partner with auto-pay enabled
+            # First try exact match
+            trusted_partner = TrustedPartner.objects.filter(
+                company=invoice.company,
+                tax_number=invoice.supplier_tax_number,
+                is_active=True,
+                auto_pay=True
+            ).first()
+            
+            # If no exact match, try normalized matching (full number)
+            if not trusted_partner:
+                for tp in TrustedPartner.objects.filter(
+                    company=invoice.company,
+                    is_active=True,
+                    auto_pay=True
+                ):
+                    tp_tax_normalized = self._normalize_tax_number(tp.tax_number)
+                    if tp_tax_normalized and tp_tax_normalized == invoice_tax_normalized:
+                        trusted_partner = tp
+                        break
+            
+            # If still no match, try base tax number matching (8-digit comparison)
+            if not trusted_partner:
+                for tp in TrustedPartner.objects.filter(
+                    company=invoice.company,
+                    is_active=True,
+                    auto_pay=True
+                ):
+                    tp_tax_base = self._get_base_tax_number(tp.tax_number)
+                    if tp_tax_base and len(tp_tax_base) >= 8 and tp_tax_base == invoice_tax_base:
+                        trusted_partner = tp
+                        break
+            
+            if trusted_partner:
+                # Auto-mark invoice as paid
+                invoice.mark_as_paid(auto_marked=True)
+                
+                # Update trusted partner statistics
+                trusted_partner.invoice_count += 1
+                if not trusted_partner.last_invoice_date or invoice.issue_date > trusted_partner.last_invoice_date:
+                    trusted_partner.last_invoice_date = invoice.issue_date
+                trusted_partner.save()
+                
+                logger.info(f"Számla automatikusan kifizetve - megbízható partner: {trusted_partner.partner_name} ({invoice.nav_invoice_number})")
+                logger.info(f"Tax number match: Invoice '{invoice.supplier_tax_number}' matched with Partner '{trusted_partner.tax_number}'")
+                
+        except Exception as e:
+            logger.error(f"Hiba a megbízható partner ellenőrzésnél: {e}")
     
     def sync_all_companies(
         self, 

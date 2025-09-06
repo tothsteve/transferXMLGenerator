@@ -1232,9 +1232,11 @@ class TrustedPartnerViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def available_partners(self, request):
         """
-        Get available partners from NAV invoices that can be added as trusted partners
+        Get available partners from NAV invoices that can be added as trusted partners.
+        Supports search and ordering parameters.
         """
-        from django.db.models import Count, Max
+        from django.db.models import Count, Max, Q
+        from django.core.paginator import Paginator
         
         # Get distinct suppliers from invoices that are not already trusted partners
         existing_tax_numbers = set(
@@ -1242,23 +1244,66 @@ class TrustedPartnerViewSet(viewsets.ModelViewSet):
             .values_list('tax_number', flat=True)
         )
         
-        # Query distinct suppliers from NAV invoices
-        available = Invoice.objects.filter(
+        # Build base query
+        query = Invoice.objects.filter(
             company=request.company,
             supplier_tax_number__isnull=False,
             supplier_name__isnull=False
         ).exclude(
             supplier_tax_number__in=existing_tax_numbers
-        ).values(
+        )
+        
+        # Apply search filter (case-insensitive)
+        search = request.query_params.get('search', '').strip()
+        if search:
+            query = query.filter(
+                Q(supplier_name__icontains=search) | 
+                Q(supplier_tax_number__icontains=search)
+            )
+        
+        # Group by supplier and annotate with statistics
+        available = query.values(
             'supplier_name', 'supplier_tax_number'
         ).annotate(
             invoice_count=Count('id'),
             last_invoice_date=Max('issue_date')
-        ).order_by('supplier_name')
+        )
+        
+        # Apply ordering (default: last_invoice_date descending)
+        ordering = request.query_params.get('ordering', '-last_invoice_date')
+        
+        # Map ordering fields for the annotated query
+        ordering_map = {
+            'partner_name': 'supplier_name',
+            '-partner_name': '-supplier_name',
+            'tax_number': 'supplier_tax_number',
+            '-tax_number': '-supplier_tax_number',
+            'invoice_count': 'invoice_count',
+            '-invoice_count': '-invoice_count',
+            'last_invoice_date': 'last_invoice_date',
+            '-last_invoice_date': '-last_invoice_date',
+        }
+        
+        if ordering in ordering_map:
+            available = available.order_by(ordering_map[ordering])
+        else:
+            # Default ordering: most recent invoices first
+            available = available.order_by('-last_invoice_date')
+        
+        # Pagination
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 10))
+        
+        # Convert to list to enable pagination
+        available_list = list(available)
+        
+        # Create paginator
+        paginator = Paginator(available_list, page_size)
+        page_obj = paginator.get_page(page)
         
         # Format the response
         partners_data = []
-        for item in available:
+        for item in page_obj.object_list:
             partners_data.append({
                 'partner_name': item['supplier_name'],
                 'tax_number': item['supplier_tax_number'],
@@ -1267,6 +1312,8 @@ class TrustedPartnerViewSet(viewsets.ModelViewSet):
             })
         
         return Response({
-            'count': len(partners_data),
+            'count': paginator.count,
+            'next': page_obj.next_page_number() if page_obj.has_next() else None,
+            'previous': page_obj.previous_page_number() if page_obj.has_previous() else None,
             'results': partners_data
         })

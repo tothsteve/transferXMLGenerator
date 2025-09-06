@@ -482,6 +482,15 @@ class InvoiceDetailSerializer(serializers.ModelSerializer):
         else:
             return f"{obj.invoice_gross_amount:,.2f} {obj.currency_code}"
     
+    def get_payment_status(self, obj):
+        """Return the payment status display value."""
+        status_map = {
+            'UNPAID': 'Fizetésre vár',
+            'PREPARED': 'Előkészítve', 
+            'PAID': 'Kifizetve'
+        }
+        return status_map.get(obj.payment_status, obj.payment_status)
+    
     def get_payment_status_date_formatted(self, obj):
         if obj.payment_status_date:
             return obj.payment_status_date.strftime('%Y-%m-%d')

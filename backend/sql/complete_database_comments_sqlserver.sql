@@ -309,6 +309,23 @@ EXEC #SafeAddProperty @name = N'MS_Description', @value = N'Log entry creation t
 EXEC #SafeAddProperty @name = N'MS_Description', @value = N'Last modification timestamp', @level0type = N'SCHEMA', @level0name = 'dbo', @level1type = N'TABLE', @level1name = 'bank_transfers_invoicesynclog', @level2type = N'COLUMN', @level2name = 'updated_at';
 
 -- =============================================================================
+-- TRUSTED PARTNERS AUTO-PAYMENT SYSTEM
+-- =============================================================================
+
+-- Trusted Partner Management
+EXEC #SafeAddProperty @name = N'MS_Description', @value = N'Company-scoped trusted partners for automatic NAV invoice payment processing. When invoices are received from trusted partners, they are automatically marked as PAID.', @level0type = N'SCHEMA', @level0name = 'dbo', @level1type = N'TABLE', @level1name = 'bank_transfers_trustedpartner';
+EXEC #SafeAddProperty @name = N'MS_Description', @value = N'Primary key - unique trusted partner identifier', @level0type = N'SCHEMA', @level0name = 'dbo', @level1type = N'TABLE', @level1name = 'bank_transfers_trustedpartner', @level2type = N'COLUMN', @level2name = 'id';
+EXEC #SafeAddProperty @name = N'MS_Description', @value = N'Foreign key to company - which company owns this trusted partner', @level0type = N'SCHEMA', @level0name = 'dbo', @level1type = N'TABLE', @level1name = 'bank_transfers_trustedpartner', @level2type = N'COLUMN', @level2name = 'company_id';
+EXEC #SafeAddProperty @name = N'MS_Description', @value = N'Full name of the trusted partner (supplier/organization)', @level0type = N'SCHEMA', @level0name = 'dbo', @level1type = N'TABLE', @level1name = 'bank_transfers_trustedpartner', @level2type = N'COLUMN', @level2name = 'partner_name';
+EXEC #SafeAddProperty @name = N'MS_Description', @value = N'Hungarian tax identification number of the partner (supports multiple formats)', @level0type = N'SCHEMA', @level0name = 'dbo', @level1type = N'TABLE', @level1name = 'bank_transfers_trustedpartner', @level2type = N'COLUMN', @level2name = 'tax_number';
+EXEC #SafeAddProperty @name = N'MS_Description', @value = N'Active status - inactive partners are ignored during auto-processing', @level0type = N'SCHEMA', @level0name = 'dbo', @level1type = N'TABLE', @level1name = 'bank_transfers_trustedpartner', @level2type = N'COLUMN', @level2name = 'is_active';
+EXEC #SafeAddProperty @name = N'MS_Description', @value = N'Auto-payment enabled - when TRUE, invoices are automatically marked as PAID', @level0type = N'SCHEMA', @level0name = 'dbo', @level1type = N'TABLE', @level1name = 'bank_transfers_trustedpartner', @level2type = N'COLUMN', @level2name = 'auto_pay';
+EXEC #SafeAddProperty @name = N'MS_Description', @value = N'Statistics: Total number of invoices processed from this partner', @level0type = N'SCHEMA', @level0name = 'dbo', @level1type = N'TABLE', @level1name = 'bank_transfers_trustedpartner', @level2type = N'COLUMN', @level2name = 'invoice_count';
+EXEC #SafeAddProperty @name = N'MS_Description', @value = N'Statistics: Date of the most recent invoice from this partner', @level0type = N'SCHEMA', @level0name = 'dbo', @level1type = N'TABLE', @level1name = 'bank_transfers_trustedpartner', @level2type = N'COLUMN', @level2name = 'last_invoice_date';
+EXEC #SafeAddProperty @name = N'MS_Description', @value = N'Partner registration timestamp', @level0type = N'SCHEMA', @level0name = 'dbo', @level1type = N'TABLE', @level1name = 'bank_transfers_trustedpartner', @level2type = N'COLUMN', @level2name = 'created_at';
+EXEC #SafeAddProperty @name = N'MS_Description', @value = N'Last modification timestamp', @level0type = N'SCHEMA', @level0name = 'dbo', @level1type = N'TABLE', @level1name = 'bank_transfers_trustedpartner', @level2type = N'COLUMN', @level2name = 'updated_at';
+
+-- =============================================================================
 -- VERIFICATION QUERIES
 -- =============================================================================
 
