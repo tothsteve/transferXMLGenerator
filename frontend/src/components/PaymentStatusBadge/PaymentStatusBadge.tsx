@@ -1,12 +1,11 @@
 import React from 'react';
 import { Chip, Tooltip } from '@mui/material';
 import {
-  Pending as PendingIcon,
   Schedule as ScheduleIcon, 
-  Done as DoneIcon,
-  AccountBalance as AccountBalanceIcon,
-  Verified as VerifiedIcon,
-  Help as HelpIcon
+  Assignment as AssignmentIcon,
+  CheckCircle as CheckCircleIcon,
+  Help as HelpIcon,
+  Upload as UploadIcon
 } from '@mui/icons-material';
 
 interface PaymentStatus {
@@ -20,27 +19,27 @@ interface PaymentStatusBadgeProps {
   paymentStatus: PaymentStatus;
   paymentStatusDate?: string;
   size?: 'small' | 'medium';
+  compact?: boolean; // New prop for compact display
 }
 
 const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({ 
   paymentStatus, 
   paymentStatusDate,
-  size = 'small' 
+  size = 'small',
+  compact = false
 }) => {
   const getIcon = (iconName: string) => {
     const iconProps = { fontSize: size === 'small' ? 'small' : 'medium' as any };
     
     switch (iconName) {
-      case 'pending':
-        return <PendingIcon {...iconProps} />;
       case 'schedule':
         return <ScheduleIcon {...iconProps} />;
-      case 'done':
-        return <DoneIcon {...iconProps} />;
-      case 'account_balance':
-        return <AccountBalanceIcon {...iconProps} />;
-      case 'verified':
-        return <VerifiedIcon {...iconProps} />;
+      case 'assignment':
+        return <AssignmentIcon {...iconProps} />;
+      case 'upload':
+        return <UploadIcon {...iconProps} />;
+      case 'check_circle':
+        return <CheckCircleIcon {...iconProps} />;
       default:
         return <HelpIcon {...iconProps} />;
     }
@@ -49,35 +48,37 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
   const getColor = (status: string) => {
     switch (status) {
       case 'UNPAID':
-        return 'error';
+        return 'error';      // Red - needs payment
       case 'PREPARED':
-        return 'warning';
+        return 'info';       // Blue - prepared in system
       case 'PAID_MANUAL':
-        return 'success';
+        return 'success';    // Green - manually paid  
       case 'PAID_SYSTEM':
-        return 'info';
+        return 'info';       // Blue - paid through system
       case 'PAID_TRUSTED':
-        return 'secondary';
+        return 'secondary';  // Purple - trusted partner auto-paid
       default:
         return 'default';
     }
   };
 
   const getTooltip = (status: string) => {
-    switch (status) {
-      case 'UNPAID':
-        return 'Számla még nincs kifizetve';
-      case 'PREPARED':
-        return 'Átutalás létrehozva, de még bankba nincs átadva';
-      case 'PAID_MANUAL':
-        return 'Manuálisan fizetettnek jelölve';
-      case 'PAID_SYSTEM':
-        return 'Rendszerben kifizetés legenerálva, bankba átadva';
-      case 'PAID_TRUSTED':
-        return 'Automatikusan fizetettnek jelölve (megbízható partner)';
-      default:
-        return paymentStatus.label;
-    }
+    const baseLabel = paymentStatus.label;
+    const dateText = paymentStatusDate ? ` (${paymentStatusDate})` : '';
+    
+    const descriptions = {
+      'UNPAID': 'Számla még nincs kifizetve',
+      'PREPARED': 'Átutalás létrehozva, de még bankba nincs átadva', 
+      'PAID_MANUAL': 'Manuálisan fizetettnek jelölve',
+      'PAID_SYSTEM': 'Rendszerben kifizetés legenerálva, bankba átadva',
+      'PAID_TRUSTED': 'Automatikusan fizetettnek jelölve (megbízható partner)'
+    };
+    
+    const description = descriptions[status as keyof typeof descriptions] || baseLabel;
+    
+    return compact 
+      ? `${baseLabel}${dateText}\n\n${description}`
+      : description;
   };
 
   // Create display label with date if available and status needs it
@@ -89,6 +90,42 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
     return baseLabel;
   };
 
+  if (compact) {
+    // Compact mode: Just icon with colors and detailed tooltip
+    const getIconColor = (status: string) => {
+      switch (status) {
+        case 'UNPAID':
+          return '#f44336'; // Red
+        case 'PREPARED':
+          return '#2196f3'; // Blue
+        case 'PAID_MANUAL':
+          return '#4caf50'; // Light Green - Manual work/effort
+        case 'PAID_SYSTEM':
+          return '#1976d2'; // Blue - Cold/digital system
+        case 'PAID_TRUSTED':
+          return '#2e7d32'; // Dark Green - Trusted/premium
+        default:
+          return '#757575'; // Gray
+      }
+    };
+
+    return (
+      <Tooltip title={getTooltip(paymentStatus.status)} arrow>
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            cursor: 'help',
+            color: getIconColor(paymentStatus.status)
+          }}
+        >
+          {getIcon(paymentStatus.icon)}
+        </span>
+      </Tooltip>
+    );
+  }
+
+  // Full mode: Chip with icon and label
   return (
     <Tooltip title={getTooltip(paymentStatus.status)} arrow>
       <Chip

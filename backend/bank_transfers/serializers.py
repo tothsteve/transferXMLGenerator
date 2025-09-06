@@ -299,7 +299,8 @@ class InvoiceListSerializer(serializers.ModelSerializer):
     invoice_vat_amount_formatted = serializers.SerializerMethodField()
     invoice_gross_amount_formatted = serializers.SerializerMethodField()
     
-    # Payment status (using new database fields)
+    # Payment status (using new database fields) 
+    payment_status = serializers.SerializerMethodField()
     payment_status_date_formatted = serializers.SerializerMethodField()
     is_overdue = serializers.SerializerMethodField()
     
@@ -385,6 +386,59 @@ class InvoiceListSerializer(serializers.ModelSerializer):
     
     def get_is_overdue(self, obj):
         return obj.is_overdue()
+    
+    def get_payment_status(self, obj):
+        """Return enhanced payment status with type differentiation."""
+        if obj.payment_status == 'UNPAID':
+            return {
+                'status': 'UNPAID',
+                'label': 'Fizetésre vár',
+                'icon': 'schedule',  # Schedule icon like before
+                'class': 'status-unpaid'
+            }
+        elif obj.payment_status == 'PREPARED':
+            return {
+                'status': 'PREPARED',
+                'label': 'Előkészítve',
+                'icon': 'upload',  # Upload icon - ready to go to bank
+                'class': 'status-prepared'
+            }
+        elif obj.payment_status == 'PAID':
+            # Enhanced logic for different PAID types
+            # Priority: 1) System transfer, 2) Trusted partner, 3) Manual
+            has_transfer = hasattr(obj, 'generated_transfers') and obj.generated_transfers.exists()
+            
+            if has_transfer:
+                # If there's a transfer record, it was paid through the system
+                return {
+                    'status': 'PAID_SYSTEM', 
+                    'label': 'Kifizetve (Bankba átadva)',
+                    'icon': 'check_circle',  # Check circle icon
+                    'class': 'status-paid-system'
+                }
+            elif obj.auto_marked_paid:
+                # Auto-marked by trusted partner but no transfer yet
+                return {
+                    'status': 'PAID_TRUSTED',
+                    'label': 'Kifizetve (Megbízható partner)',
+                    'icon': 'check_circle',  # Check circle icon
+                    'class': 'status-paid-trusted'
+                }
+            else:
+                # Manually marked as paid
+                return {
+                    'status': 'PAID_MANUAL',
+                    'label': 'Kifizetve (Manuálisan)',
+                    'icon': 'check_circle',  # Check circle icon
+                    'class': 'status-paid-manual'
+                }
+        
+        return {
+            'status': 'UNKNOWN',
+            'label': 'Ismeretlen',
+            'icon': 'help',
+            'class': 'status-unknown'
+        }
 
 
 class InvoiceDetailSerializer(serializers.ModelSerializer):
@@ -488,39 +542,43 @@ class InvoiceDetailSerializer(serializers.ModelSerializer):
             return {
                 'status': 'UNPAID',
                 'label': 'Fizetésre vár',
-                'icon': 'pending',
+                'icon': 'schedule',  # Schedule icon like before
                 'class': 'status-unpaid'
             }
         elif obj.payment_status == 'PREPARED':
             return {
                 'status': 'PREPARED',
                 'label': 'Előkészítve', 
-                'icon': 'schedule',
+                'icon': 'upload',  # Upload icon - ready to go to bank
                 'class': 'status-prepared'
             }
         elif obj.payment_status == 'PAID':
-            # Check if paid through system (has related transfer)
-            has_transfer = hasattr(obj, 'transfer_set') and obj.transfer_set.exists()
+            # Enhanced logic for different PAID types
+            # Priority: 1) System transfer, 2) Trusted partner, 3) Manual
+            has_transfer = hasattr(obj, 'generated_transfers') and obj.generated_transfers.exists()
             
-            if obj.auto_marked_paid:
-                return {
-                    'status': 'PAID_TRUSTED',
-                    'label': 'Kifizetve (Megbízható partner)',
-                    'icon': 'verified',
-                    'class': 'status-paid-trusted'
-                }
-            elif has_transfer:
+            if has_transfer:
+                # If there's a transfer record, it was paid through the system
                 return {
                     'status': 'PAID_SYSTEM',
                     'label': 'Kifizetve (Bankba átadva)',
-                    'icon': 'account_balance',
+                    'icon': 'check_circle',  # Check circle icon
                     'class': 'status-paid-system'
                 }
+            elif obj.auto_marked_paid:
+                # Auto-marked by trusted partner but no transfer yet
+                return {
+                    'status': 'PAID_TRUSTED',
+                    'label': 'Kifizetve (Megbízható partner)',
+                    'icon': 'check_circle',  # Check circle icon
+                    'class': 'status-paid-trusted'
+                }
             else:
+                # Manually marked as paid
                 return {
                     'status': 'PAID_MANUAL',
-                    'label': 'Kifizetve (Kézi)',
-                    'icon': 'done',
+                    'label': 'Kifizetve (Manuálisan)',
+                    'icon': 'check_circle',  # Check circle icon
                     'class': 'status-paid-manual'
                 }
         
