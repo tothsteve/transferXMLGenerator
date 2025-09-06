@@ -420,7 +420,7 @@ class InvoiceListSerializer(serializers.ModelSerializer):
                 # Auto-marked by trusted partner but no transfer yet
                 return {
                     'status': 'PAID_TRUSTED',
-                    'label': 'Kifizetve (Megbízható partner)',
+                    'label': 'Kifizetve (Automatikus)',
                     'icon': 'check_circle',  # Check circle icon
                     'class': 'status-paid-trusted'
                 }
@@ -569,7 +569,7 @@ class InvoiceDetailSerializer(serializers.ModelSerializer):
                 # Auto-marked by trusted partner but no transfer yet
                 return {
                     'status': 'PAID_TRUSTED',
-                    'label': 'Kifizetve (Megbízható partner)',
+                    'label': 'Kifizetve (Automatikus)',
                     'icon': 'check_circle',  # Check circle icon
                     'class': 'status-paid-trusted'
                 }

@@ -194,7 +194,7 @@ const Settings: React.FC = () => {
             />
             <Tab 
               icon={<People />} 
-              label="Megbízható partnerek" 
+              label="Automatikusan Fizetett Partnerek" 
               sx={{ textTransform: 'none', fontWeight: 600 }}
             />
           </Tabs>

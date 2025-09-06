@@ -71,7 +71,7 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
       'PREPARED': 'Átutalás létrehozva, de még bankba nincs átadva', 
       'PAID_MANUAL': 'Manuálisan fizetettnek jelölve',
       'PAID_SYSTEM': 'Rendszerben kifizetés legenerálva, bankba átadva',
-      'PAID_TRUSTED': 'Automatikusan fizetettnek jelölve (megbízható partner)'
+      'PAID_TRUSTED': 'Automatikusan fizetettnek jelölve'
     };
     
     const description = descriptions[status as keyof typeof descriptions] || baseLabel;
