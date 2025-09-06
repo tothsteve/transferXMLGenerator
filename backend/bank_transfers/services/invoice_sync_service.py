@@ -647,6 +647,13 @@ class InvoiceSyncService:
     def _update_invoice_from_nav_data(self, invoice: Invoice, nav_data: Dict):
         """Update existing invoice with NAV data."""
         
+        # Store original payment status to preserve manual changes
+        original_payment_status = invoice.payment_status
+        original_payment_status_date = invoice.payment_status_date
+        original_auto_marked_paid = invoice.auto_marked_paid
+        
+        logger.info(f"Updating invoice {invoice.nav_invoice_number} - preserving payment_status: {original_payment_status}")
+        
         # Update fields that might have changed
         invoice.supplier_name = nav_data.get('supplier_name', invoice.supplier_name)
         invoice.customer_name = nav_data.get('customer_name', invoice.customer_name)
@@ -664,6 +671,11 @@ class InvoiceSyncService:
             invoice.nav_invoice_hash = nav_data.get('nav_invoice_hash')
             
         invoice.sync_status = 'SYNCED'
+        
+        # CRITICAL: Preserve payment status fields - NAV sync must NOT override manual payment status changes
+        invoice.payment_status = original_payment_status
+        invoice.payment_status_date = original_payment_status_date  
+        invoice.auto_marked_paid = original_auto_marked_paid
         
         invoice.save()
         
