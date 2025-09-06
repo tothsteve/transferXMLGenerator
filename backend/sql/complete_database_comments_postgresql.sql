@@ -262,6 +262,23 @@ COMMENT ON COLUMN bank_transfers_invoicesynclog.created_at IS 'Log entry creatio
 COMMENT ON COLUMN bank_transfers_invoicesynclog.updated_at IS 'Last modification timestamp';
 
 -- =============================================================================
+-- TRUSTED PARTNERS AUTO-PAYMENT SYSTEM
+-- =============================================================================
+
+-- Trusted Partner Management
+COMMENT ON TABLE bank_transfers_trustedpartner IS 'Company-scoped trusted partners for automatic NAV invoice payment processing. When invoices are received from trusted partners, they are automatically marked as PAID.';
+COMMENT ON COLUMN bank_transfers_trustedpartner.id IS 'Primary key - unique trusted partner identifier';
+COMMENT ON COLUMN bank_transfers_trustedpartner.company_id IS 'Foreign key to company - which company owns this trusted partner';
+COMMENT ON COLUMN bank_transfers_trustedpartner.partner_name IS 'Full name of the trusted partner (supplier/organization)';
+COMMENT ON COLUMN bank_transfers_trustedpartner.tax_number IS 'Hungarian tax identification number of the partner (supports multiple formats)';
+COMMENT ON COLUMN bank_transfers_trustedpartner.is_active IS 'Active status - inactive partners are ignored during auto-processing';
+COMMENT ON COLUMN bank_transfers_trustedpartner.auto_pay IS 'Auto-payment enabled - when TRUE, invoices are automatically marked as PAID';
+COMMENT ON COLUMN bank_transfers_trustedpartner.invoice_count IS 'Statistics: Total number of invoices processed from this partner';
+COMMENT ON COLUMN bank_transfers_trustedpartner.last_invoice_date IS 'Statistics: Date of the most recent invoice from this partner';
+COMMENT ON COLUMN bank_transfers_trustedpartner.created_at IS 'Partner registration timestamp';
+COMMENT ON COLUMN bank_transfers_trustedpartner.updated_at IS 'Last modification timestamp';
+
+-- =============================================================================
 -- VERIFICATION QUERIES
 -- =============================================================================
 

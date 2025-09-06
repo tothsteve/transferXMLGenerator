@@ -14,6 +14,7 @@ import {
   Tooltip,
   Checkbox,
 } from '@mui/material';
+import PaymentStatusBadge from '../PaymentStatusBadge';
 import {
   Visibility as ViewIcon,
   KeyboardArrowUp as ArrowUpIcon,
@@ -61,7 +62,12 @@ interface Invoice {
   invoice_operation: string | null;
   payment_method: string | null;
   original_invoice_number: string | null;
-  payment_status: string;
+  payment_status: {
+    status: string;
+    label: string;
+    icon: string;
+    class: string;
+  };
   payment_status_date: string | null;
   payment_status_date_formatted: string | null;
   auto_marked_paid: boolean;
@@ -247,39 +253,6 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
     }
   };
 
-  const getPaymentStatusIcon = (paymentStatus: string, paymentStatusDate: string | null, isOverdue: boolean) => {
-    const statusDate = paymentStatusDate ? `Dátum: ${paymentStatusDate}` : 'Nincs dátum';
-    
-    switch (paymentStatus?.toUpperCase()) {
-      case 'PAID':
-        return (
-          <Tooltip title={`Kifizetve - ${statusDate}`}>
-            <PaidIcon color="success" fontSize="small" />
-          </Tooltip>
-        );
-      case 'PREPARED':
-        return (
-          <Tooltip title={`Előkészítve - ${statusDate}`}>
-            <PreparedIcon color="info" fontSize="small" />
-          </Tooltip>
-        );
-      case 'UNPAID':
-      default:
-        if (isOverdue) {
-          return (
-            <Tooltip title={`Lejárt - ${statusDate}`}>
-              <OverdueIcon color="error" fontSize="small" />
-            </Tooltip>
-          );
-        } else {
-          return (
-            <Tooltip title={`Fizetésre vár - ${statusDate}`}>
-              <UnpaidIcon color="warning" fontSize="small" />
-            </Tooltip>
-          );
-        }
-    }
-  };
 
 
   if (isLoading) {
@@ -370,8 +343,8 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
             {renderHeaderCell('issue_date', 'Kiállítás')}
             {renderHeaderCell('fulfillment_date', 'Teljesítés')}
             {renderHeaderCell('payment_due_date', 'Fizetési határidő')}
-            {renderHeaderCell('payment_method', 'Fizetési mód', 'center')}
             {renderHeaderCell('payment_status', 'Fizetési állapot', 'center')}
+            {renderHeaderCell('payment_method', 'Fizetési mód', 'center')}
             {renderHeaderCell('invoice_net_amount', 'Nettó', 'right')}
             {renderHeaderCell('invoice_vat_amount', 'ÁFA', 'right')}
             {renderHeaderCell('invoice_gross_amount', 'Bruttó', 'right')}
@@ -442,10 +415,15 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
                 </Typography>
               </TableCell>
               <TableCell align="center">
-                {getPaymentMethodIcon(invoice.payment_method, invoice.invoice_category)}
+                <PaymentStatusBadge 
+                  paymentStatus={invoice.payment_status}
+                  paymentStatusDate={invoice.payment_status_date_formatted || undefined}
+                  size="small"
+                  compact={true}
+                />
               </TableCell>
               <TableCell align="center">
-                {getPaymentStatusIcon(invoice.payment_status, invoice.payment_status_date_formatted, invoice.is_overdue)}
+                {getPaymentMethodIcon(invoice.payment_method, invoice.invoice_category)}
               </TableCell>
               <TableCell align="right">
                 <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>

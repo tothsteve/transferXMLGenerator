@@ -1011,3 +1011,50 @@ class CompanyFeatureManager:
             )
             return feature, True
 
+
+class TrustedPartner(TimestampedModel):
+    """
+    Trusted partners for automatic payment processing.
+    When invoices are received from these partners, they are automatically marked as PAID.
+    """
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='trusted_partners')
+    partner_name = models.CharField(max_length=200, verbose_name="Partner neve")
+    tax_number = models.CharField(max_length=20, verbose_name="Adószám")
+    is_active = models.BooleanField(default=True, verbose_name="Aktív")
+    auto_pay = models.BooleanField(default=True, verbose_name="Automatikus fizetés")
+    notes = models.TextField(blank=True, verbose_name="Megjegyzések")
+    
+    # Statistics
+    invoice_count = models.IntegerField(default=0, verbose_name="Számlák száma")
+    last_invoice_date = models.DateField(null=True, blank=True, verbose_name="Utolsó számla dátuma")
+    
+    class Meta:
+        verbose_name = "Megbízható partner"
+        verbose_name_plural = "Megbízható partnerek"
+        ordering = ['partner_name']
+        unique_together = ['company', 'tax_number']
+        indexes = [
+            models.Index(fields=['company', 'tax_number']),
+            models.Index(fields=['is_active', 'auto_pay']),
+        ]
+    
+    def __str__(self):
+        return f"{self.partner_name} ({self.tax_number})"
+    
+    def update_statistics(self):
+        """Update invoice count and last invoice date from NAV invoices"""
+        from django.db.models import Count, Max
+        
+        # Count invoices from this partner
+        stats = Invoice.objects.filter(
+            company=self.company,
+            supplier_tax_number=self.tax_number
+        ).aggregate(
+            count=Count('id'),
+            last_date=Max('issue_date')
+        )
+        
+        self.invoice_count = stats['count'] or 0
+        self.last_invoice_date = stats['last_date']
+        self.save(update_fields=['invoice_count', 'last_invoice_date'])
+

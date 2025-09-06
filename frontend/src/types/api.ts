@@ -115,3 +115,23 @@ export interface GenerateKHExportResponse {
   transfer_count: number;
   total_amount: string;
 }
+
+export interface TrustedPartner {
+  id: number;
+  partner_name: string;
+  tax_number: string;
+  is_active: boolean;
+  auto_pay: boolean;
+  invoice_count: number;
+  last_invoice_date: string | null;
+  last_invoice_date_formatted?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AvailablePartner {
+  partner_name: string;
+  tax_number: string;
+  invoice_count: number;
+  last_invoice_date: string | null;
+}

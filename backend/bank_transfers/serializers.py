@@ -2,7 +2,7 @@ from rest_framework import serializers
 from decimal import Decimal
 from .models import (
     BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch, Company,
-    NavConfiguration, Invoice, InvoiceLineItem, InvoiceSyncLog
+    NavConfiguration, Invoice, InvoiceLineItem, InvoiceSyncLog, TrustedPartner
 )
 from .hungarian_account_validator import validate_and_format_hungarian_account_number
 
@@ -299,7 +299,8 @@ class InvoiceListSerializer(serializers.ModelSerializer):
     invoice_vat_amount_formatted = serializers.SerializerMethodField()
     invoice_gross_amount_formatted = serializers.SerializerMethodField()
     
-    # Payment status (using new database fields)
+    # Payment status (using new database fields) 
+    payment_status = serializers.SerializerMethodField()
     payment_status_date_formatted = serializers.SerializerMethodField()
     is_overdue = serializers.SerializerMethodField()
     
@@ -385,6 +386,59 @@ class InvoiceListSerializer(serializers.ModelSerializer):
     
     def get_is_overdue(self, obj):
         return obj.is_overdue()
+    
+    def get_payment_status(self, obj):
+        """Return enhanced payment status with type differentiation."""
+        if obj.payment_status == 'UNPAID':
+            return {
+                'status': 'UNPAID',
+                'label': 'Fizetésre vár',
+                'icon': 'schedule',  # Schedule icon like before
+                'class': 'status-unpaid'
+            }
+        elif obj.payment_status == 'PREPARED':
+            return {
+                'status': 'PREPARED',
+                'label': 'Előkészítve',
+                'icon': 'upload',  # Upload icon - ready to go to bank
+                'class': 'status-prepared'
+            }
+        elif obj.payment_status == 'PAID':
+            # Enhanced logic for different PAID types
+            # Priority: 1) System transfer, 2) Trusted partner, 3) Manual
+            has_transfer = hasattr(obj, 'generated_transfers') and obj.generated_transfers.exists()
+            
+            if has_transfer:
+                # If there's a transfer record, it was paid through the system
+                return {
+                    'status': 'PAID_SYSTEM', 
+                    'label': 'Kifizetve (Bankba átadva)',
+                    'icon': 'check_circle',  # Check circle icon
+                    'class': 'status-paid-system'
+                }
+            elif obj.auto_marked_paid:
+                # Auto-marked by trusted partner but no transfer yet
+                return {
+                    'status': 'PAID_TRUSTED',
+                    'label': 'Kifizetve (Automatikus)',
+                    'icon': 'check_circle',  # Check circle icon
+                    'class': 'status-paid-trusted'
+                }
+            else:
+                # Manually marked as paid
+                return {
+                    'status': 'PAID_MANUAL',
+                    'label': 'Kifizetve (Manuálisan)',
+                    'icon': 'check_circle',  # Check circle icon
+                    'class': 'status-paid-manual'
+                }
+        
+        return {
+            'status': 'UNKNOWN',
+            'label': 'Ismeretlen',
+            'icon': 'help',
+            'class': 'status-unknown'
+        }
 
 
 class InvoiceDetailSerializer(serializers.ModelSerializer):
@@ -482,6 +536,59 @@ class InvoiceDetailSerializer(serializers.ModelSerializer):
         else:
             return f"{obj.invoice_gross_amount:,.2f} {obj.currency_code}"
     
+    def get_payment_status(self, obj):
+        """Return enhanced payment status with type differentiation."""
+        if obj.payment_status == 'UNPAID':
+            return {
+                'status': 'UNPAID',
+                'label': 'Fizetésre vár',
+                'icon': 'schedule',  # Schedule icon like before
+                'class': 'status-unpaid'
+            }
+        elif obj.payment_status == 'PREPARED':
+            return {
+                'status': 'PREPARED',
+                'label': 'Előkészítve', 
+                'icon': 'upload',  # Upload icon - ready to go to bank
+                'class': 'status-prepared'
+            }
+        elif obj.payment_status == 'PAID':
+            # Enhanced logic for different PAID types
+            # Priority: 1) System transfer, 2) Trusted partner, 3) Manual
+            has_transfer = hasattr(obj, 'generated_transfers') and obj.generated_transfers.exists()
+            
+            if has_transfer:
+                # If there's a transfer record, it was paid through the system
+                return {
+                    'status': 'PAID_SYSTEM',
+                    'label': 'Kifizetve (Bankba átadva)',
+                    'icon': 'check_circle',  # Check circle icon
+                    'class': 'status-paid-system'
+                }
+            elif obj.auto_marked_paid:
+                # Auto-marked by trusted partner but no transfer yet
+                return {
+                    'status': 'PAID_TRUSTED',
+                    'label': 'Kifizetve (Automatikus)',
+                    'icon': 'check_circle',  # Check circle icon
+                    'class': 'status-paid-trusted'
+                }
+            else:
+                # Manually marked as paid
+                return {
+                    'status': 'PAID_MANUAL',
+                    'label': 'Kifizetve (Manuálisan)',
+                    'icon': 'check_circle',  # Check circle icon
+                    'class': 'status-paid-manual'
+                }
+        
+        return {
+            'status': 'UNKNOWN',
+            'label': 'Ismeretlen',
+            'icon': 'help',
+            'class': 'status-unknown'
+        }
+    
     def get_payment_status_date_formatted(self, obj):
         if obj.payment_status_date:
             return obj.payment_status_date.strftime('%Y-%m-%d')
@@ -542,3 +649,56 @@ class InvoiceStatsSerializer(serializers.Serializer):
         if last_sync:
             return last_sync.strftime('%Y-%m-%d %H:%M:%S')
         return 'Még nem szinkronizált'
+
+
+class TrustedPartnerSerializer(serializers.ModelSerializer):
+    """Serializer for TrustedPartner model with validation."""
+    
+    # Add read-only formatted fields
+    last_invoice_date_formatted = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = TrustedPartner
+        fields = [
+            'id', 'partner_name', 'tax_number', 'is_active', 'auto_pay', 'notes',
+            'invoice_count', 'last_invoice_date', 'last_invoice_date_formatted',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['invoice_count', 'last_invoice_date', 'created_at', 'updated_at']
+    
+    def get_last_invoice_date_formatted(self, obj):
+        """Format the last invoice date for display"""
+        if obj.last_invoice_date:
+            return obj.last_invoice_date.strftime('%Y-%m-%d')
+        return 'Nincs számla'
+    
+    def validate_tax_number(self, value):
+        """Validate tax number format (Hungarian format)"""
+        if value and not value.replace('-', '').replace(' ', '').isdigit():
+            raise serializers.ValidationError('Az adószám csak számokat tartalmazhat')
+        return value
+    
+    def validate(self, data):
+        """Custom validation for unique partner per company"""
+        request = self.context.get('request')
+        if request and hasattr(request, 'company'):
+            company = request.company
+            tax_number = data.get('tax_number')
+            
+            # Check for duplicate tax number in the same company
+            if tax_number:
+                queryset = TrustedPartner.objects.filter(
+                    company=company,
+                    tax_number=tax_number
+                )
+                
+                # Exclude current instance during updates
+                if self.instance:
+                    queryset = queryset.exclude(pk=self.instance.pk)
+                
+                if queryset.exists():
+                    raise serializers.ValidationError({
+                        'tax_number': 'Ez az adószám már szerepel a megbízható partnerek között'
+                    })
+        
+        return data

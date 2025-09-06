@@ -94,7 +94,12 @@ interface Invoice {
   invoice_appearance?: string | null;
   payment_method: string | null;
   original_invoice_number: string | null;
-  payment_status: string;
+  payment_status: {
+    status: string;
+    label: string;
+    icon: string;
+    class: string;
+  };
   payment_status_date: string | null;
   payment_status_date_formatted: string | null;
   auto_marked_paid: boolean;
