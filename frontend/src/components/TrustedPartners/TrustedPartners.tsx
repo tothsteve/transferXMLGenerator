@@ -153,7 +153,7 @@ const TrustedPartners: React.FC = () => {
       </Box>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        A megbízható partnerektől érkező számlák automatikusan kifizetve lesznek a NAV szinkronizáció során.
+        Az automatikusan fizetettnek jelölt partnerektől érkező számlák automatikusan kifizetve jelöltek lesznek a NAV szinkronizáció során.
       </Typography>
 
       <Paper elevation={2} sx={{ width: '100%', overflow: 'hidden' }}>
@@ -278,7 +278,7 @@ const TrustedPartners: React.FC = () => {
         onClose={() => setIsAddDialogOpen(false)}
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
-          setIsAddDialogOpen(false);
+          // Don't close dialog - let AddPartnerDialog handle its own state
         }}
       />
 
