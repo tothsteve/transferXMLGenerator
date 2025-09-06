@@ -1,11 +1,12 @@
 import React from 'react';
-import { Chip, Tooltip } from '@mui/material';
+import { Chip, Tooltip, Box } from '@mui/material';
 import {
   Schedule as ScheduleIcon, 
   Assignment as AssignmentIcon,
   CheckCircle as CheckCircleIcon,
   Help as HelpIcon,
-  Upload as UploadIcon
+  Upload as UploadIcon,
+  Warning as WarningIcon
 } from '@mui/icons-material';
 
 interface PaymentStatus {
@@ -20,16 +21,23 @@ interface PaymentStatusBadgeProps {
   paymentStatusDate?: string;
   size?: 'small' | 'medium';
   compact?: boolean; // New prop for compact display
+  isOverdue?: boolean; // New prop for overdue invoices
 }
 
 const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({ 
   paymentStatus, 
   paymentStatusDate,
   size = 'small',
-  compact = false
+  compact = false,
+  isOverdue = false
 }) => {
   const getIcon = (iconName: string) => {
     const iconProps = { fontSize: size === 'small' ? 'small' : 'medium' as any };
+    
+    // Show warning icon for overdue unpaid invoices
+    if (isOverdue && paymentStatus.status === 'UNPAID') {
+      return <WarningIcon {...iconProps} />;
+    }
     
     switch (iconName) {
       case 'schedule':
@@ -46,9 +54,14 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
   };
 
   const getColor = (status: string) => {
+    // Override color for overdue unpaid invoices
+    if (isOverdue && status === 'UNPAID') {
+      return 'error'; // Keep red but will be styled differently
+    }
+    
     switch (status) {
       case 'UNPAID':
-        return 'error';      // Red - needs payment
+        return 'warning';    // Orange/yellow - needs payment (not overdue)
       case 'PREPARED':
         return 'info';       // Blue - prepared in system
       case 'PAID_MANUAL':
@@ -65,6 +78,15 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
   const getTooltip = (status: string) => {
     const baseLabel = paymentStatus.label;
     const dateText = paymentStatusDate ? ` (${paymentStatusDate})` : '';
+    
+    // Override for overdue unpaid invoices
+    if (isOverdue && status === 'UNPAID') {
+      const overdueLabel = 'LEJÁRT! Fizetésre vár';
+      const overdueDescription = 'Számla lejárt és még nincs kifizetve';
+      return compact 
+        ? `${overdueLabel}${dateText}\n\n${overdueDescription}`
+        : overdueDescription;
+    }
     
     const descriptions = {
       'UNPAID': 'Számla még nincs kifizetve',
@@ -83,6 +105,11 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
 
   // Create display label with date if available and status needs it
   const getDisplayLabel = () => {
+    // Override label for overdue unpaid invoices
+    if (isOverdue && paymentStatus.status === 'UNPAID') {
+      return 'LEJÁRT!';
+    }
+    
     const baseLabel = paymentStatus.label;
     if (paymentStatusDate && ['PREPARED', 'PAID_MANUAL', 'PAID_SYSTEM', 'PAID_TRUSTED'].includes(paymentStatus.status)) {
       return `${baseLabel} (${paymentStatusDate})`;
@@ -93,9 +120,14 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
   if (compact) {
     // Compact mode: Just icon with colors and detailed tooltip
     const getIconColor = (status: string) => {
+      // Override color for overdue unpaid invoices
+      if (isOverdue && status === 'UNPAID') {
+        return '#d32f2f'; // Dark red for overdue
+      }
+      
       switch (status) {
         case 'UNPAID':
-          return '#f44336'; // Red
+          return '#ff9800'; // Orange - needs payment but not overdue
         case 'PREPARED':
           return '#2196f3'; // Blue
         case 'PAID_MANUAL':
@@ -152,6 +184,21 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
             '& .MuiChip-icon': {
               color: '#fff'
             }
+          }),
+          // Special styling for overdue unpaid invoices
+          ...(isOverdue && paymentStatus.status === 'UNPAID' && {
+            backgroundColor: '#d32f2f', // Dark red background
+            color: '#fff',
+            fontWeight: 'bold',
+            '& .MuiChip-icon': {
+              color: '#fff'
+            },
+            '@keyframes pulse': {
+              '0%': { opacity: 1 },
+              '50%': { opacity: 0.7 },
+              '100%': { opacity: 1 }
+            },
+            animation: 'pulse 2s infinite'
           })
         }}
       />

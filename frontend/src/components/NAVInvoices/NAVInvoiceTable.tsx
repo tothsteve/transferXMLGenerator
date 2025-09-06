@@ -420,6 +420,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
                   paymentStatusDate={invoice.payment_status_date_formatted || undefined}
                   size="small"
                   compact={true}
+                  isOverdue={invoice.is_overdue}
                 />
               </TableCell>
               <TableCell align="center">
