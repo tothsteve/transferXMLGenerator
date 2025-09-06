@@ -32,7 +32,7 @@ import {
   ArrowUpward,
   ArrowDownward,
 } from '@mui/icons-material';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trustedPartnersApi } from '../../services/api';
 import { TrustedPartner, AvailablePartner } from '../../types/api';
 
@@ -81,6 +81,8 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
   const [availablePartnersSearch, setAvailablePartnersSearch] = useState('');
   const [availablePartnersOrdering, setAvailablePartnersOrdering] = useState('-last_invoice_date');
   const [error, setError] = useState<string>('');
+  const [successMessage, setSuccessMessage] = useState<string>('');
+  const queryClient = useQueryClient();
 
   // Reset form when dialog opens/closes
   useEffect(() => {
@@ -93,6 +95,7 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
         auto_pay: true,
       });
       setError('');
+      setSuccessMessage('');
       setAvailablePartnersPage(0);
       setAvailablePartnersSearch('');
     }
@@ -113,8 +116,31 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
   const createMutation = useMutation({
     mutationFn: (data: Omit<TrustedPartner, 'id' | 'invoice_count' | 'last_invoice_date' | 'created_at' | 'updated_at'>) =>
       trustedPartnersApi.create(data),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      // Show success message
+      setSuccessMessage(`Partner "${response.data.partner_name}" sikeresen hozzáadva!`);
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(''), 3000);
+      
+      // Reset manual form if on manual tab
+      if (tabValue === 0) {
+        setManualFormData({
+          partner_name: '',
+          tax_number: '',
+          is_active: true,
+          auto_pay: true,
+        });
+      }
+      
+      // Invalidate queries to refresh both trusted partners and available partners lists
+      queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
+      queryClient.invalidateQueries({ queryKey: ['availablePartners'] });
+      
+      // Call onSuccess for parent component
       onSuccess();
+      
+      // Do NOT close dialog - user can continue adding partners
     },
     onError: (error: any) => {
       if (error.response?.data?.partner_name) {
@@ -135,6 +161,7 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
     setError('');
+    setSuccessMessage('');
   };
 
   const handleManualInputChange = (field: keyof typeof manualFormData) => (
@@ -203,7 +230,7 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         <Typography variant="h6" fontWeight="600">
-          Megbízható Partner Hozzáadása
+          Automatikusan Fizetett Partner Hozzáadása
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
           Válassz módszert a partner hozzáadásához
@@ -221,6 +248,12 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
         {error && (
           <Alert severity="error" sx={{ mt: 2, mb: 2 }}>
             {error}
+          </Alert>
+        )}
+        
+        {successMessage && (
+          <Alert severity="success" sx={{ mt: 2, mb: 2 }}>
+            {successMessage}
           </Alert>
         )}
 
@@ -273,7 +306,7 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
         {/* From Invoices Tab */}
         <TabPanel value={tabValue} index={1}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            NAV számláiból származó partnerek, akik még nincsenek hozzáadva a megbízható partnerekhez.
+            NAV számláiból származó partnerek, akik még nincsenek hozzáadva az Automatikusan Fizetettnek jelölt Partnerekhez.
           </Typography>
 
           <TextField
@@ -439,7 +472,7 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
 
       <DialogActions>
         <Button onClick={onClose} disabled={createMutation.isPending}>
-          Mégse
+          Bezárás
         </Button>
         {tabValue === 0 && (
           <Button
