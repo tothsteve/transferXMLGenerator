@@ -188,9 +188,13 @@ class InvoiceLineItemSerializer(serializers.ModelSerializer):
         return f"{obj.line_gross_amount:,.2f} Ft"
     
     def get_unit_price_formatted(self, obj):
+        if obj.unit_price is None:
+            return "-"
         return f"{obj.unit_price:,.2f} Ft"
     
     def get_vat_rate_formatted(self, obj):
+        if obj.vat_rate is None:
+            return "-"
         return f"{obj.vat_rate}%"
 
 
