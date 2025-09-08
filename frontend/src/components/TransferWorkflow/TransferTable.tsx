@@ -145,7 +145,7 @@ const SortableRow: React.FC<{
           </Avatar>
           <Box>
             <Typography variant="body2" fontWeight={600} sx={{ color: 'text.primary' }}>
-              {transfer.beneficiary_data?.name || (transfer as any).beneficiary_name || `Kedvezményezett #${transfer.beneficiary}`}
+              {transfer.beneficiary_data?.name || (transfer as any).beneficiary_name || `Kedvezményezett #${typeof transfer.beneficiary === 'number' ? transfer.beneficiary : (transfer.beneficiary as any)?.id || 'N/A'}`}
             </Typography>
             <Typography 
               variant="caption" 
