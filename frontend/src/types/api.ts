@@ -37,10 +37,11 @@ export interface TemplateBeneficiary {
   is_active: boolean;
 }
 
+// Transfer for create/update operations (uses IDs)
 export interface Transfer {
   id?: number;
   beneficiary: number;
-  beneficiary_data?: Beneficiary;
+  beneficiary_data?: Beneficiary;  // Optional expanded data
   amount: string;
   currency: 'HUF' | 'EUR' | 'USD';
   execution_date: string;
@@ -50,11 +51,24 @@ export interface Transfer {
   created_at?: string;
 }
 
+// Transfer as returned from API (with expanded data)
+export interface TransferWithBeneficiary {
+  id?: number;
+  beneficiary: Beneficiary;  // Full beneficiary object
+  amount: string;
+  currency: 'HUF' | 'EUR' | 'USD';
+  execution_date: string;
+  remittance_info: string;
+  nav_invoice?: number | null;
+  is_processed: boolean;
+  created_at?: string;
+}
+
 export interface TransferBatch {
   id: number;
   name: string;
   description?: string;
-  transfers: Transfer[];
+  transfers: TransferWithBeneficiary[];  // Batches return transfers with expanded beneficiary data
   total_amount: string;
   used_in_bank: boolean;
   bank_usage_date?: string;
@@ -63,6 +77,8 @@ export interface TransferBatch {
   xml_filename: string;
   xml_generated_at?: string;
   created_at: string;
+  batch_format?: string;
+  batch_format_display?: string;
 }
 
 export interface ApiResponse<T> {

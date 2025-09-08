@@ -282,6 +282,15 @@ export function useBatches() {
   });
 }
 
+export function useBatch(id: number | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ['batch', id],
+    queryFn: () => batchesApi.getById(id!),
+    select: (data) => data.data,
+    enabled: enabled && !!id,
+  });
+}
+
 export function useMarkBatchUsedInBank() {
   const queryClient = useQueryClient();
   

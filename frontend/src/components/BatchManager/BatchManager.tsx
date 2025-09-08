@@ -28,19 +28,27 @@ import {
   Description as DescriptionIcon,
   SwapHoriz as SwapHorizIcon,
   Delete as DeleteIcon,
+  Visibility as VisibilityIcon,
 } from '@mui/icons-material';
 import {
   useBatches,
+  useBatch,
   useMarkBatchUsedInBank,
   useMarkBatchUnusedInBank,
   useDownloadBatchXml,
   useDeleteBatch,
 } from '../../hooks/api';
 import { TransferBatch } from '../../types/api';
+import BatchDetailsDialog from './BatchDetailsDialog';
 
 const BatchManager: React.FC = () => {
   const [downloadingBatchId, setDownloadingBatchId] = useState<number | null>(null);
+  const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
   const { data: batchesData, isLoading, error } = useBatches();
+  const { data: selectedBatch, isLoading: isLoadingBatchDetails } = useBatch(
+    selectedBatchId || undefined,
+    !!selectedBatchId
+  );
   const markUsedMutation = useMarkBatchUsedInBank();
   const markUnusedMutation = useMarkBatchUnusedInBank();
   const downloadMutation = useDownloadBatchXml();
@@ -108,6 +116,14 @@ const BatchManager: React.FC = () => {
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  const handlePreviewBatch = (batch: TransferBatch) => {
+    setSelectedBatchId(batch.id);
+  };
+
+  const handleClosePreview = () => {
+    setSelectedBatchId(null);
   };
 
   const formatAmount = (amount: string) => {
@@ -235,6 +251,16 @@ const BatchManager: React.FC = () => {
                     </TableCell>
                     <TableCell>
                       <Stack direction="row" spacing={1} alignItems="center">
+                        <Tooltip title="Részletek megtekintése">
+                          <IconButton
+                            size="small"
+                            onClick={() => handlePreviewBatch(batch)}
+                            color="info"
+                          >
+                            <VisibilityIcon />
+                          </IconButton>
+                        </Tooltip>
+
                         <Tooltip title="Letöltés">
                           <span>
                             <IconButton
@@ -288,6 +314,13 @@ const BatchManager: React.FC = () => {
           </TableContainer>
         </Card>
       )}
+
+      <BatchDetailsDialog
+        open={!!selectedBatchId}
+        onClose={handleClosePreview}
+        batch={selectedBatch || null}
+        isLoading={isLoadingBatchDetails}
+      />
     </Container>
   );
 };
