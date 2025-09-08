@@ -801,8 +801,8 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(fulfillment_date__lte=fulfillment_date_to)
         
         # Date range filtering for payment due date
-        payment_due_from = self.request.query_params.get('payment_due_from', None)
-        payment_due_to = self.request.query_params.get('payment_due_to', None)
+        payment_due_from = self.request.query_params.get('payment_due_date_from', None)
+        payment_due_to = self.request.query_params.get('payment_due_date_to', None)
         if payment_due_from:
             queryset = queryset.filter(payment_due_date__gte=payment_due_from)
         if payment_due_to:
