@@ -214,3 +214,6 @@ backend/**/*.pyc
 *.pdf
 Bankiutalasok*.pdf
 Adoesjarulekbefizetesek*.pdf
+backend/test_vat_api.py
+backend/test_transfer_validation.py
+backend/test_vat_api_endpoints.py
