@@ -37,7 +37,8 @@ interface TemplateViewProps {
 interface TemplateBeneficiaryDetail {
   id: number;
   beneficiary_name: string;
-  account_number: string;
+  account_number: string | undefined;
+  vat_number: string | undefined;
   description: string;
   default_amount: string;
   default_remittance_info: string;
@@ -55,6 +56,7 @@ const TemplateView: React.FC<TemplateViewProps> = ({
     id: tb.id,
     beneficiary_name: tb.beneficiary.name,
     account_number: tb.beneficiary.account_number,
+    vat_number: tb.beneficiary.vat_number,
     description: tb.beneficiary.description || '',
     default_amount: tb.default_amount?.toString() || '0',
     default_remittance_info: tb.default_remittance || '',
@@ -179,9 +181,21 @@ const TemplateView: React.FC<TemplateViewProps> = ({
                           }
                           secondary={
                             <Stack spacing={0.5}>
-                              <Typography variant="body2" fontFamily="monospace">
-                                {beneficiary.account_number}
-                              </Typography>
+                              {beneficiary.account_number && (
+                                <Typography variant="body2" fontFamily="monospace">
+                                  {beneficiary.account_number}
+                                </Typography>
+                              )}
+                              {beneficiary.vat_number && (
+                                <Typography variant="body2" sx={{ color: 'info.main', fontWeight: 500 }}>
+                                  Adóazonosító: {beneficiary.vat_number}
+                                </Typography>
+                              )}
+                              {!beneficiary.account_number && !beneficiary.vat_number && (
+                                <Typography variant="body2" color="text.secondary">
+                                  -
+                                </Typography>
+                              )}
                               {beneficiary.description && (
                                 <Typography variant="body2" color="text.secondary">
                                   {beneficiary.description}

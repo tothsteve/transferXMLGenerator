@@ -59,6 +59,11 @@ class KHBankExporter:
             
             # Clean and format account numbers (remove dashes, spaces)
             source_account = self._clean_account_number(transfer.originator_account.account_number)
+            
+            # Check if beneficiary has account number
+            if not transfer.beneficiary.account_number:
+                raise ValueError(f"Beneficiary '{transfer.beneficiary.name}' has no account number. Please add an account number before generating CSV.")
+            
             partner_account = self._clean_account_number(transfer.beneficiary.account_number)
             
             # Format amount as integer (remove decimals, no thousands separator)

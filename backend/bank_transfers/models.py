@@ -177,7 +177,9 @@ class BankAccount(CompanyOwnedTimestampedModel):
 
 class Beneficiary(CompanyOwnedTimestampedActiveModel):
     name = models.CharField(max_length=200, verbose_name="Kedvezményezett neve")
-    account_number = models.CharField(max_length=50, verbose_name="Számlaszám")
+    account_number = models.CharField(max_length=50, blank=True, null=True, verbose_name="Számlaszám")
+    vat_number = models.CharField(max_length=20, blank=True, null=True, verbose_name="Adóazonosító jel",
+                                help_text="Magyar személyi adóazonosító jel (pl. 8440961790)")
     description = models.CharField(max_length=200, blank=True, verbose_name="Leírás", 
                                  help_text="További információk a kedvezményezettről (bank neve, szervezet adatai, stb.)")
     is_frequent = models.BooleanField(default=False, verbose_name="Gyakori kedvezményezett")
@@ -192,13 +194,34 @@ class Beneficiary(CompanyOwnedTimestampedActiveModel):
             models.Index(fields=['name']),
             models.Index(fields=['is_frequent']),
             models.Index(fields=['is_active']),
+            models.Index(fields=['vat_number']),
         ]
     
     def __str__(self):
-        return f"{self.name} ({self.account_number})"
+        identifier = self.account_number or self.vat_number or "No identifier"
+        return f"{self.name} ({identifier})"
     
     def clean_account_number(self):
+        if not self.account_number:
+            return None
         return self.account_number.replace('-', '').replace(' ', '')
+    
+    def clean(self):
+        """Validate VAT number format"""
+        from django.core.exceptions import ValidationError
+        
+        if self.vat_number:
+            # Remove any spaces or dashes
+            clean_vat = self.vat_number.replace(' ', '').replace('-', '')
+            
+            # Hungarian personal VAT number should be exactly 10 digits
+            if not clean_vat.isdigit() or len(clean_vat) != 10:
+                raise ValidationError({
+                    'vat_number': 'Magyar személyi adóazonosító jel 10 számjegyből kell álljon (pl. 8440961790)'
+                })
+            
+            # Store cleaned version
+            self.vat_number = clean_vat
 
 class TransferTemplate(CompanyOwnedTimestampedActiveModel):
     name = models.CharField(max_length=200, verbose_name="Sablon neve")

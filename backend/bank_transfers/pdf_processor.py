@@ -24,6 +24,58 @@ class PDFTransactionProcessor:
     def __init__(self):
         self.supported_formats = ['tax_payments', 'salary_payments', 'wage_tax_summary', 'invoice']
     
+    def normalize_tax_number(self, tax_number: str) -> str:
+        """
+        Normalize Hungarian tax number by removing dashes and spaces
+        
+        Args:
+            tax_number: Raw tax number (e.g., "12345678-2-16" or "12345678216")
+            
+        Returns:
+            Normalized tax number with only digits
+        """
+        if not tax_number:
+            return ""
+        return re.sub(r'[-\s]', '', tax_number.strip())
+    
+    def validate_company_tax_number(self, pdf_tax_id: str, company) -> Dict[str, Any]:
+        """
+        Validate that the extracted company tax ID from PDF matches the user's company
+        
+        Args:
+            pdf_tax_id: Tax ID extracted from PDF
+            company: User's company object
+            
+        Returns:
+            Dict with validation result and error message if invalid
+        """
+        if not company:
+            return {
+                'is_valid': False,
+                'error': 'Nincs cég megadva a validációhoz'
+            }
+        
+        if not pdf_tax_id or pdf_tax_id == "Unknown":
+            return {
+                'is_valid': False,
+                'error': 'Nem sikerült kinyerni az adószámot a PDF-ből'
+            }
+        
+        # Normalize both tax numbers for comparison
+        normalized_pdf_tax = self.normalize_tax_number(pdf_tax_id)
+        normalized_company_tax = self.normalize_tax_number(company.tax_id)
+        
+        if normalized_pdf_tax != normalized_company_tax:
+            return {
+                'is_valid': False,
+                'error': f'A PDF adószáma ({pdf_tax_id}) nem egyezik a cég adószámával ({company.tax_id}). Kérjük ellenőrizze, hogy a megfelelő cég PDF-jét tölti-e fel.'
+            }
+        
+        return {
+            'is_valid': True,
+            'error': None
+        }
+    
     def validate_and_format_account_number(self, account_number: str) -> Dict[str, Any]:
         """
         Validate and format Hungarian account number using proper validation logic
@@ -71,6 +123,7 @@ class PDFTransactionProcessor:
         all_transactions = []
         consolidations = []
         company_names = []
+        company_tax_ids = []
         
         # Step 1: Extract data from all PDFs
         for pdf_file in pdf_files:
@@ -91,8 +144,25 @@ class PDFTransactionProcessor:
                 pdf_data = self.extract_pdf_data(pdf_file)
                 transactions = pdf_data['transactions']  # transactions are already parsed in extract_pdf_data
                 all_transactions.extend(transactions)
+                
+                # Collect company tax ID for validation
+                pdf_tax_id = pdf_data.get('company_tax_id')
+                if pdf_tax_id and pdf_tax_id != "Unknown":
+                    company_tax_ids.append(pdf_tax_id)
+                    
             except Exception as e:
                 raise ValueError(f"Failed to process {pdf_file.name}: {str(e)}")
+        
+        # Step 1.5: Validate company tax numbers if company is provided
+        if company and company_tax_ids:
+            # Get unique tax IDs from all PDFs
+            unique_tax_ids = list(set(company_tax_ids))
+            
+            # Validate each unique tax ID
+            for pdf_tax_id in unique_tax_ids:
+                validation_result = self.validate_company_tax_number(pdf_tax_id, company)
+                if not validation_result['is_valid']:
+                    raise ValueError(validation_result['error'])
         
         # Determine the best company name to use
         if company_names:
@@ -156,10 +226,13 @@ class PDFTransactionProcessor:
                     if page_text:
                         text += page_text + "\n"
             
-            # Detect PDF type based on content
+            # Detect PDF type based on content - order matters (most specific first)
             if "Adó és járulék befizetések" in text:
                 print(f"DEBUG: Detected as TAX PDF: {pdf_file.name}")
                 return self.parse_tax_pdf(text)
+            elif ("BÉRJEGYZÉK" in text or "B É R J E G Y Z É K" in text) and "Átutalt összeg:" in text and re.search(r'\(\d{10}\)', text):
+                print(f"DEBUG: Detected as SALARY WITH VAT PDF: {pdf_file.name}")
+                return self.parse_salary_with_vat_pdf(text)
             elif "Bérösszesítő" in text or "Megnevezés" in text and "Bankszámlaszám" in text and "Összeg" in text:
                 print(f"DEBUG: Detected as WAGE TAX SUMMARY PDF: {pdf_file.name}")
                 return self.parse_wage_tax_summary_pdf(text)
@@ -354,6 +427,86 @@ class PDFTransactionProcessor:
             'due_date': due_date
         }
     
+    def parse_salary_with_vat_pdf(self, text: str) -> Dict[str, Any]:
+        """Parse salary PDF that uses VAT numbers instead of account numbers for employee matching"""
+        transactions = []
+        
+        # Extract company tax ID (remittance info)
+        company_tax_id_match = re.search(r'(\d{8}-\d-\d{2})', text)
+        company_tax_id = company_tax_id_match.group(1) if company_tax_id_match else "Unknown"
+        
+        # Extract execution date from header
+        date_match = re.search(r'(\d{4})\.\s*(január|február|március|április|május|június|július|augusztus|szeptember|október|november|december)', text)
+        if date_match:
+            year = date_match.group(1)
+            month_name = date_match.group(2)
+            
+            # Convert Hungarian month names to numbers
+            month_map = {
+                'január': '01', 'február': '02', 'március': '03', 'április': '04',
+                'május': '05', 'június': '06', 'július': '07', 'augusztus': '08',
+                'szeptember': '09', 'október': '10', 'november': '11', 'december': '12'
+            }
+            month = month_map.get(month_name, '01')
+            due_date = f"{year}-{month}-15"  # Use 15th of the month as default
+        else:
+            due_date = self.get_default_payment_date()
+        
+        # Process per-page to handle complex layout
+        # Split text by page indicators and process each section
+        page_sections = re.split(r'B É R J E G Y Z É K', text)[1:]  # Split by page headers, skip first empty
+        
+        for page_text in page_sections:
+            if not page_text.strip():
+                continue
+                
+            # Extract employee name and VAT number from header
+            name_vat_pattern = r'^([A-ZÁÉÍÓÖŐÜŰa-záéíóöőüű\s]+?)\s*\((\d{10})\)'
+            name_vat_match = re.search(name_vat_pattern, page_text, re.MULTILINE)
+            
+            # Extract amount
+            amount_pattern = r'Átutalt összeg:\s*([\d\s]+)'
+            amount_match = re.search(amount_pattern, page_text)
+            
+            if name_vat_match and amount_match:
+                name = name_vat_match.group(1).strip()
+                vat_number = name_vat_match.group(2)
+                amount_str = amount_match.group(1).strip()
+                
+                # Validate VAT number format (10 digits)
+                if not vat_number.isdigit() or len(vat_number) != 10:
+                    print(f"Warning: Invalid VAT number format: {vat_number}")
+                    continue
+                    
+                # Clean and parse amount
+                try:
+                    amount = float(amount_str.replace(' ', '').replace(',', ''))
+                    
+                    # Skip zero amounts
+                    if amount <= 0:
+                        print(f"Info: Skipping {name} - zero amount")
+                        continue
+                        
+                    transactions.append({
+                        'beneficiary_name': name,
+                        'vat_number': vat_number,
+                        'amount': amount,
+                        'remittance_info': f'{company_tax_id} - jövedelem',
+                        'execution_date': due_date
+                    })
+                    print(f"DEBUG: Added salary transaction: {name} ({vat_number}) - {amount}")
+                    
+                except ValueError:
+                    print(f"Warning: Could not parse amount: {amount_str}")
+                    continue
+        
+        return {
+            'pdf_type': 'salary_with_vat',
+            'transactions': transactions,
+            'due_date': due_date,
+            'company_tax_id': company_tax_id
+        }
+    
     def parse_wage_tax_summary_pdf(self, text: str) -> Dict[str, Any]:
         """Parse wage tax summary PDF (Bérösszesítő)"""
         transactions = []
@@ -484,51 +637,109 @@ class PDFTransactionProcessor:
         consolidations = []
         matched_transactions = []
         
-        # Group transactions by beneficiary name and account
+        # Group transactions by beneficiary identifier (account_number OR vat_number)
         grouped = {}
         for transaction in transactions:
-            key = (transaction['beneficiary_name'], transaction['account_number'])
+            if 'vat_number' in transaction:
+                # VAT-based transaction - group by name and VAT number
+                key = (transaction['beneficiary_name'], transaction.get('vat_number', ''))
+            else:
+                # Account-based transaction - group by name and account
+                key = (transaction['beneficiary_name'], transaction.get('account_number', ''))
+            
             if key not in grouped:
                 grouped[key] = []
             grouped[key].append(transaction)
         
-        for (name, account), trans_group in grouped.items():
+        for (name, identifier), trans_group in grouped.items():
             # Try to match existing beneficiary
-            beneficiary = self.find_matching_beneficiary(account, name, company)
+            if 'vat_number' in trans_group[0]:
+                # VAT-based matching
+                beneficiary = self.find_matching_beneficiary_by_vat(identifier, name, company)
+            else:
+                # Account-based matching (existing logic)
+                beneficiary = self.find_matching_beneficiary(identifier, name, company)
             
             if len(trans_group) > 1:
                 # Consolidate multiple transactions to same beneficiary
                 total_amount = sum(t['amount'] for t in trans_group)
                 
-                # Special handling for Tóth István 116 account
-                if '116' in account and 'tóth' in name.lower():
+                # Determine remittance info based on beneficiary and transaction type
+                if 'vat_number' in trans_group[0]:
+                    # VAT-based transaction: Use beneficiary's stored remittance info or default to 'jövedelem'
+                    if beneficiary and beneficiary.remittance_information:
+                        remittance_info = beneficiary.remittance_information
+                    else:
+                        remittance_info = 'jövedelem'
+                elif 'account_number' in trans_group[0] and '116' in identifier and 'tóth' in name.lower():
+                    # Special handling for specific account-based transactions
                     remittance_info = 'jövedelem + bérleti díj'
                 else:
+                    # Other account-based transactions: use original remittance info
                     remittance_info = trans_group[0]['remittance_info']
                 
-                consolidations.append(f"{name} ({account[:8]}...): {len(trans_group)} transfers merged into {total_amount:,.0f} HUF")
+                # Format consolidation message based on transaction type
+                if 'vat_number' in trans_group[0]:
+                    identifier_display = f"VAT:{identifier}"
+                else:
+                    identifier_display = f"{identifier[:8]}..." if len(identifier) > 8 else identifier
                 
-                matched_transactions.append({
+                consolidations.append(f"{name} ({identifier_display}): {len(trans_group)} transfers merged into {total_amount:,.0f} HUF")
+                
+                # Create consolidated transaction
+                consolidated_transaction = {
                     'beneficiary_id': beneficiary.id if beneficiary else None,
                     'beneficiary_name': beneficiary.name if beneficiary else name,
-                    'account_number': account,
                     'amount': total_amount,
                     'remittance_info': remittance_info,
                     'execution_date': trans_group[0]['execution_date'],
                     'created_beneficiary': beneficiary is None
-                })
+                }
+                
+                # Add either account_number or vat_number based on transaction type
+                if 'vat_number' in trans_group[0]:
+                    consolidated_transaction['vat_number'] = identifier
+                    # For VAT-based transactions, use beneficiary's account if found
+                    if beneficiary and beneficiary.account_number:
+                        consolidated_transaction['account_number'] = beneficiary.account_number
+                else:
+                    consolidated_transaction['account_number'] = identifier
+                
+                matched_transactions.append(consolidated_transaction)
             else:
                 # Single transaction
                 transaction = trans_group[0]
-                matched_transactions.append({
+                
+                # Determine remittance info for single transaction
+                if 'vat_number' in transaction:
+                    # VAT-based transaction: Use beneficiary's stored remittance info or default to 'jövedelem'
+                    if beneficiary and beneficiary.remittance_information:
+                        remittance_info = beneficiary.remittance_information
+                    else:
+                        remittance_info = 'jövedelem'
+                else:
+                    # Account-based transaction: use original remittance info
+                    remittance_info = transaction['remittance_info']
+                
+                matched_transaction = {
                     'beneficiary_id': beneficiary.id if beneficiary else None,
                     'beneficiary_name': beneficiary.name if beneficiary else transaction['beneficiary_name'],
-                    'account_number': transaction['account_number'],
                     'amount': transaction['amount'],
-                    'remittance_info': transaction['remittance_info'],
+                    'remittance_info': remittance_info,
                     'execution_date': transaction['execution_date'],
                     'created_beneficiary': beneficiary is None
-                })
+                }
+                
+                # Add either account_number or vat_number based on transaction type
+                if 'vat_number' in transaction:
+                    matched_transaction['vat_number'] = transaction['vat_number']
+                    # For VAT-based transactions, use beneficiary's account if found
+                    if beneficiary and beneficiary.account_number:
+                        matched_transaction['account_number'] = beneficiary.account_number
+                else:
+                    matched_transaction['account_number'] = transaction['account_number']
+                
+                matched_transactions.append(matched_transaction)
         
         return matched_transactions, consolidations
     
@@ -602,6 +813,43 @@ class PDFTransactionProcessor:
         # This prevents different people with same names from being consolidated
         return beneficiary  # Returns None if no match found
     
+    def find_matching_beneficiary_by_vat(self, vat_number: str, name: str = None, company=None) -> Optional[Beneficiary]:
+        """Find existing beneficiary by VAT number"""
+        if not vat_number or not company:
+            return None
+        
+        # Clean VAT number for matching (remove spaces and dashes)
+        clean_vat = vat_number.replace('-', '').replace(' ', '')
+        
+        # Try exact VAT number match first
+        beneficiary = Beneficiary.objects.filter(
+            vat_number=clean_vat,
+            company=company
+        ).first()
+        
+        # Try with original format (in case it's stored with dashes)
+        if not beneficiary:
+            beneficiary = Beneficiary.objects.filter(
+                vat_number=vat_number,
+                company=company
+            ).first()
+        
+        # Try to match by cleaning both sides for comparison
+        if not beneficiary:
+            for b in Beneficiary.objects.filter(company=company).exclude(vat_number__isnull=True).exclude(vat_number=''):
+                db_clean_vat = b.vat_number.replace('-', '').replace(' ', '') if b.vat_number else ''
+                if db_clean_vat == clean_vat:
+                    beneficiary = b
+                    break
+        
+        # Log the match result for debugging
+        if beneficiary:
+            print(f"DEBUG: Found beneficiary match by VAT: {beneficiary.name} (VAT: {beneficiary.vat_number}) for PDF VAT: {vat_number}")
+        else:
+            print(f"DEBUG: No beneficiary found for VAT number: {vat_number}")
+        
+        return beneficiary
+    
     def create_template(self, transactions: List[Dict], template_name: str = None, company_name: str = None, company=None) -> TransferTemplate:
         """Create new transfer template"""
         if not template_name:
@@ -631,15 +879,24 @@ class PDFTransactionProcessor:
         Returns:
             TransferTemplate instance if exact match found, None otherwise
         """
-        # Get unique account numbers from transactions
-        pdf_account_numbers = set()
+        # Get unique identifiers from transactions (account numbers OR VAT numbers)
+        pdf_identifiers = set()
         for transaction in transactions:
-            account_number = transaction['account_number'].replace('-', '').replace(' ', '')
-            # Normalize account number - remove trailing zeros for comparison
-            normalized_account = self._normalize_account_number(account_number)
-            pdf_account_numbers.add(normalized_account)
+            if 'account_number' in transaction:
+                # Account-based transaction
+                account_number = transaction['account_number'].replace('-', '').replace(' ', '')
+                # Normalize account number - remove trailing zeros for comparison
+                normalized_account = self._normalize_account_number(account_number)
+                pdf_identifiers.add(f"account:{normalized_account}")
+            elif 'vat_number' in transaction:
+                # VAT-based transaction
+                vat_number = transaction['vat_number'].replace('-', '').replace(' ', '')
+                pdf_identifiers.add(f"vat:{vat_number}")
+            else:
+                # Skip transactions without identifiers
+                continue
         
-        print(f"DEBUG: PDF has {len(pdf_account_numbers)} unique accounts: {sorted(list(pdf_account_numbers))}")
+        print(f"DEBUG: PDF has {len(pdf_identifiers)} unique identifiers: {sorted(list(pdf_identifiers))}")
         
         # Find templates with EXACTLY the same beneficiaries (filtered by company)
         templates = TransferTemplate.objects.filter(is_active=True, company=company).prefetch_related(
@@ -647,23 +904,29 @@ class PDFTransactionProcessor:
         ).order_by('-created_at')  # Check newest templates first
         
         for template in templates:
-            # Get account numbers from template beneficiaries
-            template_account_numbers = set()
+            # Get identifiers from template beneficiaries  
+            template_identifiers = set()
             for tb in template.template_beneficiaries.filter(is_active=True):
-                account_number = tb.beneficiary.account_number.replace('-', '').replace(' ', '')
-                # Normalize account number - remove trailing zeros for comparison
-                normalized_account = self._normalize_account_number(account_number)
-                template_account_numbers.add(normalized_account)
+                # Add account identifier if present
+                if tb.beneficiary.account_number:
+                    account_number = tb.beneficiary.account_number.replace('-', '').replace(' ', '')
+                    normalized_account = self._normalize_account_number(account_number)
+                    template_identifiers.add(f"account:{normalized_account}")
+                
+                # Add VAT identifier if present
+                if tb.beneficiary.vat_number:
+                    vat_number = tb.beneficiary.vat_number.replace('-', '').replace(' ', '')
+                    template_identifiers.add(f"vat:{vat_number}")
             
-            print(f"DEBUG: Template '{template.name}' has {len(template_account_numbers)} accounts: {sorted(list(template_account_numbers))}")
+            print(f"DEBUG: Template '{template.name}' has {len(template_identifiers)} identifiers: {sorted(list(template_identifiers))}")
             
-            # EXACT match only - same number of accounts AND same account numbers
-            if (len(pdf_account_numbers) == len(template_account_numbers) and 
-                pdf_account_numbers == template_account_numbers):
-                print(f"DEBUG: Found EXACT template match: '{template.name}' - same {len(pdf_account_numbers)} accounts")
+            # EXACT match only - same number of identifiers AND same identifiers
+            if (len(pdf_identifiers) == len(template_identifiers) and 
+                pdf_identifiers == template_identifiers):
+                print(f"DEBUG: Found EXACT template match: '{template.name}' - same {len(pdf_identifiers)} identifiers")
                 return template
             else:
-                print(f"DEBUG: Template '{template.name}' does not match - different accounts or count")
+                print(f"DEBUG: Template '{template.name}' does not match - different identifiers or count")
         
         print("DEBUG: No exact matching template found - will create new one")
         return None
@@ -695,13 +958,18 @@ class PDFTransactionProcessor:
         return normalized
     
     def update_template_beneficiaries(self, template: TransferTemplate, transactions: List[Dict], company=None):
-        """Update template with beneficiaries from transactions - merge with existing"""
+        """Update template with beneficiaries from transactions - merge with existing, support VAT-based matching"""
         # Don't clear existing beneficiaries - merge instead
         # Get existing beneficiaries in the template
         existing_beneficiaries = {}
         for tb in template.template_beneficiaries.all():
-            clean_account = tb.beneficiary.account_number.replace('-', '').replace(' ', '')
-            existing_beneficiaries[clean_account] = tb
+            # Create keys based on available identifiers
+            if tb.beneficiary.account_number:
+                clean_account = tb.beneficiary.account_number.replace('-', '').replace(' ', '')
+                existing_beneficiaries[f"account:{clean_account}"] = tb
+            if tb.beneficiary.vat_number:
+                clean_vat = tb.beneficiary.vat_number.replace('-', '').replace(' ', '')
+                existing_beneficiaries[f"vat:{clean_vat}"] = tb
         
         # Group transactions by beneficiary to handle duplicates
         beneficiary_data = {}
@@ -709,16 +977,31 @@ class PDFTransactionProcessor:
         for transaction in transactions:
             # Create beneficiary if doesn't exist
             if transaction.get('created_beneficiary', False):
-                # Clean the account number for database storage
-                clean_account = clean_account_number(transaction['account_number'])
+                # Create beneficiary with appropriate fields based on transaction type
+                create_data = {
+                    'name': transaction['beneficiary_name'],
+                    'is_frequent': True,
+                    'is_active': True,
+                    'company': company
+                }
                 
-                beneficiary = Beneficiary.objects.create(
-                    name=transaction['beneficiary_name'],
-                    account_number=clean_account,
-                    is_frequent=True,
-                    is_active=True,
-                    company=company
-                )
+                # Add account number if provided
+                if 'account_number' in transaction:
+                    clean_account = clean_account_number(transaction['account_number'])
+                    create_data['account_number'] = clean_account
+                
+                # Add VAT number if provided
+                if 'vat_number' in transaction:
+                    create_data['vat_number'] = transaction['vat_number']
+                
+                # For VAT-based transactions without account, we need to get account from somewhere
+                # This is a limitation - VAT-only beneficiaries need account numbers for transfers
+                if 'vat_number' in transaction and 'account_number' not in transaction:
+                    # This will be handled later - beneficiary created without account number
+                    # User will need to add account number before generating transfers
+                    print(f"DEBUG: Creating VAT-only beneficiary '{transaction['beneficiary_name']}' - account number required for transfers")
+                
+                beneficiary = Beneficiary.objects.create(**create_data)
                 beneficiary_id = beneficiary.id
             else:
                 beneficiary_id = transaction['beneficiary_id']
@@ -764,11 +1047,18 @@ class PDFTransactionProcessor:
             
             # Check if this beneficiary already exists in template
             beneficiary = Beneficiary.objects.get(id=beneficiary_id)
-            clean_account = beneficiary.account_number.replace('-', '').replace(' ', '')
             
-            if clean_account in existing_beneficiaries:
+            # Try to find existing template beneficiary by account or VAT number
+            existing_tb = None
+            if beneficiary.account_number:
+                clean_account = beneficiary.account_number.replace('-', '').replace(' ', '')
+                existing_tb = existing_beneficiaries.get(f"account:{clean_account}")
+            if not existing_tb and beneficiary.vat_number:
+                clean_vat = beneficiary.vat_number.replace('-', '').replace(' ', '')
+                existing_tb = existing_beneficiaries.get(f"vat:{clean_vat}")
+            
+            if existing_tb:
                 # Update existing template beneficiary
-                existing_tb = existing_beneficiaries[clean_account]
                 existing_tb.default_amount = data['amount']
                 existing_tb.default_remittance = data['remittance']
                 # Always update execution date - use new date or today if no date in PDF

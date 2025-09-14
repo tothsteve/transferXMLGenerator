@@ -5,6 +5,7 @@ from .models import (
     NavConfiguration, Invoice, InvoiceLineItem, InvoiceSyncLog, TrustedPartner
 )
 from .hungarian_account_validator import validate_and_format_hungarian_account_number
+from .string_validation import validate_beneficiary_name, validate_remittance_info, normalize_whitespace, sanitize_export_string
 
 class BankAccountSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.name', read_only=True)
@@ -32,7 +33,7 @@ class BeneficiarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Beneficiary
         fields = [
-            'id', 'name', 'account_number', 'description', 
+            'id', 'name', 'account_number', 'vat_number', 'description', 
             'is_frequent', 'is_active', 'remittance_information', 
             'company_name', 'created_at', 'updated_at'
         ]
@@ -49,6 +50,41 @@ class BeneficiarySerializer(serializers.ModelSerializer):
         
         # Return the formatted account number for consistent storage
         return validation.formatted
+    
+    def validate_name(self, value):
+        """Sanitize beneficiary name for XML/CSV export"""
+        if not value or not value.strip():
+            raise serializers.ValidationError("A kedvezményezett neve kötelező.")
+        
+        # Sanitize invalid characters and normalize whitespace
+        sanitized = sanitize_export_string(value)
+        return normalize_whitespace(sanitized)
+    
+    def validate_remittance_information(self, value):
+        """Sanitize remittance information for XML/CSV export"""
+        if not value:
+            return value
+        
+        # Sanitize invalid characters and normalize whitespace
+        sanitized = sanitize_export_string(value)
+        return normalize_whitespace(sanitized)
+    
+    def validate_vat_number(self, value):
+        """Validate Hungarian VAT number format"""
+        if not value:
+            return value
+        
+        # Clean the VAT number (remove spaces and dashes)
+        clean_vat = value.replace(' ', '').replace('-', '')
+        
+        # Validate format
+        if not clean_vat.isdigit() or len(clean_vat) != 10:
+            raise serializers.ValidationError(
+                "Magyar személyi adóazonosító jel 10 számjegyből kell álljon (pl. 8440961790)"
+            )
+        
+        # Return the cleaned VAT number
+        return clean_vat
 
 class TemplateBeneficiarySerializer(serializers.ModelSerializer):
     beneficiary = BeneficiarySerializer(read_only=True)
@@ -95,6 +131,28 @@ class TransferSerializer(serializers.ModelSerializer):
             'order', 'is_processed', 'notes', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
+    
+    def validate_remittance_info(self, value):
+        """Sanitize remittance info for XML/CSV export"""
+        if not value:
+            return value
+        
+        # Sanitize invalid characters and normalize whitespace
+        sanitized = sanitize_export_string(value)
+        return normalize_whitespace(sanitized)
+    
+    def validate_beneficiary_id(self, value):
+        """Validate that beneficiary has account number for transfer creation"""
+        try:
+            beneficiary = Beneficiary.objects.get(id=value)
+            if not beneficiary.account_number:
+                raise serializers.ValidationError(
+                    f"Kedvezményezett '{beneficiary.name}' rendelkezik adóazonosító jellel ({beneficiary.vat_number}), "
+                    f"de nincs bankszámlaszáma. Kérem adja meg a bankszámlaszámot az utalás létrehozása előtt."
+                )
+            return value
+        except Beneficiary.DoesNotExist:
+            raise serializers.ValidationError("A kedvezményezett nem található.")
 
 class TransferBatchSerializer(serializers.ModelSerializer):
     transfers = TransferSerializer(many=True, read_only=True)
@@ -392,40 +450,69 @@ class InvoiceListSerializer(serializers.ModelSerializer):
         return obj.is_overdue()
     
     def get_payment_status(self, obj):
-        """Return enhanced payment status with type differentiation."""
+        """Enhanced payment status with business logic - Transfer workflow state takes priority"""
+        from django.utils import timezone
+        
+        # PRIORITY 1: Check transfer workflow state first (overrides database status)
+        has_transfer = hasattr(obj, 'generated_transfers') and obj.generated_transfers.exists()
+        has_used_batch = False
+        
+        if has_transfer:
+            # Check if any related transfer has a batch that is marked as used in bank
+            for transfer in obj.generated_transfers.all():
+                if hasattr(transfer, 'transferbatch_set') and transfer.transferbatch_set.filter(used_in_bank=True).exists():
+                    has_used_batch = True
+                    break
+            
+            if has_used_batch:
+                # Transfer has batch marked as used in bank - PAID_SYSTEM (highest priority)
+                return {
+                    'status': 'PAID_SYSTEM', 
+                    'label': 'Kifizetve (Bankba átadva)',
+                    'icon': 'check_circle',
+                    'class': 'status-paid-system'
+                }
+            else:
+                # Has transfer but no used batch - PREPARED (overrides manual PAID status)
+                return {
+                    'status': 'PREPARED',
+                    'label': 'Előkészítve',
+                    'icon': 'upload',
+                    'class': 'status-prepared'
+                }
+        
+        # PRIORITY 2: No transfer exists, check database payment_status
         if obj.payment_status == 'UNPAID':
-            return {
-                'status': 'UNPAID',
-                'label': 'Fizetésre vár',
-                'icon': 'schedule',  # Schedule icon like before
-                'class': 'status-unpaid'
-            }
+            # Check if overdue
+            if obj.payment_due_date and obj.payment_due_date < timezone.now().date():
+                return {
+                    'status': 'OVERDUE',
+                    'label': 'Lejárt',
+                    'icon': 'warning',
+                    'class': 'status-overdue'
+                }
+            else:
+                return {
+                    'status': 'UNPAID',
+                    'label': 'Fizetésre vár',
+                    'icon': 'schedule',
+                    'class': 'status-unpaid'
+                }
         elif obj.payment_status == 'PREPARED':
             return {
                 'status': 'PREPARED',
                 'label': 'Előkészítve',
-                'icon': 'upload',  # Upload icon - ready to go to bank
+                'icon': 'upload',
                 'class': 'status-prepared'
             }
         elif obj.payment_status == 'PAID':
-            # Enhanced logic for different PAID types
-            # Priority: 1) System transfer, 2) Trusted partner, 3) Manual
-            has_transfer = hasattr(obj, 'generated_transfers') and obj.generated_transfers.exists()
-            
-            if has_transfer:
-                # If there's a transfer record, it was paid through the system
-                return {
-                    'status': 'PAID_SYSTEM', 
-                    'label': 'Kifizetve (Bankba átadva)',
-                    'icon': 'check_circle',  # Check circle icon
-                    'class': 'status-paid-system'
-                }
-            elif obj.auto_marked_paid:
-                # Auto-marked by trusted partner but no transfer yet
+            # No transfer exists, but marked as PAID - check if trusted partner or manual
+            if obj.auto_marked_paid:
+                # Auto-marked as paid by trusted partner
                 return {
                     'status': 'PAID_TRUSTED',
                     'label': 'Kifizetve (Automatikus)',
-                    'icon': 'check_circle',  # Check circle icon
+                    'icon': 'check_circle',
                     'class': 'status-paid-trusted'
                 }
             else:
@@ -433,7 +520,7 @@ class InvoiceListSerializer(serializers.ModelSerializer):
                 return {
                     'status': 'PAID_MANUAL',
                     'label': 'Kifizetve (Manuálisan)',
-                    'icon': 'check_circle',  # Check circle icon
+                    'icon': 'check_circle',
                     'class': 'status-paid-manual'
                 }
         
@@ -541,40 +628,69 @@ class InvoiceDetailSerializer(serializers.ModelSerializer):
             return f"{obj.invoice_gross_amount:,.2f} {obj.currency_code}"
     
     def get_payment_status(self, obj):
-        """Return enhanced payment status with type differentiation."""
+        """Enhanced payment status with business logic - Transfer workflow state takes priority"""
+        from django.utils import timezone
+        
+        # PRIORITY 1: Check transfer workflow state first (overrides database status)
+        has_transfer = hasattr(obj, 'generated_transfers') and obj.generated_transfers.exists()
+        has_used_batch = False
+        
+        if has_transfer:
+            # Check if any related transfer has a batch that is marked as used in bank
+            for transfer in obj.generated_transfers.all():
+                if hasattr(transfer, 'transferbatch_set') and transfer.transferbatch_set.filter(used_in_bank=True).exists():
+                    has_used_batch = True
+                    break
+            
+            if has_used_batch:
+                # Transfer has batch marked as used in bank - PAID_SYSTEM (highest priority)
+                return {
+                    'status': 'PAID_SYSTEM', 
+                    'label': 'Kifizetve (Bankba átadva)',
+                    'icon': 'check_circle',
+                    'class': 'status-paid-system'
+                }
+            else:
+                # Has transfer but no used batch - PREPARED (overrides manual PAID status)
+                return {
+                    'status': 'PREPARED',
+                    'label': 'Előkészítve',
+                    'icon': 'upload',
+                    'class': 'status-prepared'
+                }
+        
+        # PRIORITY 2: No transfer exists, check database payment_status
         if obj.payment_status == 'UNPAID':
-            return {
-                'status': 'UNPAID',
-                'label': 'Fizetésre vár',
-                'icon': 'schedule',  # Schedule icon like before
-                'class': 'status-unpaid'
-            }
+            # Check if overdue
+            if obj.payment_due_date and obj.payment_due_date < timezone.now().date():
+                return {
+                    'status': 'OVERDUE',
+                    'label': 'Lejárt',
+                    'icon': 'warning',
+                    'class': 'status-overdue'
+                }
+            else:
+                return {
+                    'status': 'UNPAID',
+                    'label': 'Fizetésre vár',
+                    'icon': 'schedule',
+                    'class': 'status-unpaid'
+                }
         elif obj.payment_status == 'PREPARED':
             return {
                 'status': 'PREPARED',
-                'label': 'Előkészítve', 
-                'icon': 'upload',  # Upload icon - ready to go to bank
+                'label': 'Előkészítve',
+                'icon': 'upload',
                 'class': 'status-prepared'
             }
         elif obj.payment_status == 'PAID':
-            # Enhanced logic for different PAID types
-            # Priority: 1) System transfer, 2) Trusted partner, 3) Manual
-            has_transfer = hasattr(obj, 'generated_transfers') and obj.generated_transfers.exists()
-            
-            if has_transfer:
-                # If there's a transfer record, it was paid through the system
-                return {
-                    'status': 'PAID_SYSTEM',
-                    'label': 'Kifizetve (Bankba átadva)',
-                    'icon': 'check_circle',  # Check circle icon
-                    'class': 'status-paid-system'
-                }
-            elif obj.auto_marked_paid:
-                # Auto-marked by trusted partner but no transfer yet
+            # No transfer exists, but marked as PAID - check if trusted partner or manual
+            if obj.auto_marked_paid:
+                # Auto-marked as paid by trusted partner
                 return {
                     'status': 'PAID_TRUSTED',
                     'label': 'Kifizetve (Automatikus)',
-                    'icon': 'check_circle',  # Check circle icon
+                    'icon': 'check_circle',
                     'class': 'status-paid-trusted'
                 }
             else:
@@ -582,7 +698,7 @@ class InvoiceDetailSerializer(serializers.ModelSerializer):
                 return {
                     'status': 'PAID_MANUAL',
                     'label': 'Kifizetve (Manuálisan)',
-                    'icon': 'check_circle',  # Check circle icon
+                    'icon': 'check_circle',
                     'class': 'status-paid-manual'
                 }
         

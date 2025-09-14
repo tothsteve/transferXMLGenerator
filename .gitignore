@@ -214,3 +214,10 @@ backend/**/*.pyc
 *.pdf
 Bankiutalasok*.pdf
 Adoesjarulekbefizetesek*.pdf
+
+# Development temp files and examples
+temp/
+backend/test_transfer_validation.py
+backend/test_vat_api_endpoints.py
+backend/test_vat_api.py
+.gitignore

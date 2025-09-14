@@ -21,7 +21,10 @@ def generate_xml(transfers):
         name.text = transfer.beneficiary.name
         ben_account = ET.SubElement(beneficiary, "Account")
         ben_account_num = ET.SubElement(ben_account, "AccountNumber")
-        ben_account_num.text = transfer.beneficiary.clean_account_number()
+        clean_account = transfer.beneficiary.clean_account_number()
+        if not clean_account:
+            raise ValueError(f"Beneficiary '{transfer.beneficiary.name}' has no account number. Please add an account number before generating XML.")
+        ben_account_num.text = clean_account
         
         # Amount
         amount = ET.SubElement(transaction, "Amount", Currency=transfer.currency)
