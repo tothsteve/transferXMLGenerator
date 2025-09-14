@@ -88,11 +88,12 @@ COMMENT ON COLUMN bank_transfers_bankaccount.created_at IS 'Account creation tim
 COMMENT ON COLUMN bank_transfers_bankaccount.updated_at IS 'Last modification timestamp';
 
 -- Beneficiary Management
-COMMENT ON TABLE bank_transfers_beneficiary IS 'Recipients of bank transfers. Contains account details, contact information, and transfer preferences per company.';
+COMMENT ON TABLE bank_transfers_beneficiary IS 'Recipients of bank transfers. Contains account details, VAT numbers, contact information, and transfer preferences per company. Supports both bank account and VAT number identification.';
 COMMENT ON COLUMN bank_transfers_beneficiary.id IS 'Primary key - unique beneficiary identifier';
 COMMENT ON COLUMN bank_transfers_beneficiary.company_id IS 'Foreign key to company that owns this beneficiary record';
 COMMENT ON COLUMN bank_transfers_beneficiary.name IS 'Full legal name of the beneficiary (person or organization)';
-COMMENT ON COLUMN bank_transfers_beneficiary.account_number IS 'Bank account number for receiving transfers';
+COMMENT ON COLUMN bank_transfers_beneficiary.account_number IS 'Bank account number for receiving transfers (nullable - can use VAT number instead)';
+COMMENT ON COLUMN bank_transfers_beneficiary.vat_number IS 'Hungarian personal VAT number (személyi adóazonosító jel) - 10 digits (e.g. 8440961790). Nullable when account_number is provided.';
 COMMENT ON COLUMN bank_transfers_beneficiary.description IS 'Additional description or notes about this beneficiary';
 COMMENT ON COLUMN bank_transfers_beneficiary.is_frequent IS 'Whether this beneficiary is marked as frequently used for quick access';
 COMMENT ON COLUMN bank_transfers_beneficiary.is_active IS 'Whether this beneficiary is currently active and available for transfers';

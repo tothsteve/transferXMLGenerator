@@ -1,9 +1,9 @@
 # Database Schema Documentation
 ## Transfer XML Generator - Hungarian Banking System
 
-**Last Updated:** 2025-01-15  
+**Last Updated:** 2025-09-14  
 **Database:** PostgreSQL (Production on Railway) / SQL Server (Local Development)  
-**Schema Version:** Multi-Company Architecture with Feature Flags, NAV Invoice Payment Status Tracking, and Trusted Partners Auto-Payment System (Migration 0033)  
+**Schema Version:** Multi-Company Architecture with Feature Flags, NAV Invoice Payment Status Tracking, Trusted Partners Auto-Payment System, and VAT Number Beneficiary Support (Migration 0036)  
 
 > **Note:** This documentation is the **single source of truth** for database schema. All database comment scripts should be generated from this document.
 
@@ -52,14 +52,15 @@ The system implements a **multi-tenant architecture** where:
 ---
 
 ## 2. **bank_transfers_beneficiary**
-**Table Comment:** *Company-scoped beneficiary information for bank transfers. Contains payees, suppliers, employees, and tax authorities.*
+**Table Comment:** *Company-scoped beneficiary information for bank transfers. Contains payees, suppliers, employees, and tax authorities. Supports both bank account and VAT number identification.*
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | SERIAL | PRIMARY KEY | Unique identifier for beneficiary record |
 | `company_id` | INTEGER | NOT NULL, FK(bank_transfers_company.id) | Company owner of this beneficiary |
 | `name` | VARCHAR(200) | NOT NULL | Full legal name of the beneficiary (person or organization) |
-| `account_number` | VARCHAR(50) | NOT NULL | Beneficiary's bank account number in Hungarian format (validated and formatted) |
+| `account_number` | VARCHAR(50) | NULL | Beneficiary's bank account number in Hungarian format (validated and formatted) |
+| `vat_number` | VARCHAR(20) | NULL | Hungarian personal VAT number (személyi adóazonosító jel) - 10 digits (e.g. 8440961790) |
 | `description` | VARCHAR(200) | | Additional information about the beneficiary (bank name, organization details, etc.) |
 | `is_frequent` | BOOLEAN | DEFAULT FALSE | Marks frequently used beneficiaries for quick access in UI |
 | `is_active` | BOOLEAN | DEFAULT TRUE | Soft delete flag - inactive beneficiaries are hidden from selection |
@@ -73,10 +74,14 @@ The system implements a **multi-tenant architecture** where:
 - Index on `name` for search functionality
 - Index on `is_frequent` for frequent beneficiary lookup
 - Index on `is_active` for active filtering
+- Index on `vat_number` for VAT number-based search and lookup
 
 **Business Rules:**
-- Account numbers are validated using Hungarian banking rules (16 or 24 digits)
-- Account numbers are automatically formatted (8-8 or 8-8-8 with dashes)
+- Either `account_number` OR `vat_number` must be provided (application-level validation)
+- Account numbers are validated using Hungarian banking rules (16 or 24 digits) when provided
+- Account numbers are automatically formatted (8-8 or 8-8-8 with dashes) when provided
+- VAT numbers must be exactly 10 digits (Hungarian personal VAT format) when provided
+- VAT numbers are automatically cleaned (spaces and dashes removed) during validation
 
 ---
 
