@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FileUploadParser
@@ -85,12 +85,18 @@ class BeneficiaryViewSet(viewsets.ModelViewSet):
     Támogatott szűrések:
     - is_active: true/false
     - is_frequent: true/false  
-    - search: név, számlaszám és leírás alapján keresés
+    - search: név, számlaszám, adószám és leírás alapján keresés
+    - vat_number: adószám alapján szűrés
+    - has_vat_number: true/false - adószámmal rendelkező beneficiaries
+    - has_account_number: true/false - számlaszámmal rendelkező beneficiaries
     
     Jogosultság: BENEFICIARY_MANAGEMENT (írás) vagy BENEFICIARY_VIEW (olvasás)
     """
     serializer_class = BeneficiarySerializer
     permission_classes = [IsAuthenticated, IsCompanyMember, RequireBeneficiaryManagement]
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['name', 'account_number', 'vat_number', 'description', 'remittance_information', 'is_active', 'is_frequent', 'created_at']
+    ordering = ['name']  # Default ordering
     
     def get_queryset(self):
         if not hasattr(self.request, 'company') or not self.request.company:
@@ -110,6 +116,19 @@ class BeneficiaryViewSet(viewsets.ModelViewSet):
         search = self.request.query_params.get('search', None)
         if search:
             filters['search'] = search
+        
+        # VAT number specific filters
+        vat_number = self.request.query_params.get('vat_number', None)
+        if vat_number:
+            filters['vat_number'] = vat_number
+            
+        has_vat_number = self.request.query_params.get('has_vat_number', None)
+        if has_vat_number is not None:
+            filters['has_vat_number'] = has_vat_number.lower() == 'true'
+            
+        has_account_number = self.request.query_params.get('has_account_number', None)
+        if has_account_number is not None:
+            filters['has_account_number'] = has_account_number.lower() == 'true'
         
         return BeneficiaryService.get_company_beneficiaries(self.request.company, filters)
     
@@ -138,6 +157,22 @@ class BeneficiaryViewSet(viewsets.ModelViewSet):
         beneficiary = self.get_object()
         beneficiary = BeneficiaryService.toggle_frequent_status(beneficiary)
         serializer = self.get_serializer(beneficiary)
+        return Response(serializer.data)
+    
+    @swagger_auto_schema(
+        operation_description="Adószámmal rendelkező, de számlaszám nélküli kedvezményezettek",
+        responses={200: BeneficiarySerializer(many=True)}
+    )
+    @action(detail=False, methods=['get'])
+    def vat_only(self, request):
+        """Adószámmal rendelkező, de számlaszám nélküli kedvezményezettek listája"""
+        filters = {
+            'has_vat_number': True,
+            'has_account_number': False,
+            'is_active': True
+        }
+        beneficiaries = BeneficiaryService.get_company_beneficiaries(request.company, filters)
+        serializer = self.get_serializer(beneficiaries, many=True)
         return Response(serializer.data)
 
 class TransferTemplateViewSet(viewsets.ModelViewSet):

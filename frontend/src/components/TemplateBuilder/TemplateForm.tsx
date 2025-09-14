@@ -71,7 +71,8 @@ interface TemplateFormData {
 interface BeneficiarySelection {
   beneficiary_id: number;
   beneficiary_name: string;
-  account_number: string;
+  account_number: string | undefined;
+  vat_number: string | undefined;
   default_amount: string;
   default_remittance_info: string;
   order: number;
@@ -134,9 +135,23 @@ const SortableBeneficiary: React.FC<{
           <Typography variant="body1" fontWeight={500}>
             {beneficiary.beneficiary_name}
           </Typography>
-          <Typography variant="body2" color="text.secondary" fontFamily="monospace">
-            {beneficiary.account_number}
-          </Typography>
+          <Stack spacing={0.25}>
+            {beneficiary.account_number && (
+              <Typography variant="body2" color="text.secondary" fontFamily="monospace">
+                {beneficiary.account_number}
+              </Typography>
+            )}
+            {beneficiary.vat_number && (
+              <Typography variant="body2" sx={{ color: 'info.main', fontWeight: 500 }}>
+                Adóazonosító: {beneficiary.vat_number}
+              </Typography>
+            )}
+            {!beneficiary.account_number && !beneficiary.vat_number && (
+              <Typography variant="body2" color="text.secondary">
+                -
+              </Typography>
+            )}
+          </Stack>
           
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mt: 1 }}>
             <Box>
@@ -237,6 +252,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
             beneficiary_id: tb.beneficiary.id,
             beneficiary_name: tb.beneficiary.name,
             account_number: tb.beneficiary.account_number,
+            vat_number: tb.beneficiary.vat_number,
             default_amount: tb.default_amount?.toString() || '',
             default_remittance_info: tb.default_remittance || '',
             order: tb.order,
@@ -301,6 +317,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
         beneficiary_id: beneficiary.id,
         beneficiary_name: beneficiary.name,
         account_number: beneficiary.account_number,
+        vat_number: beneficiary.vat_number,
         default_amount: '',
         default_remittance_info: beneficiary.remittance_information || '',
         order: prev.length, // Add to the end
@@ -454,9 +471,23 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
                           <ListItemText
                             primary={beneficiary.name}
                             secondary={
-                              <Typography variant="body2" fontFamily="monospace">
-                                {beneficiary.account_number}
-                              </Typography>
+                              <Stack spacing={0.25}>
+                                {beneficiary.account_number && (
+                                  <Typography variant="body2" fontFamily="monospace">
+                                    {beneficiary.account_number}
+                                  </Typography>
+                                )}
+                                {beneficiary.vat_number && (
+                                  <Typography variant="body2" sx={{ color: 'info.main', fontWeight: 500 }}>
+                                    Adóazonosító: {beneficiary.vat_number}
+                                  </Typography>
+                                )}
+                                {!beneficiary.account_number && !beneficiary.vat_number && (
+                                  <Typography variant="body2" color="text.secondary">
+                                    -
+                                  </Typography>
+                                )}
+                              </Stack>
                             }
                           />
                         </ListItem>

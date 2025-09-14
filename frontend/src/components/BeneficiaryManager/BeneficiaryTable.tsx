@@ -30,6 +30,11 @@ import {
   formatAccountNumberOnInput, 
   validateAndFormatHungarianAccountNumber 
 } from '../../utils/bankAccountValidation';
+import { 
+  validateBeneficiaryName,
+  validateRemittanceInfo,
+  normalizeWhitespace
+} from '../../utils/stringValidation';
 
 interface BeneficiaryTableProps {
   beneficiaries: Beneficiary[];
@@ -61,6 +66,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
     setEditData({
       name: beneficiary.name,
       account_number: beneficiary.account_number,
+      vat_number: beneficiary.vat_number,
       description: beneficiary.description,
       remittance_information: beneficiary.remittance_information,
       is_frequent: beneficiary.is_frequent,
@@ -85,6 +91,15 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
       // Clear previous errors
       setFieldErrors({});
       
+      // Validate that at least one identifier is provided
+      if (!editData.account_number && !editData.vat_number) {
+        setFieldErrors({ 
+          account_number: 'Meg kell adni a számlaszámot vagy az adóazonosító jelet',
+          vat_number: 'Meg kell adni a számlaszámot vagy az adóazonosító jelet' 
+        });
+        return;
+      }
+      
       // Format account number before saving
       const updatedData = { ...editData };
       if (editData.account_number) {
@@ -95,6 +110,42 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
           setFieldErrors({ account_number: validation.error || 'Érvénytelen számlaszám' });
           return;
         }
+      }
+      
+      // Validate VAT number if provided
+      if (editData.vat_number) {
+        const cleanVat = editData.vat_number.replace(/[\s-]/g, '');
+        if (!/^\d{10}$/.test(cleanVat)) {
+          setFieldErrors({ 
+            vat_number: 'Magyar személyi adóazonosító jel 10 számjegyből kell álljon (pl. 8440961790)' 
+          });
+          return;
+        }
+        updatedData.vat_number = cleanVat;
+      }
+
+      // Validate name
+      const nameValidation = validateBeneficiaryName(editData.name || '');
+      if (!nameValidation.isValid) {
+        setFieldErrors({ name: nameValidation.error || 'Érvénytelen név' });
+        return;
+      }
+
+      // Validate remittance information
+      if (editData.remittance_information) {
+        const remittanceValidation = validateRemittanceInfo(editData.remittance_information);
+        if (!remittanceValidation.isValid) {
+          setFieldErrors({ remittance_information: remittanceValidation.error || 'Érvénytelen közlemény' });
+          return;
+        }
+      }
+
+      // Normalize string fields
+      if (updatedData.name) {
+        updatedData.name = normalizeWhitespace(updatedData.name);
+      }
+      if (updatedData.remittance_information) {
+        updatedData.remittance_information = normalizeWhitespace(updatedData.remittance_information);
       }
       
       try {
@@ -144,12 +195,13 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 borderBottomColor: 'divider',
               }
             }}>
-              <TableCell sx={{ width: '25%', minWidth: 200, backgroundColor: 'background.paper' }}>Név</TableCell>
-              <TableCell sx={{ width: '20%', minWidth: 180, backgroundColor: 'background.paper' }}>Leírás</TableCell>
-              <TableCell sx={{ width: '20%', minWidth: 180, backgroundColor: 'background.paper' }}>Számlaszám</TableCell>
-              <TableCell sx={{ width: '25%', minWidth: 200, backgroundColor: 'background.paper' }}>Közlemény</TableCell>
+              <TableCell sx={{ width: '20%', minWidth: 200, backgroundColor: 'background.paper' }}>Név</TableCell>
+              <TableCell sx={{ width: '15%', minWidth: 140, backgroundColor: 'background.paper' }}>Leírás</TableCell>
+              <TableCell sx={{ width: '18%', minWidth: 160, backgroundColor: 'background.paper' }}>Számlaszám</TableCell>
+              <TableCell sx={{ width: '12%', minWidth: 120, backgroundColor: 'background.paper' }}>Adóazonosító jel</TableCell>
+              <TableCell sx={{ width: '20%', minWidth: 180, backgroundColor: 'background.paper' }}>Közlemény</TableCell>
               <TableCell sx={{ width: '10%', minWidth: 120, backgroundColor: 'background.paper' }}>Állapot</TableCell>
-              <TableCell align="right" sx={{ width: '10%', minWidth: 100, backgroundColor: 'background.paper' }}>Műveletek</TableCell>
+              <TableCell align="right" sx={{ width: '5%', minWidth: 80, backgroundColor: 'background.paper' }}>Műveletek</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -158,6 +210,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 <TableCell><Skeleton variant="text" width="80%" /></TableCell>
                 <TableCell><Skeleton variant="text" width="60%" /></TableCell>
                 <TableCell><Skeleton variant="text" width="90%" /></TableCell>
+                <TableCell><Skeleton variant="text" width="70%" /></TableCell>
                 <TableCell><Skeleton variant="text" width="70%" /></TableCell>
                 <TableCell><Skeleton variant="text" width="60%" /></TableCell>
                 <TableCell><Skeleton variant="text" width="40%" /></TableCell>
@@ -196,7 +249,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 '&:hover': { backgroundColor: 'action.hover' },
                 fontWeight: 600,
                 backgroundColor: 'background.paper',
-                width: '25%',
+                width: '20%',
                 minWidth: 200
               }}
               onClick={() => handleSort('name')}
@@ -218,8 +271,8 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 '&:hover': { backgroundColor: 'action.hover' },
                 fontWeight: 600,
                 backgroundColor: 'background.paper',
-                width: '20%',
-                minWidth: 180
+                width: '15%',
+                minWidth: 140
               }}
               onClick={() => handleSort('description')}
             >
@@ -240,8 +293,8 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 '&:hover': { backgroundColor: 'action.hover' },
                 fontWeight: 600,
                 backgroundColor: 'background.paper',
-                width: '20%',
-                minWidth: 180
+                width: '18%',
+                minWidth: 160
               }}
               onClick={() => handleSort('account_number')}
             >
@@ -262,8 +315,30 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 '&:hover': { backgroundColor: 'action.hover' },
                 fontWeight: 600,
                 backgroundColor: 'background.paper',
-                width: '25%',
-                minWidth: 200
+                width: '12%',
+                minWidth: 120
+              }}
+              onClick={() => handleSort('vat_number')}
+            >
+              <Stack direction="row" alignItems="center" spacing={0.5}>
+                <Typography variant="body2" fontWeight="inherit">
+                  Adóazonosító jel
+                </Typography>
+                {sortField === 'vat_number' && (
+                  sortDirection === 'asc' ? 
+                    <ArrowUpIcon fontSize="small" /> : 
+                    <ArrowDownIcon fontSize="small" />
+                )}
+              </Stack>
+            </TableCell>
+            <TableCell 
+              sx={{ 
+                cursor: 'pointer',
+                '&:hover': { backgroundColor: 'action.hover' },
+                fontWeight: 600,
+                backgroundColor: 'background.paper',
+                width: '20%',
+                minWidth: 180
               }}
               onClick={() => handleSort('remittance_information')}
             >
@@ -283,7 +358,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 Állapot
               </Typography>
             </TableCell>
-            <TableCell align="right" sx={{ fontWeight: 600, width: '10%', minWidth: 100, backgroundColor: 'background.paper' }}>
+            <TableCell align="right" sx={{ fontWeight: 600, width: '5%', minWidth: 80, backgroundColor: 'background.paper' }}>
               <Typography variant="body2" fontWeight="inherit">
                 Műveletek
               </Typography>
@@ -358,7 +433,34 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                   />
                 ) : (
                   <Typography variant="body2" fontFamily="monospace">
-                    {beneficiary.account_number}
+                    {beneficiary.account_number || '-'}
+                  </Typography>
+                )}
+              </TableCell>
+              <TableCell>
+                {editingId === beneficiary.id ? (
+                  <TextField
+                    size="small"
+                    value={editData.vat_number || ''}
+                    onChange={(e) => setEditData({ ...editData, vat_number: e.target.value })}
+                    placeholder="8440961790"
+                    fullWidth
+                    error={!!fieldErrors.vat_number}
+                    helperText={fieldErrors.vat_number}
+                    InputProps={{
+                      sx: { 
+                        fontFamily: 'monospace', 
+                        letterSpacing: '0.5px',
+                        fontSize: '0.875rem'
+                      }
+                    }}
+                    sx={{
+                      '& .MuiInputBase-input': { py: '6px' }
+                    }}
+                  />
+                ) : (
+                  <Typography variant="body2" fontFamily="monospace">
+                    {beneficiary.vat_number || '-'}
                   </Typography>
                 )}
               </TableCell>

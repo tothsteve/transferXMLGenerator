@@ -89,6 +89,15 @@ class TemplateService:
             transfer_data = {
                 'originator_account': originator_account.id,
                 'beneficiary': template_beneficiary.beneficiary.id,
+                'beneficiary_data': {
+                    'id': template_beneficiary.beneficiary.id,
+                    'name': template_beneficiary.beneficiary.name,
+                    'account_number': template_beneficiary.beneficiary.account_number,
+                    'vat_number': template_beneficiary.beneficiary.vat_number,
+                    'description': template_beneficiary.beneficiary.description,
+                    'is_frequent': template_beneficiary.beneficiary.is_frequent,
+                    'is_active': template_beneficiary.beneficiary.is_active,
+                },
                 'amount': template_beneficiary.default_amount or 0,
                 'currency': 'HUF',
                 'execution_date': beneficiary_execution_date,

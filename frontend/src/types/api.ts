@@ -1,7 +1,8 @@
 export interface Beneficiary {
   id: number;
   name: string;
-  account_number: string;
+  account_number?: string;  // Optional for VAT-only beneficiaries
+  vat_number?: string;      // Hungarian VAT number for employee identification
   description: string;
   remittance_information: string;
   is_frequent: boolean;
