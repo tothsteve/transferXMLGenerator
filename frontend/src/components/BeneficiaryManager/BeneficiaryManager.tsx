@@ -48,8 +48,9 @@ const BeneficiaryManager: React.FC = () => {
     is_active: showActive,
     is_frequent: showFrequent,
     page: currentPage,
-    // Don't send ordering for remittance_information field since we handle it client-side
-    ordering: (sortField !== 'remittance_information' && sortField !== 'description') ? `${sortDirection === 'desc' ? '-' : ''}${sortField}` : undefined,
+    page_size: 20, // Force pagination with 20 items per page
+    // Send all sorting to backend for proper cross-page sorting
+    ordering: `${sortDirection === 'desc' ? '-' : ''}${sortField}`,
   };
 
   const { data: beneficiariesData, isLoading, refetch } = useBeneficiaries(queryParams);
@@ -57,27 +58,12 @@ const BeneficiaryManager: React.FC = () => {
   const updateMutation = useUpdateBeneficiary();
   const deleteMutation = useDeleteBeneficiary();
 
-  // Get raw beneficiaries and apply client-side sorting for notes if needed
-  const rawBeneficiaries = beneficiariesData?.results || [];
+  // All sorting handled by backend for proper cross-page sorting
+  const beneficiaries = beneficiariesData?.results || [];
   
-  // Apply client-side sorting for remittance_information and description columns to handle null values properly
-  const beneficiaries = (sortField === 'remittance_information' || sortField === 'description')
-    ? [...rawBeneficiaries].sort((a, b) => {
-        const aValue = (sortField === 'remittance_information' ? a.remittance_information : a.description) || '';
-        const bValue = (sortField === 'remittance_information' ? b.remittance_information : b.description) || '';
-        
-        // Handle null/empty values - put them at the end for ascending, beginning for descending
-        if (!aValue && !bValue) return 0;
-        if (!aValue) return sortDirection === 'asc' ? 1 : -1;
-        if (!bValue) return sortDirection === 'asc' ? -1 : 1;
-        
-        // Normal string comparison
-        const comparison = aValue.localeCompare(bValue);
-        return sortDirection === 'desc' ? -comparison : comparison;
-      })
-    : rawBeneficiaries;
-  
-  const totalPages = Math.ceil((beneficiariesData?.count || 0) / 20); // Assuming 20 per page
+  // Calculate pagination based on our forced page size
+  const pageSize = 20;
+  const totalPages = Math.ceil((beneficiariesData?.count || 0) / pageSize);
 
   const handleCreateBeneficiary = async (data: Omit<Beneficiary, 'id'>) => {
     try {
@@ -125,6 +111,8 @@ const BeneficiaryManager: React.FC = () => {
     setSortField(field);
     setSortDirection(direction);
     setCurrentPage(1); // Reset to first page when sorting
+    // Force refetch to ensure fresh data
+    setTimeout(() => refetch(), 100);
   };
 
   const clearFilters = () => {
@@ -185,9 +173,12 @@ const BeneficiaryManager: React.FC = () => {
           {/* Search */}
           <TextField
             fullWidth
-            placeholder="Keresés név, számlaszám vagy leírás alapján..."
+            placeholder="Keresés név, számlaszám, adóazonosító jel vagy leírás alapján..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1); // Reset to first page when searching
+            }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -219,7 +210,10 @@ const BeneficiaryManager: React.FC = () => {
                 control={
                   <Checkbox
                     checked={showActive === true}
-                    onChange={(e) => setShowActive(e.target.checked ? true : undefined)}
+                    onChange={(e) => {
+                      setShowActive(e.target.checked ? true : undefined);
+                      setCurrentPage(1);
+                    }}
                     size="small"
                   />
                 }
@@ -232,7 +226,10 @@ const BeneficiaryManager: React.FC = () => {
                 control={
                   <Checkbox
                     checked={showFrequent === true}
-                    onChange={(e) => setShowFrequent(e.target.checked ? true : undefined)}
+                    onChange={(e) => {
+                      setShowFrequent(e.target.checked ? true : undefined);
+                      setCurrentPage(1);
+                    }}
                     size="small"
                   />
                 }

@@ -23,14 +23,40 @@ class BeneficiaryService:
             if filters.get('is_frequent') is not None:
                 queryset = queryset.filter(is_frequent=filters['is_frequent'])
             
-            # Apply search filter - search in name, account_number, and description
+            # Apply search filter - search in name, account_number, vat_number, and description
             search = filters.get('search')
             if search:
-                queryset = queryset.filter(
-                    Q(name__icontains=search) |
-                    Q(account_number__icontains=search) |
-                    Q(description__icontains=search)
-                )
+                search_q = Q(name__icontains=search) | Q(description__icontains=search)
+                
+                # Add account number search if present
+                if 'account_number__icontains' not in str(search_q):
+                    search_q |= Q(account_number__icontains=search)
+                
+                # Add VAT number search if present
+                search_q |= Q(vat_number__icontains=search)
+                
+                queryset = queryset.filter(search_q)
+            
+            # Apply VAT number filter
+            vat_number = filters.get('vat_number')
+            if vat_number:
+                queryset = queryset.filter(vat_number__icontains=vat_number)
+            
+            # Apply has_vat_number filter (true/false)
+            has_vat_number = filters.get('has_vat_number')
+            if has_vat_number is not None:
+                if has_vat_number:
+                    queryset = queryset.exclude(vat_number__isnull=True).exclude(vat_number='')
+                else:
+                    queryset = queryset.filter(Q(vat_number__isnull=True) | Q(vat_number=''))
+            
+            # Apply has_account_number filter (true/false) 
+            has_account_number = filters.get('has_account_number')
+            if has_account_number is not None:
+                if has_account_number:
+                    queryset = queryset.exclude(account_number__isnull=True).exclude(account_number='')
+                else:
+                    queryset = queryset.filter(Q(account_number__isnull=True) | Q(account_number=''))
         
         return queryset
     

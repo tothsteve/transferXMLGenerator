@@ -185,6 +185,11 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({
                           primary={
                             <Typography variant="body2" fontWeight={500}>
                               {beneficiary.name}
+                              {beneficiary.vat_number && (
+                                <Typography component="span" variant="body2" sx={{ color: 'info.main', fontWeight: 400, ml: 1 }}>
+                                  ({beneficiary.vat_number})
+                                </Typography>
+                              )}
                             </Typography>
                           }
                           secondary={
@@ -217,6 +222,11 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({
                   <Box>
                     <Typography variant="body2" fontWeight={500}>
                       {selectedBeneficiary?.name}
+                      {selectedBeneficiary?.vat_number && (
+                        <Typography component="span" variant="body2" sx={{ color: 'info.main', fontWeight: 400, ml: 1 }}>
+                          ({selectedBeneficiary.vat_number})
+                        </Typography>
+                      )}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
                       {selectedBeneficiary?.account_number}

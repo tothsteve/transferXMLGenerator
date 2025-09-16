@@ -48,6 +48,8 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
         return <UploadIcon {...iconProps} />;
       case 'check_circle':
         return <CheckCircleIcon {...iconProps} />;
+      case 'warning':
+        return <WarningIcon {...iconProps} />;
       default:
         return <HelpIcon {...iconProps} />;
     }
@@ -62,6 +64,8 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
     switch (status) {
       case 'UNPAID':
         return 'warning';    // Orange/yellow - needs payment (not overdue)
+      case 'OVERDUE':
+        return 'error';      // Red - overdue invoice
       case 'PREPARED':
         return 'info';       // Blue - prepared in system
       case 'PAID_MANUAL':
@@ -128,6 +132,8 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
       switch (status) {
         case 'UNPAID':
           return '#ff9800'; // Orange - needs payment but not overdue
+        case 'OVERDUE':
+          return '#d32f2f'; // Dark red - overdue invoice
         case 'PREPARED':
           return '#2196f3'; // Blue
         case 'PAID_MANUAL':
