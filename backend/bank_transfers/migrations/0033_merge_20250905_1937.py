@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('bank_transfers', '0030_invoice_auto_marked_paid'),
+        ('bank_transfers', '0030_add_nav_invoice_payment_tracking'),
         ('bank_transfers', '0032_remove_overdue_status'),
     ]
 

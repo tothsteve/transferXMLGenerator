@@ -629,7 +629,6 @@ class Invoice(TimestampedModel):
         default='UNPAID', 
         verbose_name="Fizetési állapot"
     )
-    auto_marked_paid = models.BooleanField(default=False, verbose_name="Automatikusan fizetettnek jelölve")
     
     # Sync metadata
     sync_status = models.CharField(max_length=10, choices=SYNC_STATUS_CHOICES, default='SUCCESS')

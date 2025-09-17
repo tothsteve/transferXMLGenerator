@@ -214,16 +214,17 @@ backend/**/*.pyc
 *.pdf
 Bankiutalasok*.pdf
 Adoesjarulekbefizetesek*.pdf
-<<<<<<< HEAD
-backend/test_vat_api.py
-backend/test_transfer_validation.py
-backend/test_vat_api_endpoints.py
-=======
 
 # Development temp files and examples
 temp/
 backend/test_transfer_validation.py
 backend/test_vat_api_endpoints.py
 backend/test_vat_api.py
-.gitignore
->>>>>>> 7203cae2ccf3da78c2c58890e25388948f79127f
+
+# Docker configuration - contains local paths and passwords
+docker-compose.yml
+
+# Database backups - may contain sensitive data
+backup_*.json
+*.bak
+backups/
