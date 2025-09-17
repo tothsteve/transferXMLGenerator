@@ -129,7 +129,10 @@ class InvoiceSyncService:
                 sync_log=sync_log,
                 direction=direction
             )
-            
+
+            # Populate STORNO relationships after all invoices are synced
+            self._populate_storno_relationships(company)
+
             # Update sync log with results
             sync_log.sync_end_time = django_timezone.now()
             sync_log.sync_status = 'COMPLETED'
@@ -908,7 +911,47 @@ class InvoiceSyncService:
             else:
                 logger.warning(f"No active NAV config found for {company.name}")
             return config
-    
+
+    def _populate_storno_relationships(self, company: Company):
+        """
+        Populate storno_of relationships for STORNO invoices within the company.
+        This runs after sync completion to ensure all invoices are in the database.
+
+        Args:
+            company: Company instance to process STORNO relationships for
+        """
+        # Find STORNO invoices without relationships set
+        storno_invoices = Invoice.objects.filter(
+            company=company,
+            invoice_operation='STORNO',
+            original_invoice_number__isnull=False,
+            storno_of__isnull=True  # Only process ones that aren't already set
+        )
+
+        populated_count = 0
+        for storno_invoice in storno_invoices:
+            try:
+                # Find original invoice within same company (critical for multi-tenant)
+                original_invoice = Invoice.objects.get(
+                    company=company,
+                    nav_invoice_number=storno_invoice.original_invoice_number
+                )
+
+                # Set the relationship
+                storno_invoice.storno_of = original_invoice
+                storno_invoice.save(update_fields=['storno_of'])
+                populated_count += 1
+
+                logger.info(f"STORNO relationship set: {storno_invoice.nav_invoice_number} -> {original_invoice.nav_invoice_number}")
+
+            except Invoice.DoesNotExist:
+                logger.warning(f"Original invoice {storno_invoice.original_invoice_number} not found for STORNO {storno_invoice.nav_invoice_number}")
+            except Invoice.MultipleObjectsReturned:
+                logger.error(f"Multiple invoices found for {storno_invoice.original_invoice_number}, skipping STORNO {storno_invoice.nav_invoice_number}")
+
+        if populated_count > 0:
+            logger.info(f"Populated {populated_count} STORNO relationships for {company.name}")
+
     def _initialize_nav_client(self, nav_config: NavConfiguration):
         """
         Initialize NAV API client with the given configuration.
