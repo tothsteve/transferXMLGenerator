@@ -914,16 +914,16 @@ class InvoiceSyncService:
 
     def _populate_storno_relationships(self, company: Company):
         """
-        Populate storno_of relationships for STORNO invoices within the company.
+        Populate storno_of relationships for STORNO and MODIFY invoices within the company.
         This runs after sync completion to ensure all invoices are in the database.
 
         Args:
             company: Company instance to process STORNO relationships for
         """
-        # Find STORNO invoices without relationships set
+        # Find STORNO and MODIFY invoices without relationships set
         storno_invoices = Invoice.objects.filter(
             company=company,
-            invoice_operation='STORNO',
+            invoice_operation__in=['STORNO', 'MODIFY'],
             original_invoice_number__isnull=False,
             storno_of__isnull=True  # Only process ones that aren't already set
         )
@@ -942,15 +942,15 @@ class InvoiceSyncService:
                 storno_invoice.save(update_fields=['storno_of'])
                 populated_count += 1
 
-                logger.info(f"STORNO relationship set: {storno_invoice.nav_invoice_number} -> {original_invoice.nav_invoice_number}")
+                logger.info(f"{storno_invoice.invoice_operation} relationship set: {storno_invoice.nav_invoice_number} -> {original_invoice.nav_invoice_number}")
 
             except Invoice.DoesNotExist:
-                logger.warning(f"Original invoice {storno_invoice.original_invoice_number} not found for STORNO {storno_invoice.nav_invoice_number}")
+                logger.warning(f"Original invoice {storno_invoice.original_invoice_number} not found for {storno_invoice.invoice_operation} {storno_invoice.nav_invoice_number}")
             except Invoice.MultipleObjectsReturned:
-                logger.error(f"Multiple invoices found for {storno_invoice.original_invoice_number}, skipping STORNO {storno_invoice.nav_invoice_number}")
+                logger.error(f"Multiple invoices found for {storno_invoice.original_invoice_number}, skipping {storno_invoice.invoice_operation} {storno_invoice.nav_invoice_number}")
 
         if populated_count > 0:
-            logger.info(f"Populated {populated_count} STORNO relationships for {company.name}")
+            logger.info(f"Populated {populated_count} STORNO/MODIFY relationships for {company.name}")
 
     def _initialize_nav_client(self, nav_config: NavConfiguration):
         """

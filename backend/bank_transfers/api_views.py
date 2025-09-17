@@ -896,13 +896,13 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
                 models.Q(original_invoice_number__icontains=search)
             )
         
-        # STORNO filtering - hide both STORNO invoices and invoices that have been storno'd
+        # STORNO filtering - hide both STORNO/MODIFY invoices and invoices that have been storno'd
         hide_storno_invoices = self.request.query_params.get('hide_storno_invoices', 'true').lower() == 'true'
         if hide_storno_invoices:
-            # Exclude STORNO invoices and invoices that have been storno'd
+            # Exclude STORNO and MODIFY invoices and invoices that have been storno'd
             # This uses the ForeignKey relationship for better performance and accuracy
             queryset = queryset.exclude(
-                models.Q(invoice_operation='STORNO') |  # Exclude STORNO invoices themselves
+                models.Q(invoice_operation__in=['STORNO', 'MODIFY']) |  # Exclude STORNO and MODIFY invoices themselves
                 models.Q(storno_invoices__isnull=False)  # Exclude invoices that have been storno'd
             )
         
