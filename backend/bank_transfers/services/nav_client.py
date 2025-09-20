@@ -889,10 +889,18 @@ class NavApiClient:
                 if invoice_data_elem is not None:
                     # Decode base64 invoice XML data
                     import base64
+                    import gzip
                     try:
                         encoded_xml = invoice_data_elem.text
                         decoded_xml_bytes = base64.b64decode(encoded_xml)
-                        decoded_xml = decoded_xml_bytes.decode('utf-8')
+
+                        # Check if the data is gzipped (starts with gzip magic number 0x1f 0x8b)
+                        if decoded_xml_bytes.startswith(b'\x1f\x8b'):
+                            # Decompress gzipped data
+                            decoded_xml = gzip.decompress(decoded_xml_bytes).decode('utf-8')
+                        else:
+                            # Plain text XML
+                            decoded_xml = decoded_xml_bytes.decode('utf-8')
                         
                         # Store the raw XML data
                         invoice_data['nav_invoice_xml'] = decoded_xml
