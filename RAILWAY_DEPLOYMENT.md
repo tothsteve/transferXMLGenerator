@@ -85,10 +85,24 @@ DJANGO_SETTINGS_MODULE=transferXMLGenerator.settings_production python migrate_t
 - **Frontend**: `https://your-frontend.railway.app`
 - **API docs**: `https://your-backend.railway.app/swagger/`
 
+## Optimized Monorepo Deployment
+
+For optimal monorepo deployment with separate services, use watch paths to prevent unnecessary rebuilds:
+
+### Backend Service Configuration
+- Uses **root `railway.json`** with `"watchPaths": ["backend/**", "requirements.txt"]`
+- Only rebuilds when backend code or requirements change
+
+### Frontend Service Configuration
+- Uses **`frontend/railway.json`** with `"watchPaths": ["frontend/**"]`
+- Only rebuilds when frontend code changes
+
+This ensures each service rebuilds independently based on actual code changes.
+
 ## Important Notes
 
 1. **Separate Services**: Backend and frontend are deployed as completely separate Railway services
-2. **Different Repositories**: You can deploy from the same GitHub repo by setting different root directories
+2. **Optimized Rebuilds**: Each service has its own `railway.json` with specific watch paths for monorepo efficiency
 3. **Database**: PostgreSQL is shared between services via environment variables
 4. **Static Files**: Backend serves its own static files, frontend is served by npm serve
 5. **CORS**: Make sure to update CORS settings with actual deployment URLs
@@ -106,6 +120,7 @@ DJANGO_SETTINGS_MODULE=transferXMLGenerator.settings_production python migrate_t
 - [ ] Data exported from SQL Server (`python migrate_to_postgresql.py --export-only`)
 - [ ] Backend service deployed with correct environment variables
 - [ ] Frontend service deployed with backend URL
+- [ ] Frontend service configured with `frontend/railway.json` for optimized rebuilds
 - [ ] Services can communicate (test API calls)
 - [ ] Data imported to PostgreSQL (`python migrate_to_postgresql.py --import-only`)
 - [ ] CORS settings updated with actual URLs
