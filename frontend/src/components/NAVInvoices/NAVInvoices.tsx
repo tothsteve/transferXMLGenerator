@@ -53,9 +53,11 @@ import {
   Schedule as PreparedIcon,
   CheckCircle as PaidIcon,
   Clear as ClearIcon,
+  AddCircle as AddTrustedIcon,
+  Verified as VerifiedIcon,
 } from '@mui/icons-material';
 import { useToastContext } from '../../context/ToastContext';
-import { navInvoicesApi } from '../../services/api';
+import { navInvoicesApi, trustedPartnersApi } from '../../services/api';
 import { useBulkMarkUnpaid, useBulkMarkPrepared, useBulkMarkPaid } from '../../hooks/api';
 import NAVInvoiceTable from './NAVInvoiceTable';
 
@@ -260,6 +262,11 @@ const NAVInvoices: React.FC = () => {
   const [invoiceDetailsOpen, setInvoiceDetailsOpen] = useState(false);
   const [invoiceLineItems, setInvoiceLineItems] = useState<InvoiceLineItem[]>([]);
   const [invoiceDetailsLoading, setInvoiceDetailsLoading] = useState(false);
+
+  // Trusted partner states
+  const [isSupplierTrusted, setIsSupplierTrusted] = useState<boolean>(false);
+  const [checkingTrustedStatus, setCheckingTrustedStatus] = useState<boolean>(false);
+  const [addingTrustedPartner, setAddingTrustedPartner] = useState<boolean>(false);
   
   const { success: showSuccess, error: showError } = useToastContext();
   const navigate = useNavigate();
@@ -317,6 +324,34 @@ const NAVInvoices: React.FC = () => {
     }
   };
 
+  // Check if supplier is already a trusted partner
+  const checkSupplierTrustedStatus = async (supplierTaxNumber: string) => {
+    if (!supplierTaxNumber) {
+      setIsSupplierTrusted(false);
+      return;
+    }
+
+    try {
+      setCheckingTrustedStatus(true);
+      const response = await trustedPartnersApi.getAll({
+        search: supplierTaxNumber,
+        is_active: true
+      });
+
+      // Check if any trusted partner matches this tax number
+      const isTrusted = response.data?.results?.some(partner =>
+        partner.tax_number === supplierTaxNumber
+      ) || false;
+
+      setIsSupplierTrusted(isTrusted);
+    } catch (error) {
+      console.error('Error checking trusted partner status:', error);
+      setIsSupplierTrusted(false);
+    } finally {
+      setCheckingTrustedStatus(false);
+    }
+  };
+
   // Load invoice details with line items
   const loadInvoiceDetails = async (invoiceId: number) => {
     try {
@@ -325,6 +360,13 @@ const NAVInvoices: React.FC = () => {
       console.log('Invoice detail response:', response.data); // Debug log
       setSelectedInvoice(response.data);
       setInvoiceLineItems(response.data.line_items || []);
+
+      // Check trusted partner status for supplier
+      if (response.data.supplier_tax_number) {
+        await checkSupplierTrustedStatus(response.data.supplier_tax_number);
+      } else {
+        setIsSupplierTrusted(false);
+      }
     } catch (error) {
       console.error('Error loading invoice details:', error);
       showError('Hiba a számla részletek betöltése során');
@@ -344,11 +386,90 @@ const NAVInvoices: React.FC = () => {
     await loadInvoiceDetails(invoice.id);
   };
 
+  // Track if we need to refresh the invoice list when closing the detail dialog
+  const [shouldRefreshOnClose, setShouldRefreshOnClose] = useState<boolean>(false);
+
   const handleCloseInvoiceDetails = () => {
     setInvoiceDetailsOpen(false);
     setSelectedInvoice(null);
     setInvoiceLineItems([]);
     setInvoiceDetailsLoading(false);
+    setIsSupplierTrusted(false);
+    setCheckingTrustedStatus(false);
+    setAddingTrustedPartner(false);
+
+    // Refresh the invoice list if changes were made (preserving filters)
+    if (shouldRefreshOnClose) {
+      loadInvoices();
+      setShouldRefreshOnClose(false);
+    }
+  };
+
+  // Add supplier as trusted partner
+  const handleAddTrustedPartner = async () => {
+    if (!selectedInvoice || !selectedInvoice.supplier_name || !selectedInvoice.supplier_tax_number) {
+      showError('Hiányzó szállító adatok a partner hozzáadásához');
+      return;
+    }
+
+    try {
+      setAddingTrustedPartner(true);
+
+      const trustedPartnerData = {
+        partner_name: selectedInvoice.supplier_name,
+        tax_number: selectedInvoice.supplier_tax_number,
+        is_active: true,
+        auto_pay: true
+      };
+
+      // Add trusted partner
+      await trustedPartnersApi.create(trustedPartnerData);
+      setIsSupplierTrusted(true);
+      setShouldRefreshOnClose(true); // Mark that we need to refresh the list
+
+      // Auto-mark invoice as PAID if it's currently UNPAID
+      if (selectedInvoice.payment_status.status === 'UNPAID') {
+        try {
+          await bulkMarkPaidMutation.mutateAsync({
+            invoice_ids: [selectedInvoice.id],
+            payment_date: new Date().toISOString().split('T')[0] // Today's date
+          });
+
+          // Update the invoice in state to reflect the new payment status
+          setSelectedInvoice(prev => prev ? {
+            ...prev,
+            payment_status: {
+              status: 'PAID',
+              label: 'Kifizetve',
+              icon: 'CheckCircle',
+              class: 'success'
+            },
+            payment_status_date: new Date().toISOString().split('T')[0],
+            payment_status_date_formatted: new Date().toLocaleDateString('hu-HU'),
+            is_paid: true
+          } : null);
+
+          showSuccess(`${selectedInvoice.supplier_name} hozzáadva a megbízható partnerekhez és a számla megjelölve kifizetettként`);
+        } catch (paymentError) {
+          console.error('Error marking invoice as paid:', paymentError);
+          showSuccess(`${selectedInvoice.supplier_name} hozzáadva a megbízható partnerekhez (fizetési állapot frissítése sikertelen)`);
+        }
+      } else {
+        showSuccess(`${selectedInvoice.supplier_name} hozzáadva a megbízható partnerekhez`);
+      }
+
+    } catch (error: any) {
+      console.error('Error adding trusted partner:', error);
+      if (error?.response?.data?.non_field_errors?.[0]) {
+        showError(error.response.data.non_field_errors[0]);
+      } else if (error?.response?.data?.tax_number?.[0]) {
+        showError(`Adószám hiba: ${error.response.data.tax_number[0]}`);
+      } else {
+        showError('Hiba a megbízható partner hozzáadása során');
+      }
+    } finally {
+      setAddingTrustedPartner(false);
+    }
   };
 
   const handleSort = (field: string, direction: 'asc' | 'desc') => {
@@ -1256,6 +1377,36 @@ const NAVInvoices: React.FC = () => {
                   <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
                     Partnerek
                   </Typography>
+
+                  {/* Trusted Partner Status and Action */}
+                  <Box sx={{ mb: 2 }}>
+                    {checkingTrustedStatus ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CircularProgress size={16} />
+                        <Typography variant="caption" color="text.secondary">
+                          Megbízható partner állapot ellenőrzése...
+                        </Typography>
+                      </Box>
+                    ) : isSupplierTrusted ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <VerifiedIcon color="success" fontSize="small" />
+                        <Typography variant="body2" color="success.main" sx={{ fontWeight: 'medium' }}>
+                          Megbízható partner
+                        </Typography>
+                      </Box>
+                    ) : selectedInvoice.supplier_tax_number && (
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<AddTrustedIcon />}
+                        onClick={handleAddTrustedPartner}
+                        disabled={addingTrustedPartner}
+                      >
+                        {addingTrustedPartner ? 'Hozzáadás...' : 'Megbízható partnerré jelölés'}
+                      </Button>
+                    )}
+                  </Box>
+
                   {selectedInvoice.supplier_name && (
                     <>
                       <Typography variant="body2" sx={{ mb: 0.5 }}>
