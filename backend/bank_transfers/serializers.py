@@ -276,7 +276,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'payment_due_date', 'currency_code', 'invoice_net_amount', 'invoice_vat_amount',
             'invoice_gross_amount', 'invoice_gross_amount_formatted', 'sync_status',
             'sync_status_display', 'line_items', 'line_items_count', 'payment_status',
-            'payment_status_date', 'auto_marked_paid', 'created_at', 'updated_at'
+            'payment_status_date', 'auto_marked_paid', 'supplier_bank_account_number',
+            'customer_bank_account_number', 'created_at', 'updated_at'
         ]
         read_only_fields = ['__all__']
     
@@ -574,7 +575,8 @@ class InvoiceDetailSerializer(serializers.ModelSerializer):
             
             # Business
             'invoice_operation', 'invoice_category', 'payment_method', 'invoice_appearance',
-            'original_invoice_number', 'payment_status',
+            'original_invoice_number', 'payment_status', 'supplier_bank_account_number',
+            'customer_bank_account_number',
             
             # NAV metadata
             'nav_source', 'original_request_version', 'completion_date', 'last_modified_date',
