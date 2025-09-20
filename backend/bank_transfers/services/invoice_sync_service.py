@@ -273,6 +273,8 @@ class InvoiceSyncService:
                     # Extract and save line items if we have XML data
                     if detailed_invoice_data and 'nav_invoice_xml' in detailed_invoice_data:
                         self._extract_and_save_line_items(existing_invoice, detailed_invoice_data['nav_invoice_xml'])
+                        # Calculate header amounts from line items if header data is unreliable
+                        self._calculate_header_amounts_from_line_items(existing_invoice)
                 else:
                     # Create new invoice
                     new_invoice = self._create_invoice_from_nav_data(company, invoice_data)
@@ -280,6 +282,8 @@ class InvoiceSyncService:
                     # Extract and save line items if we have XML data
                     if detailed_invoice_data and 'nav_invoice_xml' in detailed_invoice_data:
                         self._extract_and_save_line_items(new_invoice, detailed_invoice_data['nav_invoice_xml'])
+                        # Calculate header amounts from line items if header data is unreliable
+                        self._calculate_header_amounts_from_line_items(new_invoice)
                 
                 invoices_processed += 1
                 
@@ -422,7 +426,51 @@ class InvoiceSyncService:
             
         except Exception as e:
             logger.error(f"❌ Failed to extract line items for invoice {invoice.nav_invoice_number}: {str(e)}")
-    
+
+    def _calculate_header_amounts_from_line_items(self, invoice: Invoice):
+        """
+        Calculate and update header amounts from line items when header data is unreliable.
+        This is used as a fallback when NAV digest/detailed data has 0 or missing amounts.
+
+        Args:
+            invoice: Invoice instance to update
+        """
+        from django.db.models import Sum
+
+        # Calculate totals from line items
+        line_totals = invoice.line_items.aggregate(
+            total_net=Sum('line_net_amount'),
+            total_vat=Sum('line_vat_amount'),
+            total_gross=Sum('line_gross_amount')
+        )
+
+        # Check if header amounts need to be corrected (are 0 but line items exist)
+        has_line_items = invoice.line_items.exists()
+        needs_net_correction = (invoice.invoice_net_amount == 0 and line_totals['total_net'] and line_totals['total_net'] != 0)
+        needs_vat_correction = (invoice.invoice_vat_amount == 0 and line_totals['total_vat'] and line_totals['total_vat'] != 0)
+        needs_gross_correction = (invoice.invoice_gross_amount == 0 and line_totals['total_gross'] and line_totals['total_gross'] != 0)
+
+        if has_line_items and (needs_net_correction or needs_vat_correction or needs_gross_correction):
+            original_net = invoice.invoice_net_amount
+            original_vat = invoice.invoice_vat_amount
+            original_gross = invoice.invoice_gross_amount
+
+            # Update header amounts with line item totals
+            if needs_net_correction:
+                invoice.invoice_net_amount = line_totals['total_net']
+            if needs_vat_correction:
+                invoice.invoice_vat_amount = line_totals['total_vat'] or 0
+            if needs_gross_correction:
+                invoice.invoice_gross_amount = line_totals['total_gross'] or 0
+
+            # Save the updated invoice
+            invoice.save(update_fields=['invoice_net_amount', 'invoice_vat_amount', 'invoice_gross_amount'])
+
+            logger.info(f"💰 Corrected header amounts for {invoice.nav_invoice_number} from line items:")
+            logger.info(f"   Net: {original_net} → {invoice.invoice_net_amount}")
+            logger.info(f"   VAT: {original_vat} → {invoice.invoice_vat_amount}")
+            logger.info(f"   Gross: {original_gross} → {invoice.invoice_gross_amount}")
+
     def _extract_bank_account_numbers(self, invoice: Invoice, root):
         """
         Extract bank account numbers from NAV invoice XML.
