@@ -1417,6 +1417,11 @@ const NAVInvoices: React.FC = () => {
                           <strong>Eladó adószám:</strong> {selectedInvoice.supplier_tax_number}
                         </Typography>
                       )}
+                      {selectedInvoice.supplier_bank_account_number && (
+                        <Typography variant="body2" sx={{ mb: 0.5 }}>
+                          <strong>Eladó bankszámlaszám:</strong> {selectedInvoice.supplier_bank_account_number}
+                        </Typography>
+                      )}
                     </>
                   )}
                   {selectedInvoice.customer_name && (
@@ -1427,6 +1432,11 @@ const NAVInvoices: React.FC = () => {
                       {selectedInvoice.customer_tax_number && (
                         <Typography variant="body2" sx={{ mb: 0.5 }}>
                           <strong>Vevő adószám:</strong> {selectedInvoice.customer_tax_number}
+                        </Typography>
+                      )}
+                      {selectedInvoice.customer_bank_account_number && (
+                        <Typography variant="body2" sx={{ mb: 0.5 }}>
+                          <strong>Vevő bankszámlaszám:</strong> {selectedInvoice.customer_bank_account_number}
                         </Typography>
                       )}
                     </>
