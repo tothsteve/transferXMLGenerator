@@ -25,7 +25,7 @@ This guide explains how to deploy the Transfer XML Generator application (Django
 2. **Configure backend service:**
    - **Root Directory**: `backend`
    - **Service Name**: `backend` or `api`
-   - Railway will auto-detect Django and use the `nixpacks.toml` configuration
+   - Railway will auto-detect Django using **Railpack** builder
 
 ### 3. Set Environment Variables (Backend)
 
@@ -52,7 +52,7 @@ DJANGO_LOG_LEVEL=INFO
 2. **Configure frontend service:**
    - **Root Directory**: `frontend`
    - **Service Name**: `frontend` or `web`
-   - Railway will auto-detect React and use the `nixpacks.toml` configuration
+   - Railway will auto-detect React automatically
 
 ### 5. Set Environment Variables (Frontend)
 
@@ -78,39 +78,6 @@ Once backend is deployed and PostgreSQL is ready:
 DJANGO_SETTINGS_MODULE=transferXMLGenerator.settings_production python migrate_to_postgresql.py --import-only
 ```
 
-## Service Configuration Files
-
-Each service has its own `nixpacks.toml` for Railway:
-
-### Backend (`backend/nixpacks.toml`)
-```toml
-[phases.setup]
-nixPkgs = ["python38", "pip"]
-
-[phases.install]
-cmds = ["pip install -r requirements.txt"]
-
-[phases.build] 
-cmds = ["python manage.py collectstatic --noinput"]
-
-[start]
-cmd = "python manage.py migrate && gunicorn transferXMLGenerator.wsgi:application --bind 0.0.0.0:$PORT"
-```
-
-### Frontend (`frontend/nixpacks.toml`)
-```toml
-[phases.setup]
-nixPkgs = ["nodejs", "npm"]
-
-[phases.install]
-cmds = ["npm install"]
-
-[phases.build]
-cmds = ["npm run build"]
-
-[start]
-cmd = "npm run serve"
-```
 
 ## Testing Deployment
 
@@ -128,7 +95,7 @@ cmd = "npm run serve"
 
 ## Troubleshooting
 
-- **Build failures**: Check the `nixpacks.toml` configuration for each service
+- **Build failures**: Check Railway service configuration in the dashboard
 - **Environment variables**: Ensure all required variables are set for each service
 - **CORS issues**: Update `FRONTEND_URL` in backend settings
 - **Database connection**: Verify `DATABASE_URL` is correctly provided by PostgreSQL service
