@@ -420,19 +420,6 @@ class InvoiceSyncService:
                         line_data['vat_rate'] = None
                 else:
                     line_data['vat_rate'] = None
-                
-                # Extract VAT rate (convert from decimal to percentage format)
-                vat_percentage_text = get_line_text('vatPercentage')
-                if vat_percentage_text:
-                    try:
-                        # NAV XML contains vatPercentage as decimal (e.g., 0.27 for 27%)
-                        # Convert to percentage format for database storage
-                        vat_decimal = Decimal(vat_percentage_text)
-                        line_data['vat_rate'] = vat_decimal * 100  # Convert 0.27 to 27
-                    except:
-                        line_data['vat_rate'] = None
-                else:
-                    line_data['vat_rate'] = None
 
                 # Create the line item
                 InvoiceLineItem.objects.create(
@@ -775,7 +762,6 @@ class InvoiceSyncService:
     def _create_line_item_from_nav_data(self, invoice: Invoice, line_data: Dict):
         """Create invoice line item from NAV data."""
 
-<<<<<<< HEAD
         # Handle VAT rate conversion if needed
         vat_rate = None
         if 'vatRate' in line_data:
@@ -786,8 +772,13 @@ class InvoiceSyncService:
             vat_percentage = self._parse_decimal(line_data.get('vatPercentage', '0'))
             vat_rate = vat_percentage * 100 if vat_percentage is not None else None
 
-=======
->>>>>>> feature/improve-invoice-detail-ui
+        # Calculate gross amount from net + vat if lineGrossAmount is 0 or missing
+        line_gross_amount = self._parse_decimal(line_data.get('lineGrossAmount', '0'))
+        if line_gross_amount == 0:
+            line_net = self._parse_decimal(line_data.get('lineNetAmount', '0'))
+            line_vat = self._parse_decimal(line_data.get('lineVatAmount', '0'))
+            line_gross_amount = line_net + line_vat
+
         return InvoiceLineItem.objects.create(
             invoice=invoice,
             line_number=line_data.get('lineNumber', 1),
@@ -797,7 +788,7 @@ class InvoiceSyncService:
             unit_price=self._parse_decimal(line_data.get('unitPrice', '0')),
             line_net_amount=self._parse_decimal(line_data.get('lineNetAmount', '0')),
             line_vat_amount=self._parse_decimal(line_data.get('lineVatAmount', '0')),
-            line_gross_amount=self._parse_decimal(line_data.get('lineGrossAmount', '0')),
+            line_gross_amount=line_gross_amount,
             vat_rate=vat_rate,
             product_code_category=line_data.get('productCodeCategory', ''),
             product_code_value=line_data.get('productCodeValue', '')
