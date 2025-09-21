@@ -405,7 +405,8 @@ class InvoiceSyncService:
                     except:
                         line_data['line_gross_amount'] = Decimal('0.00')
                 else:
-                    line_data['line_gross_amount'] = Decimal('0.00')
+                    # Calculate gross amount from net + vat if not provided in XML
+                    line_data['line_gross_amount'] = line_data['line_net_amount'] + line_data['line_vat_amount']
                 
                 # Create the line item
                 InvoiceLineItem.objects.create(
@@ -746,7 +747,7 @@ class InvoiceSyncService:
     
     def _create_line_item_from_nav_data(self, invoice: Invoice, line_data: Dict):
         """Create invoice line item from NAV data."""
-        
+
         return InvoiceLineItem.objects.create(
             invoice=invoice,
             line_number=line_data.get('lineNumber', 1),

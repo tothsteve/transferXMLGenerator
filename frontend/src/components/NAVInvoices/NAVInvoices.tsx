@@ -546,12 +546,23 @@ const NAVInvoices: React.FC = () => {
 
   const totals = calculateTotals();
 
+  // Consistent number formatting function - ensures spaces as thousand separators
+  const formatNumber = (value: number | string | null): string => {
+    if (value === null || value === undefined || value === '') return '-';
+
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(num)) return '-';
+
+    // Use Hungarian locale which uses spaces as thousand separators
+    return num.toLocaleString('hu-HU', { maximumFractionDigits: 2 }).replace(/,00$/, '');
+  };
+
   // Format amount helper function
   const formatAmount = (amount: number, currency: string) => {
     if (currency === 'HUF') {
-      return `${amount.toLocaleString('hu-HU', { maximumFractionDigits: 0 })} Ft`;
+      return `${formatNumber(amount)} Ft`;
     }
-    return `${amount.toLocaleString('hu-HU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+    return `${formatNumber(amount)} ${currency}`;
   };
 
   const handlePageSizeChange = (event: any) => {
@@ -1470,7 +1481,7 @@ const NAVInvoices: React.FC = () => {
                       <Stack direction="row" justifyContent="space-between">
                         <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Számla nettó értéke</Typography>
                         <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                          {selectedInvoice.invoice_net_amount_formatted}
+                          {formatNumber(selectedInvoice.invoice_net_amount)} Ft
                         </Typography>
                       </Stack>
                     )}
@@ -1478,14 +1489,14 @@ const NAVInvoices: React.FC = () => {
                       <Stack direction="row" justifyContent="space-between">
                         <Typography variant="body2">Áfa összege</Typography>
                         <Typography variant="body2">
-                          {selectedInvoice.invoice_vat_amount_formatted}
+                          {formatNumber(selectedInvoice.invoice_vat_amount)} Ft
                         </Typography>
                       </Stack>
                     )}
                     <Stack direction="row" justifyContent="space-between" sx={{ borderTop: '1px solid #ddd', pt: 0.5 }}>
                       <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Számla bruttó végösszege</Typography>
                       <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                        {selectedInvoice.invoice_gross_amount_formatted}
+                        {formatNumber(selectedInvoice.invoice_gross_amount)} Ft
                       </Typography>
                     </Stack>
                   </Stack>
@@ -1521,19 +1532,19 @@ const NAVInvoices: React.FC = () => {
                               {item.quantity ? `${item.quantity} ${item.unit_of_measure}` : '-'}
                             </TableCell>
                             <TableCell align="right">
-                              {item.unit_price ? item.unit_price.toLocaleString('hu-HU') : '-'}
+                              {formatNumber(item.unit_price)}
                             </TableCell>
                             <TableCell align="right">
-                              {item.line_net_amount.toLocaleString('hu-HU')}
+                              {formatNumber(item.line_net_amount)}
                             </TableCell>
                             <TableCell align="right">
-                              {item.vat_rate ? `${item.vat_rate}%` : '-'}
+                              {item.vat_rate ? `${formatNumber(item.vat_rate)}%` : '-'}
                             </TableCell>
                             <TableCell align="right">
-                              {item.line_vat_amount.toLocaleString('hu-HU')}
+                              {formatNumber(item.line_vat_amount)}
                             </TableCell>
                             <TableCell align="right">
-                              {item.line_gross_amount.toLocaleString('hu-HU')}
+                              {formatNumber(item.line_gross_amount)}
                             </TableCell>
                           </TableRow>
                         ))}
