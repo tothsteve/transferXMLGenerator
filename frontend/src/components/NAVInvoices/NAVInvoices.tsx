@@ -34,7 +34,6 @@ import {
 } from '@mui/material';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
 import { hu } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
@@ -42,7 +41,6 @@ import {
   Search as SearchIcon,
   FilterList as FilterIcon,
   Refresh as RefreshIcon,
-  Visibility as ViewIcon,
   SwapHoriz,
   Add as AddIcon,
   ExpandMore as ExpandMoreIcon,
@@ -55,6 +53,8 @@ import {
   Clear as ClearIcon,
   AddCircle as AddTrustedIcon,
   Verified as VerifiedIcon,
+  TrendingDown as TrendingDownIcon,
+  TrendingUp as TrendingUpIcon,
 } from '@mui/icons-material';
 import { useToastContext } from '../../context/ToastContext';
 import { navInvoicesApi, trustedPartnersApi } from '../../services/api';
@@ -546,12 +546,23 @@ const NAVInvoices: React.FC = () => {
 
   const totals = calculateTotals();
 
+  // Consistent number formatting function - ensures spaces as thousand separators
+  const formatNumber = (value: number | string | null): string => {
+    if (value === null || value === undefined || value === '') return '-';
+
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(num)) return '-';
+
+    // Use Hungarian locale which uses spaces as thousand separators
+    return num.toLocaleString('hu-HU', { maximumFractionDigits: 2 }).replace(/,00$/, '');
+  };
+
   // Format amount helper function
   const formatAmount = (amount: number, currency: string) => {
     if (currency === 'HUF') {
-      return `${amount.toLocaleString('hu-HU', { maximumFractionDigits: 0 })} Ft`;
+      return `${formatNumber(amount)} Ft`;
     }
-    return `${amount.toLocaleString('hu-HU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+    return `${formatNumber(amount)} ${currency}`;
   };
 
   const handlePageSizeChange = (event: any) => {
@@ -1338,7 +1349,26 @@ const NAVInvoices: React.FC = () => {
         fullWidth
       >
         <DialogTitle>
-          Számla részletei: {selectedInvoice?.nav_invoice_number || 'Betöltés...'}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            <Typography variant="h6" component="span">
+              Számla részletei: {selectedInvoice?.nav_invoice_number || 'Betöltés...'}
+            </Typography>
+            {selectedInvoice && (
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                {/* Direction Badge - same style as in the list */}
+                <Chip
+                  label={selectedInvoice.invoice_direction_display}
+                  color={selectedInvoice.invoice_direction === 'INBOUND' ? 'secondary' : 'primary'}
+                  size="small"
+                  variant="outlined"
+                  icon={selectedInvoice.invoice_direction === 'INBOUND' ? <TrendingDownIcon /> : <TrendingUpIcon />}
+                />
+                {selectedInvoice.invoice_operation === 'STORNO' && (
+                  <Chip label="Stornó" color="error" size="small" variant="filled" sx={{ height: 24, fontSize: '0.75rem' }} />
+                )}
+              </Box>
+            )}
+          </Box>
         </DialogTitle>
         <DialogContent>
           {invoiceDetailsLoading ? (
@@ -1347,174 +1377,132 @@ const NAVInvoices: React.FC = () => {
             </Box>
           ) : selectedInvoice && (
             <Box>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} sx={{ mb: 3 }}>
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
-                    Alapadatok
-                  </Typography>
-                  <Typography variant="body2" sx={{ mb: 0.5 }}>
-                    <strong>Irány:</strong> {selectedInvoice.invoice_direction_display}
-                  </Typography>
-                  <Typography variant="body2" sx={{ mb: 0.5 }}>
-                    <strong>Kategória:</strong> {selectedInvoice.invoice_category || 'N/A'}
-                  </Typography>
-                  {selectedInvoice.invoice_operation === 'STORNO' && (
-                    <Typography variant="body2" sx={{ mb: 0.5 }}>
-                      <strong>Művelet:</strong> <Chip label="Stornó" color="error" size="small" variant="filled" />
-                    </Typography>
-                  )}
-                  <Typography variant="body2" sx={{ mb: 0.5 }}>
-                    <strong>Pénznem:</strong> {selectedInvoice.currency_code}
-                  </Typography>
-                  {selectedInvoice.original_invoice_number && (
-                    <Typography variant="body2" sx={{ mb: 0.5 }}>
-                      <strong>Eredeti szám:</strong> {selectedInvoice.original_invoice_number}
-                    </Typography>
-                  )}
-                </Box>
-                
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
-                    Partnerek
-                  </Typography>
 
-                  {/* Trusted Partner Status and Action */}
-                  <Box sx={{ mb: 2 }}>
-                    {checkingTrustedStatus ? (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <CircularProgress size={16} />
-                        <Typography variant="caption" color="text.secondary">
-                          Megbízható partner állapot ellenőrzése...
-                        </Typography>
-                      </Box>
-                    ) : isSupplierTrusted ? (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <VerifiedIcon color="success" fontSize="small" />
-                        <Typography variant="body2" color="success.main" sx={{ fontWeight: 'medium' }}>
-                          Megbízható partner
-                        </Typography>
-                      </Box>
-                    ) : selectedInvoice.supplier_tax_number && (
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<AddTrustedIcon />}
-                        onClick={handleAddTrustedPartner}
-                        disabled={addingTrustedPartner}
-                      >
-                        {addingTrustedPartner ? 'Hozzáadás...' : 'Megbízható partnerré jelölés'}
-                      </Button>
+              {/* Compact Partners Section - Clean two-column like invoice */}
+              <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+                {/* Supplier Column */}
+                {selectedInvoice.supplier_name && (
+                  <Box sx={{ flex: 1, borderRight: selectedInvoice.customer_name ? '1px solid #e0e0e0' : 'none', pr: selectedInvoice.customer_name ? 2 : 0 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                      Eladó: {selectedInvoice.supplier_name}
+                    </Typography>
+                    {selectedInvoice.supplier_tax_number && (
+                      <Typography variant="body2" sx={{ mb: 0.3, fontSize: '0.875rem' }}>
+                        Magyar adószám: {selectedInvoice.supplier_tax_number}
+                      </Typography>
+                    )}
+                    {selectedInvoice.supplier_bank_account_number && (
+                      <Typography variant="body2" sx={{ mb: 0.3, fontSize: '0.875rem' }}>
+                        Bankszámlaszám: {selectedInvoice.supplier_bank_account_number}
+                      </Typography>
+                    )}
+
+                    {/* Trusted Partner Status - Compact */}
+                    <Box sx={{ mt: 1 }}>
+                      {checkingTrustedStatus ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <CircularProgress size={14} />
+                          <Typography variant="caption" color="text.secondary">
+                            Ellenőrzés...
+                          </Typography>
+                        </Box>
+                      ) : isSupplierTrusted ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <VerifiedIcon color="success" fontSize="small" />
+                          <Typography variant="caption" color="success.main" sx={{ fontWeight: 'medium' }}>
+                            Megbízható partner
+                          </Typography>
+                        </Box>
+                      ) : selectedInvoice.supplier_tax_number && (
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={<AddTrustedIcon />}
+                          onClick={handleAddTrustedPartner}
+                          disabled={addingTrustedPartner}
+                          sx={{ fontSize: '0.75rem', py: 0.5, px: 1 }}
+                        >
+                          {addingTrustedPartner ? 'Hozzáadás...' : 'Megbízható partner'}
+                        </Button>
+                      )}
+                    </Box>
+                  </Box>
+                )}
+
+                {/* Customer Column */}
+                {selectedInvoice.customer_name && (
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                      Vevő: {selectedInvoice.customer_name}
+                    </Typography>
+                    {selectedInvoice.customer_tax_number && (
+                      <Typography variant="body2" sx={{ mb: 0.3, fontSize: '0.875rem' }}>
+                        Magyar adószám: {selectedInvoice.customer_tax_number}
+                      </Typography>
+                    )}
+                    {selectedInvoice.customer_bank_account_number && (
+                      <Typography variant="body2" sx={{ mb: 0.3, fontSize: '0.875rem' }}>
+                        Bankszámlaszám: {selectedInvoice.customer_bank_account_number}
+                      </Typography>
                     )}
                   </Box>
-
-                  {selectedInvoice.supplier_name && (
-                    <>
-                      <Typography variant="body2" sx={{ mb: 0.5 }}>
-                        <strong>Eladó:</strong> {selectedInvoice.supplier_name}
-                      </Typography>
-                      {selectedInvoice.supplier_tax_number && (
-                        <Typography variant="body2" sx={{ mb: 0.5 }}>
-                          <strong>Eladó adószám:</strong> {selectedInvoice.supplier_tax_number}
-                        </Typography>
-                      )}
-                      {selectedInvoice.supplier_bank_account_number && (
-                        <Typography variant="body2" sx={{ mb: 0.5 }}>
-                          <strong>Eladó bankszámlaszám:</strong> {selectedInvoice.supplier_bank_account_number}
-                        </Typography>
-                      )}
-                    </>
-                  )}
-                  {selectedInvoice.customer_name && (
-                    <>
-                      <Typography variant="body2" sx={{ mb: 0.5 }}>
-                        <strong>Vevő:</strong> {selectedInvoice.customer_name}
-                      </Typography>
-                      {selectedInvoice.customer_tax_number && (
-                        <Typography variant="body2" sx={{ mb: 0.5 }}>
-                          <strong>Vevő adószám:</strong> {selectedInvoice.customer_tax_number}
-                        </Typography>
-                      )}
-                      {selectedInvoice.customer_bank_account_number && (
-                        <Typography variant="body2" sx={{ mb: 0.5 }}>
-                          <strong>Vevő bankszámlaszám:</strong> {selectedInvoice.customer_bank_account_number}
-                        </Typography>
-                      )}
-                    </>
-                  )}
-                </Box>
-                
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
-                    Összegek
-                  </Typography>
-                  {selectedInvoice.invoice_net_amount && (
-                    <Typography variant="body2" sx={{ mb: 0.5 }}>
-                      <strong>Nettó:</strong> {selectedInvoice.invoice_net_amount_formatted}
-                    </Typography>
-                  )}
-                  {selectedInvoice.invoice_vat_amount && (
-                    <Typography variant="body2" sx={{ mb: 0.5 }}>
-                      <strong>ÁFA:</strong> {selectedInvoice.invoice_vat_amount_formatted}
-                    </Typography>
-                  )}
-                  <Typography variant="body2" sx={{ mb: 0.5 }}>
-                    <strong>Bruttó:</strong> {selectedInvoice.invoice_gross_amount_formatted}
-                  </Typography>
-                </Box>
+                )}
               </Stack>
 
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} sx={{ mb: 3 }}>
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
-                    Dátumok
+              {/* Compact Details Row - Essential dates only */}
+              <Box sx={{ borderTop: '1px solid #e0e0e0', pt: 1.5, mb: 2 }}>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}>
+                    Teljesítés: {selectedInvoice.fulfillment_date_formatted || selectedInvoice.issue_date_formatted}
                   </Typography>
-                  <Typography variant="body2" sx={{ mb: 0.5 }}>
-                    <strong>Kiállítás:</strong> {selectedInvoice.issue_date_formatted}
+                  <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}>
+                    Keltezés: {selectedInvoice.issue_date_formatted}
                   </Typography>
-                  {selectedInvoice.fulfillment_date_formatted && (
-                    <Typography variant="body2" sx={{ mb: 0.5 }}>
-                      <strong>Teljesítés:</strong> {selectedInvoice.fulfillment_date_formatted}
+                  <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}>
+                    Fizetési határidő: {selectedInvoice.payment_due_date_formatted || 'N/A'}
+                  </Typography>
+                  {selectedInvoice.original_invoice_number && (
+                    <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}>
+                      Eredeti szám: {selectedInvoice.original_invoice_number}
                     </Typography>
                   )}
-                  {selectedInvoice.payment_due_date_formatted && (
-                    <Typography variant="body2" sx={{ mb: 0.5 }}>
-                      <strong>Fizetési határidő:</strong> {selectedInvoice.payment_due_date_formatted}
-                    </Typography>
-                  )}
-                </Box>
+                </Stack>
+              </Box>
 
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
-                    Fizetés
-                  </Typography>
-                  {selectedInvoice.payment_date_formatted && (
-                    <Typography variant="body2" sx={{ mb: 0.5 }}>
-                      <strong>Fizetés dátuma:</strong> {selectedInvoice.payment_date_formatted}
-                    </Typography>
-                  )}
-                  {selectedInvoice.payment_method && (
-                    <Typography variant="body2" sx={{ mb: 0.5 }}>
-                      <strong>Fizetési mód:</strong> {selectedInvoice.payment_method}
-                    </Typography>
-                  )}
-                </Box>
+              {/* Compact Summary Section */}
+              <Box sx={{ backgroundColor: '#f9f9f9', p: 1.5, borderRadius: 1, mb: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  Számla összesítő:
+                </Typography>
 
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
-                    NAV adatok
-                  </Typography>
-                  {selectedInvoice.nav_source && (
-                    <Typography variant="body2" sx={{ mb: 0.5 }}>
-                      <strong>Forrás:</strong> {selectedInvoice.nav_source}
-                    </Typography>
-                  )}
-                  {selectedInvoice.completion_date && (
-                    <Typography variant="body2" sx={{ mb: 0.5 }}>
-                      <strong>Befejezés:</strong> {selectedInvoice.completion_date}
-                    </Typography>
-                  )}
-                </Box>
-              </Stack>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
+                  <Stack spacing={0.5} sx={{ flex: 1 }}>
+                    {selectedInvoice.invoice_net_amount && (
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Számla nettó értéke</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                          {formatNumber(selectedInvoice.invoice_net_amount)} Ft
+                        </Typography>
+                      </Stack>
+                    )}
+                    {selectedInvoice.invoice_vat_amount && (
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography variant="body2">Áfa összege</Typography>
+                        <Typography variant="body2">
+                          {formatNumber(selectedInvoice.invoice_vat_amount)} Ft
+                        </Typography>
+                      </Stack>
+                    )}
+                    <Stack direction="row" justifyContent="space-between" sx={{ borderTop: '1px solid #ddd', pt: 0.5 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Számla bruttó végösszege</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                        {formatNumber(selectedInvoice.invoice_gross_amount)} Ft
+                      </Typography>
+                    </Stack>
+                  </Stack>
+                </Stack>
+
+              </Box>
 
               <Box>
                 <Typography variant="subtitle1" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
@@ -1544,19 +1532,19 @@ const NAVInvoices: React.FC = () => {
                               {item.quantity ? `${item.quantity} ${item.unit_of_measure}` : '-'}
                             </TableCell>
                             <TableCell align="right">
-                              {item.unit_price ? item.unit_price.toLocaleString('hu-HU') : '-'}
+                              {formatNumber(item.unit_price)}
                             </TableCell>
                             <TableCell align="right">
-                              {item.line_net_amount.toLocaleString('hu-HU')}
+                              {formatNumber(item.line_net_amount)}
                             </TableCell>
                             <TableCell align="right">
-                              {item.vat_rate ? `${item.vat_rate}%` : '-'}
+                              {item.vat_rate ? `${formatNumber(item.vat_rate)}%` : '-'}
                             </TableCell>
                             <TableCell align="right">
-                              {item.line_vat_amount.toLocaleString('hu-HU')}
+                              {formatNumber(item.line_vat_amount)}
                             </TableCell>
                             <TableCell align="right">
-                              {item.line_gross_amount.toLocaleString('hu-HU')}
+                              {formatNumber(item.line_gross_amount)}
                             </TableCell>
                           </TableRow>
                         ))}

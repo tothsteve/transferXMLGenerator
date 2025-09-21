@@ -883,9 +883,10 @@ class NavApiClient:
                 # Extract the base64 encoded invoice XML
                 invoice_data_elem = data_result_elem.find('.//{http://schemas.nav.gov.hu/OSA/3.0/api}invoiceData')
                 audit_data_elem = data_result_elem.find('.//{http://schemas.nav.gov.hu/OSA/3.0/api}auditData')
-                
+                compressed_indicator_elem = data_result_elem.find('.//{http://schemas.nav.gov.hu/OSA/3.0/api}compressedContentIndicator')
+
                 invoice_data = {}
-                
+
                 if invoice_data_elem is not None:
                     # Decode base64 invoice XML data
                     import base64
@@ -894,8 +895,12 @@ class NavApiClient:
                         encoded_xml = invoice_data_elem.text
                         decoded_xml_bytes = base64.b64decode(encoded_xml)
 
-                        # Check if the data is gzipped (starts with gzip magic number 0x1f 0x8b)
-                        if decoded_xml_bytes.startswith(b'\x1f\x8b'):
+                        # Check compressedContentIndicator flag from NAV response
+                        is_compressed = False
+                        if compressed_indicator_elem is not None:
+                            is_compressed = compressed_indicator_elem.text.lower() == 'true'
+
+                        if is_compressed:
                             # Decompress gzipped data
                             decoded_xml = gzip.decompress(decoded_xml_bytes).decode('utf-8')
                         else:

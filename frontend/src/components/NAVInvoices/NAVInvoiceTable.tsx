@@ -94,6 +94,17 @@ interface NAVInvoiceTableProps {
   onSelectAll?: (selected: boolean) => void;
 }
 
+// Consistent number formatting function - ensures spaces as thousand separators
+const formatNumber = (value: number | string | null): string => {
+  if (value === null || value === undefined || value === '') return '-';
+
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return '-';
+
+  // Use Hungarian locale which uses spaces as thousand separators
+  return num.toLocaleString('hu-HU', { maximumFractionDigits: 2 }).replace(/,00$/, '');
+};
+
 const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
   invoices,
   isLoading,
@@ -428,17 +439,17 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
               </TableCell>
               <TableCell align="right">
                 <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
-                  {invoice.invoice_net_amount_formatted}
+                  {formatNumber(invoice.invoice_net_amount)} Ft
                 </Typography>
               </TableCell>
               <TableCell align="right">
                 <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
-                  {invoice.invoice_vat_amount_formatted}
+                  {formatNumber(invoice.invoice_vat_amount)} Ft
                 </Typography>
               </TableCell>
               <TableCell align="right">
                 <Typography variant="body2" sx={{ fontWeight: 'medium', fontSize: '0.8rem' }}>
-                  {invoice.invoice_gross_amount_formatted}
+                  {formatNumber(invoice.invoice_gross_amount)} Ft
                 </Typography>
               </TableCell>
               {showStornoColumn && (
