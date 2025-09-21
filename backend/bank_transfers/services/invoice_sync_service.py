@@ -405,7 +405,8 @@ class InvoiceSyncService:
                     except:
                         line_data['line_gross_amount'] = Decimal('0.00')
                 else:
-                    line_data['line_gross_amount'] = Decimal('0.00')
+                    # Calculate gross amount from net + vat if not provided in XML
+                    line_data['line_gross_amount'] = line_data['line_net_amount'] + line_data['line_vat_amount']
 
                 # Extract VAT rate (convert from decimal to percentage format)
                 vat_percentage_text = get_line_text('vatPercentage')
@@ -420,6 +421,19 @@ class InvoiceSyncService:
                 else:
                     line_data['vat_rate'] = None
                 
+                # Extract VAT rate (convert from decimal to percentage format)
+                vat_percentage_text = get_line_text('vatPercentage')
+                if vat_percentage_text:
+                    try:
+                        # NAV XML contains vatPercentage as decimal (e.g., 0.27 for 27%)
+                        # Convert to percentage format for database storage
+                        vat_decimal = Decimal(vat_percentage_text)
+                        line_data['vat_rate'] = vat_decimal * 100  # Convert 0.27 to 27
+                    except:
+                        line_data['vat_rate'] = None
+                else:
+                    line_data['vat_rate'] = None
+
                 # Create the line item
                 InvoiceLineItem.objects.create(
                     invoice=invoice,
@@ -761,6 +775,7 @@ class InvoiceSyncService:
     def _create_line_item_from_nav_data(self, invoice: Invoice, line_data: Dict):
         """Create invoice line item from NAV data."""
 
+<<<<<<< HEAD
         # Handle VAT rate conversion if needed
         vat_rate = None
         if 'vatRate' in line_data:
@@ -771,6 +786,8 @@ class InvoiceSyncService:
             vat_percentage = self._parse_decimal(line_data.get('vatPercentage', '0'))
             vat_rate = vat_percentage * 100 if vat_percentage is not None else None
 
+=======
+>>>>>>> feature/improve-invoice-detail-ui
         return InvoiceLineItem.objects.create(
             invoice=invoice,
             line_number=line_data.get('lineNumber', 1),
