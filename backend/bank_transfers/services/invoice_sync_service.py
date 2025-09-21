@@ -408,6 +408,19 @@ class InvoiceSyncService:
                     # Calculate gross amount from net + vat if not provided in XML
                     line_data['line_gross_amount'] = line_data['line_net_amount'] + line_data['line_vat_amount']
                 
+                # Extract VAT rate (convert from decimal to percentage format)
+                vat_percentage_text = get_line_text('vatPercentage')
+                if vat_percentage_text:
+                    try:
+                        # NAV XML contains vatPercentage as decimal (e.g., 0.27 for 27%)
+                        # Convert to percentage format for database storage
+                        vat_decimal = Decimal(vat_percentage_text)
+                        line_data['vat_rate'] = vat_decimal * 100  # Convert 0.27 to 27
+                    except:
+                        line_data['vat_rate'] = None
+                else:
+                    line_data['vat_rate'] = None
+
                 # Create the line item
                 InvoiceLineItem.objects.create(
                     invoice=invoice,
@@ -418,7 +431,8 @@ class InvoiceSyncService:
                     unit_price=line_data['unit_price'],
                     line_net_amount=line_data['line_net_amount'],
                     line_vat_amount=line_data['line_vat_amount'],
-                    line_gross_amount=line_data['line_gross_amount']
+                    line_gross_amount=line_data['line_gross_amount'],
+                    vat_rate=line_data['vat_rate']
                 )
             
             # Log line items created
