@@ -67,6 +67,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
       name: beneficiary.name,
       account_number: beneficiary.account_number,
       vat_number: beneficiary.vat_number,
+      tax_number: beneficiary.tax_number,
       description: beneficiary.description,
       remittance_information: beneficiary.remittance_information,
       is_frequent: beneficiary.is_frequent,
@@ -92,10 +93,9 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
       setFieldErrors({});
       
       // Validate that at least one identifier is provided
-      if (!editData.account_number && !editData.vat_number) {
-        setFieldErrors({ 
-          account_number: 'Meg kell adni a számlaszámot vagy az adóazonosító jelet',
-          vat_number: 'Meg kell adni a számlaszámot vagy az adóazonosító jelet' 
+      if (!editData.account_number && !editData.vat_number && !editData.tax_number) {
+        setFieldErrors({
+          account_number: 'Meg kell adni a számlaszámot, adóazonosító jelet vagy céges adószámot'
         });
         return;
       }
@@ -116,12 +116,24 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
       if (editData.vat_number) {
         const cleanVat = editData.vat_number.replace(/[\s-]/g, '');
         if (!/^\d{10}$/.test(cleanVat)) {
-          setFieldErrors({ 
-            vat_number: 'Magyar személyi adóazonosító jel 10 számjegyből kell álljon (pl. 8440961790)' 
+          setFieldErrors({
+            vat_number: 'Magyar személyi adóazonosító jel 10 számjegyből kell álljon (pl. 8440961790)'
           });
           return;
         }
         updatedData.vat_number = cleanVat;
+      }
+
+      // Validate tax number if provided
+      if (editData.tax_number) {
+        const cleanTax = editData.tax_number.replace(/[\s-]/g, '');
+        if (!/^\d{8}$/.test(cleanTax)) {
+          setFieldErrors({
+            tax_number: 'Magyar céges adószám 8 számjegyből kell álljon (pl. 12345678)'
+          });
+          return;
+        }
+        updatedData.tax_number = cleanTax;
       }
 
       // Validate name
@@ -197,9 +209,10 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
             }}>
               <TableCell sx={{ width: '20%', minWidth: 200, backgroundColor: 'background.paper' }}>Név</TableCell>
               <TableCell sx={{ width: '15%', minWidth: 140, backgroundColor: 'background.paper' }}>Leírás</TableCell>
-              <TableCell sx={{ width: '18%', minWidth: 160, backgroundColor: 'background.paper' }}>Számlaszám</TableCell>
-              <TableCell sx={{ width: '12%', minWidth: 120, backgroundColor: 'background.paper' }}>Adóazonosító jel</TableCell>
-              <TableCell sx={{ width: '20%', minWidth: 180, backgroundColor: 'background.paper' }}>Közlemény</TableCell>
+              <TableCell sx={{ width: '16%', minWidth: 140, backgroundColor: 'background.paper' }}>Számlaszám</TableCell>
+              <TableCell sx={{ width: '10%', minWidth: 100, backgroundColor: 'background.paper' }}>Adóazonosító jel</TableCell>
+              <TableCell sx={{ width: '10%', minWidth: 100, backgroundColor: 'background.paper' }}>Céges adószám</TableCell>
+              <TableCell sx={{ width: '18%', minWidth: 160, backgroundColor: 'background.paper' }}>Közlemény</TableCell>
               <TableCell sx={{ width: '10%', minWidth: 120, backgroundColor: 'background.paper' }}>Állapot</TableCell>
               <TableCell align="right" sx={{ width: '5%', minWidth: 80, backgroundColor: 'background.paper' }}>Műveletek</TableCell>
             </TableRow>
@@ -210,6 +223,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 <TableCell><Skeleton variant="text" width="80%" /></TableCell>
                 <TableCell><Skeleton variant="text" width="60%" /></TableCell>
                 <TableCell><Skeleton variant="text" width="90%" /></TableCell>
+                <TableCell><Skeleton variant="text" width="70%" /></TableCell>
                 <TableCell><Skeleton variant="text" width="70%" /></TableCell>
                 <TableCell><Skeleton variant="text" width="70%" /></TableCell>
                 <TableCell><Skeleton variant="text" width="60%" /></TableCell>
@@ -331,14 +345,36 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 )}
               </Stack>
             </TableCell>
-            <TableCell 
-              sx={{ 
+            <TableCell
+              sx={{
                 cursor: 'pointer',
                 '&:hover': { backgroundColor: 'action.hover' },
                 fontWeight: 600,
                 backgroundColor: 'background.paper',
-                width: '20%',
-                minWidth: 180
+                width: '10%',
+                minWidth: 100
+              }}
+              onClick={() => handleSort('tax_number')}
+            >
+              <Stack direction="row" alignItems="center" spacing={0.5}>
+                <Typography variant="body2" fontWeight="inherit">
+                  Céges adószám
+                </Typography>
+                {sortField === 'tax_number' && (
+                  sortDirection === 'asc' ?
+                    <ArrowUpIcon fontSize="small" /> :
+                    <ArrowDownIcon fontSize="small" />
+                )}
+              </Stack>
+            </TableCell>
+            <TableCell
+              sx={{
+                cursor: 'pointer',
+                '&:hover': { backgroundColor: 'action.hover' },
+                fontWeight: 600,
+                backgroundColor: 'background.paper',
+                width: '18%',
+                minWidth: 160
               }}
               onClick={() => handleSort('remittance_information')}
             >
@@ -461,6 +497,30 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 ) : (
                   <Typography variant="body2" fontFamily="monospace">
                     {beneficiary.vat_number || '-'}
+                  </Typography>
+                )}
+              </TableCell>
+              <TableCell>
+                {editingId === beneficiary.id ? (
+                  <TextField
+                    size="small"
+                    value={editData.tax_number || ''}
+                    onChange={(e) => setEditData({ ...editData, tax_number: e.target.value })}
+                    placeholder="12345678"
+                    fullWidth
+                    error={!!fieldErrors.tax_number}
+                    helperText={fieldErrors.tax_number}
+                    InputProps={{
+                      sx: {
+                        fontFamily: 'monospace',
+                        letterSpacing: '0.5px',
+                        fontSize: '0.875rem'
+                      }
+                    }}
+                  />
+                ) : (
+                  <Typography variant="body2" fontFamily="monospace">
+                    {beneficiary.tax_number || '-'}
                   </Typography>
                 )}
               </TableCell>

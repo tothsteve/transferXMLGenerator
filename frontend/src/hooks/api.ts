@@ -22,6 +22,7 @@ export const queryKeys = {
   beneficiariesFrequent: ['beneficiaries', 'frequent'] as const,
   templates: ['templates'] as const,
   template: (id: number) => ['templates', id] as const,
+  transfers: ['transfers'] as const,
   bankAccountDefault: ['bankAccount', 'default'] as const,
   batches: ['batches'] as const,
 };
@@ -209,9 +210,30 @@ export function useUpdateTemplateBeneficiary() {
 }
 
 // Transfers Hooks
+export function useTransfers(params?: {
+  page?: number;
+  page_size?: number;
+  is_processed?: boolean;
+  template_id?: number;
+  execution_date_from?: string;
+  execution_date_to?: string;
+  ordering?: string;
+}) {
+  return useQuery({
+    queryKey: [...queryKeys.transfers, params],
+    queryFn: () => transfersApi.getAll(params),
+    select: (data) => data.data,
+  });
+}
+
 export function useBulkCreateTransfers() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (data: BulkCreateTransferRequest) => transfersApi.bulkCreate(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.transfers });
+    },
   });
 }
 

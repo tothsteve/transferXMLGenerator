@@ -57,7 +57,7 @@ import {
   TrendingUp as TrendingUpIcon,
 } from '@mui/icons-material';
 import { useToastContext } from '../../context/ToastContext';
-import { navInvoicesApi, trustedPartnersApi } from '../../services/api';
+import { navInvoicesApi, trustedPartnersApi, bankAccountsApi } from '../../services/api';
 import { useBulkMarkUnpaid, useBulkMarkPrepared, useBulkMarkPaid } from '../../hooks/api';
 import NAVInvoiceTable from './NAVInvoiceTable';
 
@@ -268,7 +268,7 @@ const NAVInvoices: React.FC = () => {
   const [checkingTrustedStatus, setCheckingTrustedStatus] = useState<boolean>(false);
   const [addingTrustedPartner, setAddingTrustedPartner] = useState<boolean>(false);
   
-  const { success: showSuccess, error: showError } = useToastContext();
+  const { success: showSuccess, error: showError, addToast } = useToastContext();
   const navigate = useNavigate();
   
   // Bulk payment status update hooks
@@ -587,78 +587,89 @@ const NAVInvoices: React.FC = () => {
     }
   };
 
-  // Generate transfers from selected invoices
-  const handleGenerateTransfers = () => {
-    const selectedInvoiceObjects = invoices.filter(invoice => selectedInvoices.includes(invoice.id));
-    
-    if (selectedInvoiceObjects.length === 0) {
+  // Generate transfers from selected invoices using new API with tax number fallback
+  const handleGenerateTransfers = async () => {
+    if (selectedInvoices.length === 0) {
       showError('Kérjük, válasszon ki legalább egy számlát');
       return;
     }
 
-    // Filter out invoices without required data and collect missing data info
-    const validInvoices = [];
-    const invalidInvoices = [];
-    
-    for (const invoice of selectedInvoiceObjects) {
-      const hasAccountNumber = invoice.supplier_bank_account_number && invoice.supplier_bank_account_number.trim() !== '';
-      const hasAmount = invoice.invoice_gross_amount && invoice.invoice_gross_amount > 0;
-      const hasPartnerName = (invoice.partner_name && invoice.partner_name.trim() !== '') || (invoice.supplier_name && invoice.supplier_name.trim() !== '');
-      
-      if (hasAccountNumber && hasAmount && hasPartnerName) {
-        validInvoices.push(invoice);
-      } else {
-        const missingFields = [];
-        if (!hasAccountNumber) missingFields.push('bankszámlaszám');
-        if (!hasAmount) missingFields.push('összeg');
-        if (!hasPartnerName) missingFields.push('partnernév');
-        
-        invalidInvoices.push({
-          invoice,
-          missingFields
+    try {
+      // Get default bank account for originator
+      const defaultAccountResponse = await bankAccountsApi.getDefault();
+      const originatorAccountId = defaultAccountResponse.data.id;
+
+      if (!originatorAccountId) {
+        showError('Nincs beállítva alapértelmezett bankszámla. Kérjük, állítson be egyet a beállítások menüben.');
+        return;
+      }
+
+      // Call the new generate_transfers endpoint with tax number fallback
+      const requestData = {
+        invoice_ids: selectedInvoices,
+        originator_account_id: originatorAccountId,
+        execution_date: new Date().toISOString().split('T')[0], // Today as default execution date
+      };
+
+      showSuccess('Átutalások generálása folyamatban...');
+
+      const response = await navInvoicesApi.generateTransfers(requestData);
+      const { transfers, transfer_count, errors, warnings, message } = response.data;
+
+      // Show detailed feedback about the generation process
+      if (errors.length > 0) {
+        const errorMessage = `Hibák:\n${errors.slice(0, 3).join('\n')}${errors.length > 3 ? `\n...és további ${errors.length - 3} hiba` : ''}`;
+        showError(errorMessage);
+      }
+
+      if (warnings.length > 0) {
+        const warningMessage = `Figyelmeztetések:\n${warnings.slice(0, 3).join('\n')}${warnings.length > 3 ? `\n...és további ${warnings.length - 3} figyelmeztetés` : ''}`;
+        // Use addToast with longer duration (12 seconds) for detailed warning messages
+        addToast('warning', 'Figyelmeztetések', warningMessage, 12000);
+      }
+
+      if (transfer_count > 0) {
+        // Use addToast with longer duration (8 seconds) so the message stays visible longer
+        addToast('success', `${transfer_count} átutalás sikeresen létrehozva`, '', 8000);
+
+        // Navigate to transfers page to show the created transfers
+        navigate('/transfers', {
+          state: {
+            source: 'nav_invoices_generated',
+            transfers: transfers, // Pass the created transfers data
+            message: `${transfer_count} átutalás létrehozva NAV számlákból`
+          }
         });
+      } else {
+        showError('Nem sikerült átutalást létrehozni a kiválasztott számlákból');
+      }
+
+      // Clear selections
+      setSelectedInvoices([]);
+
+    } catch (error: any) {
+      console.error('Error generating transfers:', error);
+      console.log('Error details:', {
+        status: error?.response?.status,
+        data: error?.response?.data,
+        message: error?.message
+      });
+
+      if (error?.response?.status === 401) {
+        showError('Nincs jogosultság az átutalások generálásához. Kérjük jelentkezzen be újra.');
+      } else if (error?.response?.status === 403) {
+        showError('Nincs engedély az átutalások generálásához');
+      } else if (error?.response?.data?.error) {
+        showError(error.response.data.error);
+      } else if (error?.response?.data?.errors) {
+        const errorMessage = `Hibák:\n${error.response.data.errors.slice(0, 3).join('\n')}`;
+        showError(errorMessage);
+      } else if (error?.response?.data?.detail) {
+        showError(`API hiba: ${error.response.data.detail}`);
+      } else {
+        showError(`Hiba történt az átutalások generálásakor: ${error?.message || 'Ismeretlen hiba'}`);
       }
     }
-
-    if (validInvoices.length === 0) {
-      // Show detailed error about why all invoices were invalid
-      const errorDetails = invalidInvoices.map(item => 
-        `${item.invoice.nav_invoice_number}: hiányzik ${item.missingFields.join(', ')}`
-      ).slice(0, 3); // Show max 3 examples
-      
-      const errorMessage = `A kiválasztott számlák nem tartalmaznak elegendő adatot az átutalás generálásához:\n${errorDetails.join('\n')}${invalidInvoices.length > 3 ? `\n...és további ${invalidInvoices.length - 3} számla` : ''}`;
-      showError(errorMessage);
-      return;
-    }
-
-    // Create transfer data structure compatible with TransferWorkflow
-    const transfersData = validInvoices.map((invoice, index) => ({
-      beneficiary_id: null, // Will need to be set manually or matched
-      beneficiary_name: invoice.partner_name || invoice.supplier_name,
-      account_number: invoice.supplier_bank_account_number!,
-      amount: Math.floor(invoice.invoice_gross_amount).toString(), // Convert to int as requested
-      currency: invoice.currency_code === 'HUF' ? 'HUF' : invoice.currency_code,
-      execution_date: invoice.payment_due_date || new Date().toISOString().split('T')[0], // Use payment due date or today
-      remittance_info: invoice.nav_invoice_number,
-      nav_invoice: invoice.id, // Link to NAV invoice for automatic payment tracking
-      order: index + 1,
-      fromNAVInvoice: true // Flag to indicate this came from NAV invoice
-    }));
-
-    // Navigate to transfers with pre-populated data
-    navigate('/transfers', { 
-      state: { 
-        preloadedTransfers: transfersData,
-        source: 'nav_invoices'
-      } 
-    });
-
-    // Show success message with details about skipped invoices
-    const successMessage = validInvoices.length === selectedInvoiceObjects.length 
-      ? `${validInvoices.length} átutalás előkészítve`
-      : `${validInvoices.length} átutalás előkészítve (${invalidInvoices.length} számlát kihagytunk hiányos adatok miatt)`;
-    
-    showSuccess(successMessage);
   };
 
   // Bulk payment status update handlers

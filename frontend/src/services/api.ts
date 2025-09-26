@@ -120,21 +120,35 @@ export const templatesApi = {
 
 // Transfers API
 export const transfersApi = {
+  getAll: (params?: {
+    page?: number;
+    page_size?: number;
+    is_processed?: boolean;
+    template_id?: number;
+    execution_date_from?: string;
+    execution_date_to?: string;
+    ordering?: string;
+  }) =>
+    apiClient.get<ApiResponse<Transfer>>('/transfers/', { params }),
+
+  getById: (id: number) =>
+    apiClient.get<Transfer>(`/transfers/${id}/`),
+
   bulkCreate: (data: BulkCreateTransferRequest) =>
     apiClient.post<Transfer[]>('/transfers/bulk_create/', data),
-  
+
   update: (id: number, data: Partial<Transfer>) =>
     apiClient.put<Transfer>(`/transfers/${id}/`, data),
-  
+
   partialUpdate: (id: number, data: Partial<Transfer>) =>
     apiClient.patch<Transfer>(`/transfers/${id}/`, data),
-  
+
   delete: (id: number) =>
     apiClient.delete(`/transfers/${id}/`),
-  
+
   generateXml: (data: GenerateXmlRequest) =>
     apiClient.post<GenerateXmlResponse>('/transfers/generate_xml/', data),
-  
+
   generateKHExport: (data: GenerateXmlRequest) =>
     apiClient.post<GenerateKHExportResponse>('/transfers/generate_kh_export/', data),
 };
@@ -229,12 +243,20 @@ export const navInvoicesApi = {
   bulkMarkPrepared: (invoice_ids: number[]) =>
     apiClient.post('/nav/invoices/bulk_mark_prepared/', { invoice_ids }),
   
-  bulkMarkPaid: (data: { 
-    invoice_ids?: number[], 
+  bulkMarkPaid: (data: {
+    invoice_ids?: number[],
     payment_date?: string,
     invoices?: { invoice_id: number, payment_date: string }[]
   }) =>
     apiClient.post('/nav/invoices/bulk_mark_paid/', data),
+
+  // Generate transfers from NAV invoices with tax number fallback
+  generateTransfers: (data: {
+    invoice_ids: number[],
+    originator_account_id: number,
+    execution_date: string
+  }) =>
+    apiClient.post('/nav/invoices/generate_transfers/', data),
 };
 
 // Trusted Partners API
