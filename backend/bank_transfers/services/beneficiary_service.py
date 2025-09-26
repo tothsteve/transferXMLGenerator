@@ -23,18 +23,21 @@ class BeneficiaryService:
             if filters.get('is_frequent') is not None:
                 queryset = queryset.filter(is_frequent=filters['is_frequent'])
             
-            # Apply search filter - search in name, account_number, vat_number, and description
+            # Apply search filter - search in name, account_number, vat_number, tax_number, and description
             search = filters.get('search')
             if search:
                 search_q = Q(name__icontains=search) | Q(description__icontains=search)
-                
+
                 # Add account number search if present
                 if 'account_number__icontains' not in str(search_q):
                     search_q |= Q(account_number__icontains=search)
-                
+
                 # Add VAT number search if present
                 search_q |= Q(vat_number__icontains=search)
-                
+
+                # Add tax number search if present
+                search_q |= Q(tax_number__icontains=search)
+
                 queryset = queryset.filter(search_q)
             
             # Apply VAT number filter
@@ -50,14 +53,19 @@ class BeneficiaryService:
                 else:
                     queryset = queryset.filter(Q(vat_number__isnull=True) | Q(vat_number=''))
             
-            # Apply has_account_number filter (true/false) 
+            # Apply has_account_number filter (true/false)
             has_account_number = filters.get('has_account_number')
             if has_account_number is not None:
                 if has_account_number:
                     queryset = queryset.exclude(account_number__isnull=True).exclude(account_number='')
                 else:
                     queryset = queryset.filter(Q(account_number__isnull=True) | Q(account_number=''))
-        
+
+            # Apply tax number search if present
+            tax_number = filters.get('tax_number')
+            if tax_number:
+                queryset = queryset.filter(tax_number__icontains=tax_number)
+
         return queryset
     
     @staticmethod
@@ -100,3 +108,33 @@ class BeneficiaryService:
         )
         
         return beneficiary, created
+
+    @staticmethod
+    def find_beneficiary_by_tax_number(company, supplier_tax_number):
+        """
+        Find beneficiary by 8-digit tax number for transfer fallback.
+
+        Args:
+            company: Company instance
+            supplier_tax_number: Tax number from NAV invoice (can be 8-13 digits)
+
+        Returns:
+            Beneficiary instance with account_number, or None if not found
+        """
+        if not supplier_tax_number or len(supplier_tax_number) < 8:
+            return None
+
+        # Extract base 8-digit tax number (normalize first by removing non-digits)
+        normalized = ''.join(filter(str.isdigit, supplier_tax_number))
+        base_tax = normalized[:8] if len(normalized) >= 8 else normalized
+
+        if len(base_tax) != 8:
+            return None
+
+        # Find beneficiary with matching tax number and account number
+        return Beneficiary.objects.filter(
+            company=company,
+            tax_number=base_tax,
+            account_number__isnull=False,
+            is_active=True
+        ).exclude(account_number='').first()

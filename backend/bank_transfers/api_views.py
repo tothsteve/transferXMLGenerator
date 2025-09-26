@@ -1163,6 +1163,192 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         
         return Response(response_data)
 
+    @swagger_auto_schema(
+        operation_summary="Eseti átutalások generálása NAV számlákból",
+        operation_description="Generate ad-hoc transfers from NAV invoices with tax number fallback for missing bank accounts",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'invoice_ids': openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(type=openapi.TYPE_INTEGER),
+                    description="List of invoice IDs to generate transfers from"
+                ),
+                'originator_account_id': openapi.Schema(
+                    type=openapi.TYPE_INTEGER,
+                    description="ID of the originator bank account"
+                ),
+                'execution_date': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    format=openapi.FORMAT_DATE,
+                    description="Execution date for the transfers (YYYY-MM-DD)"
+                )
+            },
+            required=['invoice_ids', 'originator_account_id', 'execution_date']
+        )
+    )
+    @action(detail=False, methods=['post'])
+    def generate_transfers(self, request):
+        """Generate transfers from NAV invoices with tax number fallback logic"""
+        from .services.beneficiary_service import BeneficiaryService
+        from decimal import Decimal
+        from datetime import datetime
+
+        invoice_ids = request.data.get('invoice_ids', [])
+        originator_account_id = request.data.get('originator_account_id')
+        execution_date_str = request.data.get('execution_date')
+
+        if not invoice_ids:
+            return Response({'error': 'invoice_ids kötelező'}, status=400)
+
+        if not originator_account_id:
+            return Response({'error': 'originator_account_id kötelező'}, status=400)
+
+        if not execution_date_str:
+            return Response({'error': 'execution_date kötelező'}, status=400)
+
+        # Parse execution date
+        try:
+            execution_date = datetime.strptime(execution_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({'error': 'Érvénytelen dátum formátum. Használj YYYY-MM-DD formátumot.'}, status=400)
+
+        # Validate originator account
+        try:
+            originator_account = BankAccount.objects.get(
+                id=originator_account_id,
+                company=request.company
+            )
+        except BankAccount.DoesNotExist:
+            return Response({'error': 'Originátor számla nem található'}, status=400)
+
+        # Get invoices
+        invoices = Invoice.objects.filter(
+            id__in=invoice_ids,
+            company=request.company
+        )
+
+        if not invoices.exists():
+            return Response({'error': 'Nem található számla'}, status=400)
+
+        generated_transfers = []
+        errors = []
+        warnings = []
+
+        for invoice in invoices:
+            try:
+                # Extract supplier tax number (normalize to 8 digits)
+                supplier_tax_number = invoice.supplier_tax_number
+                if not supplier_tax_number:
+                    errors.append(f'Számla {invoice.nav_invoice_number}: Hiányzó beszállító adószám')
+                    continue
+
+                # Normalize tax number to 8 digits for matching
+                normalized_tax_number = ''.join(filter(str.isdigit, supplier_tax_number))
+                base_tax_number = normalized_tax_number[:8] if len(normalized_tax_number) >= 8 else normalized_tax_number
+
+                if len(base_tax_number) != 8:
+                    errors.append(f'Számla {invoice.nav_invoice_number}: Érvénytelen adószám formátum: {supplier_tax_number}')
+                    continue
+
+                # Only process INBOUND invoices (where we pay suppliers)
+                if invoice.invoice_direction != 'INBOUND':
+                    errors.append(f'Számla {invoice.nav_invoice_number}: Csak bejövő számlákhoz lehet átutalást generálni')
+                    continue
+
+                # Check if invoice has supplier bank account number
+                account_number = None
+                beneficiary_name = invoice.supplier_name
+
+                if invoice.supplier_bank_account_number:
+                    # Use supplier bank account from invoice
+                    account_number = invoice.supplier_bank_account_number
+                    warnings.append(f'Számla {invoice.nav_invoice_number}: Számla szállító számlaszámát használja')
+                else:
+                    # Look for beneficiary with matching tax number
+                    beneficiary = BeneficiaryService.find_beneficiary_by_tax_number(
+                        request.company,
+                        base_tax_number
+                    )
+
+                    if beneficiary:
+                        account_number = beneficiary.account_number
+                        beneficiary_name = beneficiary.name
+                        warnings.append(f'Számla {invoice.nav_invoice_number}: Kedvezményezett találat adószám alapján: {beneficiary.name}')
+                    else:
+                        errors.append(f'Számla {invoice.nav_invoice_number}: Nincs számlaszám és nem található kedvezményezett a {base_tax_number} adószámmal')
+                        continue
+
+                if not account_number:
+                    errors.append(f'Számla {invoice.nav_invoice_number}: Nincs elérhető számlaszám')
+                    continue
+
+                # Find or create beneficiary
+                beneficiary = None
+                if invoice.supplier_bank_account_number:
+                    # For invoices with supplier bank accounts, try to find or create a beneficiary
+                    beneficiary, created = Beneficiary.objects.get_or_create(
+                        company=request.company,
+                        account_number=account_number,
+                        defaults={
+                            'name': beneficiary_name,
+                            'description': f'Auto-created from invoice {invoice.nav_invoice_number}',
+                            'remittance_information': '',
+                            'is_frequent': False,
+                            'is_active': True,
+                            'tax_number': base_tax_number  # Add the tax number for future matching
+                        }
+                    )
+                    if created:
+                        warnings.append(f'Számla {invoice.nav_invoice_number}: Új kedvezményezett létrehozva: {beneficiary_name}')
+                else:
+                    # Use the found beneficiary from tax number matching
+                    beneficiary = BeneficiaryService.find_beneficiary_by_tax_number(
+                        request.company,
+                        base_tax_number
+                    )
+
+                if not beneficiary:
+                    errors.append(f'Számla {invoice.nav_invoice_number}: Nem található kedvezményezett')
+                    continue
+
+                # Create transfer data for bulk creation
+                transfer_data = {
+                    'originator_account': originator_account,
+                    'beneficiary': beneficiary,
+                    'amount': Decimal(str(invoice.invoice_gross_amount)),
+                    'currency': invoice.currency_code or 'HUF',
+                    'execution_date': execution_date,
+                    'remittance_info': invoice.nav_invoice_number,
+                    'nav_invoice': invoice,
+                    'order': len(generated_transfers) + 1,
+                    'is_processed': False
+                }
+
+                generated_transfers.append(transfer_data)
+
+            except Exception as e:
+                errors.append(f'Számla {invoice.nav_invoice_number}: Hiba - {str(e)}')
+                continue
+
+        # Create the transfers if any were generated
+        created_transfers = []
+        if generated_transfers:
+            try:
+                from .services.transfer_service import TransferService
+                transfers, batch = TransferService.bulk_create_transfers(generated_transfers)
+                created_transfers = TransferSerializer(transfers, many=True).data
+            except Exception as e:
+                errors.append(f'Hiba a transzferek létrehozásakor: {str(e)}')
+
+        return Response({
+            'transfers': created_transfers,
+            'transfer_count': len(created_transfers),
+            'errors': errors,
+            'warnings': warnings,
+            'message': f'{len(created_transfers)} átutalás létrehozva, {len(errors)} hiba történt'
+        })
+
 
 class InvoiceSyncLogViewSet(viewsets.ReadOnlyModelViewSet):
     """
