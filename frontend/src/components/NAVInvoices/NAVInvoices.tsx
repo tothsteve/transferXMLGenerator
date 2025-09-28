@@ -618,14 +618,14 @@ const NAVInvoices: React.FC = () => {
 
       // Show detailed feedback about the generation process
       if (errors.length > 0) {
-        const errorMessage = `Hibák:\n${errors.slice(0, 3).join('\n')}${errors.length > 3 ? `\n...és további ${errors.length - 3} hiba` : ''}`;
+        const errorMessage = errors.join('\n\n');
         showError(errorMessage);
       }
 
       if (warnings.length > 0) {
-        const warningMessage = `Figyelmeztetések:\n${warnings.slice(0, 3).join('\n')}${warnings.length > 3 ? `\n...és további ${warnings.length - 3} figyelmeztetés` : ''}`;
-        // Use addToast with longer duration (12 seconds) for detailed warning messages
-        addToast('warning', 'Figyelmeztetések', warningMessage, 12000);
+        const warningMessage = warnings.join('\n\n');
+        // Use addToast with longer duration (15 seconds) for detailed warning messages
+        addToast('warning', 'Figyelmeztetések', warningMessage, 15000);
       }
 
       if (transfer_count > 0) {
@@ -662,7 +662,7 @@ const NAVInvoices: React.FC = () => {
       } else if (error?.response?.data?.error) {
         showError(error.response.data.error);
       } else if (error?.response?.data?.errors) {
-        const errorMessage = `Hibák:\n${error.response.data.errors.slice(0, 3).join('\n')}`;
+        const errorMessage = error.response.data.errors.join('\n\n');
         showError(errorMessage);
       } else if (error?.response?.data?.detail) {
         showError(`API hiba: ${error.response.data.detail}`);
