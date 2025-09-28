@@ -556,7 +556,7 @@ class TransferBatchViewSet(viewsets.ModelViewSet):
     def download_xml(self, request, pk=None):
         """Fájl letöltése - regenerálja a fájlt a mentett adatokból (XML vagy CSV formátumban)"""
         batch = self.get_object()
-        
+
         try:
             if batch.batch_format == 'KH_CSV':
                 # Generate KH Bank CSV content
@@ -567,9 +567,13 @@ class TransferBatchViewSet(viewsets.ModelViewSet):
                 response = HttpResponse(content, content_type='text/csv; charset=iso-8859-2')
             else:
                 # Generate SEPA XML content
+                transfers = batch.transfers.all().select_related('beneficiary', 'originator_account').order_by('order', 'execution_date')
                 content = TransferBatchService.regenerate_xml_for_batch(batch)
                 response = HttpResponse(content, content_type='application/xml')
-            
+
+            # Mark transfers as processed when downloaded
+            batch.transfers.filter(is_processed=False).update(is_processed=True)
+
             response['Content-Disposition'] = f'attachment; filename="{batch.filename}"'
             return response
         except ValueError as e:

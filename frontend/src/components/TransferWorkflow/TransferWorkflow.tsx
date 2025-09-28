@@ -79,6 +79,22 @@ const TransferWorkflow: React.FC = () => {
   const beneficiaries = beneficiariesData?.results || [];
   const existingTransfers = transfersData?.results || [];
 
+  // Reset workflow state when navigating to transfers without specific state or with reset flag
+  useEffect(() => {
+    const state = location.state as any;
+
+    // If navigating to transfers page without any special state (fresh navigation from menu),
+    // or with explicit reset flag, reset the workflow to initial state
+    if (!state || state.reset || (!state.source && !state.templateData && !state.loadFromTemplate && !state.preloadedTransfers)) {
+      console.log('Resetting transfer workflow to initial state');
+      setSelectedTemplate(null);
+      setTransfers([]);
+      setXmlPreview(null);
+      setValidationErrors([]);
+      return;
+    }
+  }, [location.pathname, location.state, location.key]);
+
   // Handle transfers from NAV invoices or load existing transfers
   useEffect(() => {
     const state = location.state as any;
@@ -135,8 +151,8 @@ const TransferWorkflow: React.FC = () => {
 
       setTransfers(convertedTransfers);
 
-    } else if (existingTransfers.length > 0) {
-      // Load existing transfers from API
+    } else if (existingTransfers.length > 0 && state?.source) {
+      // Only load existing transfers if we have a specific source (not fresh navigation)
       console.log('Loading existing transfers:', existingTransfers);
 
       const convertedTransfers: TransferData[] = existingTransfers.map((transfer: any) => ({

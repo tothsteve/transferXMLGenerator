@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides comprehensive guidance to Claude Code when working with Python code in this repository.
+This file provides comprehensive guidance to Claude Code when working with Django REST API code in this Transfer XML Generator repository.
 
 ## Core Development Philosophy
 
@@ -31,126 +31,130 @@ Avoid building functionality on speculation. Implement features only when they a
 
 ### Project Architecture
 
-Follow strict vertical slice architecture with tests living next to the code they test:
+Follow Django app-based architecture with clear separation of concerns:
 
 ```
-src/project/
-    __init__.py
-    main.py
-    tests/
-        test_main.py
-    conftest.py
-
-    # Core modules
-    database/
-        __init__.py
-        connection.py
-        models.py
-        tests/
-            test_connection.py
-            test_models.py
-
-    auth/
-        __init__.py
-        authentication.py
-        authorization.py
-        tests/
-            test_authentication.py
-            test_authorization.py
-
-    # Feature slices
-    features/
-        user_management/
-            __init__.py
-            handlers.py
-            validators.py
-            tests/
-                test_handlers.py
-                test_validators.py
-
-        payment_processing/
-            __init__.py
-            processor.py
-            gateway.py
-            tests/
-                test_processor.py
-                test_gateway.py
+transferXMLGenerator/
+    ├── backend/
+    │   ├── manage.py
+    │   ├── transferXMLGenerator/           # Main project settings
+    │   │   ├── __init__.py
+    │   │   ├── settings.py                # Environment detection
+    │   │   ├── settings_local.py          # SQL Server (development)
+    │   │   ├── settings_production.py     # PostgreSQL (Railway)
+    │   │   ├── urls.py
+    │   │   └── wsgi.py
+    │   │
+    │   └── bank_transfers/                 # Main Django app
+    │       ├── __init__.py
+    │       ├── models.py                   # Company, Beneficiary, Transfer models
+    │       ├── serializers.py             # DRF serializers with validation
+    │       ├── api_views.py                # ViewSets and API endpoints
+    │       ├── admin.py                    # Django admin configuration
+    │       ├── apps.py
+    │       ├── services/                   # Business logic services
+    │       │   ├── beneficiary_service.py  # Tax number matching logic
+    │       │   ├── nav_sync_service.py     # NAV API integration
+    │       │   └── export_service.py       # XML/CSV generation
+    │       ├── utils/                      # Helper functions
+    │       │   ├── generate_xml.py         # SEPA XML generation
+    │       │   ├── kh_export.py           # KH Bank CSV export
+    │       │   └── validators.py          # Custom field validators
+    │       ├── migrations/                 # Database migrations
+    │       └── tests/                      # Django test cases
+    │           ├── test_models.py
+    │           ├── test_serializers.py
+    │           ├── test_api_views.py
+    │           └── test_services.py
+    │
+    └── frontend/                          # React TypeScript frontend
 ```
 
 ## 🛠️ Development Environment
 
-### UV Package Management
+### Django + pip/virtualenv Setup
 
-This project uses UV for blazing-fast Python package and environment management.
+This project uses Django with traditional pip and virtualenv for package management.
 
 ```bash
-# Install UV (if not already installed)
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# Create virtual environment (recommended: Python 3.11+)
+python -m venv venv
 
-# Create virtual environment
-uv venv
+# Activate virtual environment
+# Linux/Mac:
+source venv/bin/activate
+# Windows:
+venv\Scripts\activate
 
-# Sync dependencies
-uv sync
+# Install dependencies
+pip install -r requirements.txt
 
-# Add a package ***NEVER UPDATE A DEPENDENCY DIRECTLY IN PYPROJECT.toml***
-# ALWAYS USE UV ADD
-uv add requests
+# Install development dependencies (if separate file exists)
+pip install -r requirements-dev.txt
 
-# Add development dependency
-uv add --dev pytest ruff mypy
+# Add a new package
+# 1. Install the package
+pip install new-package
+# 2. Update requirements.txt
+pip freeze > requirements.txt
 
-# Remove a package
-uv remove requests
-
-# Run commands in the environment
-uv run python script.py
-uv run pytest
-uv run ruff check .
-
-# Install specific Python version
-uv python install 3.12
+# OR manually add to requirements.txt with version
+echo "new-package==1.2.3" >> requirements.txt
 ```
 
 ### Development Commands
 
 ```bash
+# Django development server
+python manage.py runserver 8002
+
 # Run all tests
-uv run pytest
+python manage.py test
 
-# Run specific tests with verbose output
-uv run pytest tests/test_module.py -v
+# Run specific app tests
+python manage.py test bank_transfers
 
-# Run tests with coverage
-uv run pytest --cov=src --cov-report=html
+# Run specific test class
+python manage.py test bank_transfers.tests.test_models.BeneficiaryModelTests
 
-# Format code
-uv run ruff format .
+# Database migrations
+python manage.py makemigrations
+python manage.py migrate
 
-# Check linting
-uv run ruff check .
+# Create superuser
+python manage.py createsuperuser
 
-# Fix linting issues automatically
-uv run ruff check --fix .
+# Django shell for debugging
+python manage.py shell
 
-# Type checking
-uv run mypy src/
+# Collect static files (production)
+python manage.py collectstatic
 
-# Run pre-commit hooks
-uv run pre-commit run --all-files
+# Check for common issues
+python manage.py check
+
+# Show migration status
+python manage.py showmigrations
+
+# Load initial data (if fixtures exist)
+python manage.py loaddata fixtures/initial_data.json
 ```
 
 ## 📋 Style & Conventions
 
-### Python Style Guide
+### Django + Python Style Guide
 
-- **Follow PEP8** with these specific choices:
-  - Line length: 100 characters (set by Ruff in pyproject.toml)
+- **Follow PEP8 and Django coding style** with these specific choices:
+  - Line length: 100 characters
   - Use double quotes for strings
   - Use trailing commas in multi-line structures
-- **Always use type hints** for function signatures and class attributes
-- **Format with `ruff format`** (faster alternative to Black)
-- **Use `pydantic` v2** for data validation and settings management
+- **Django-specific conventions**:
+  - Use `snake_case` for model fields, methods, and variables
+  - Use `PascalCase` for model and class names
+  - Use `UPPER_SNAKE_CASE` for constants and settings
+- **Type hints recommended** for complex functions and service methods
+- **Use Django's built-in validators and forms** for data validation
+- **Follow Django REST Framework patterns** for serializers and viewsets
 
 ### Docstring Standards
 
@@ -202,36 +206,72 @@ def calculate_discount(
 4. **Refactor** - Improve code while keeping tests green
 5. **Repeat** - One test at a time
 
-### Testing Best Practices
+### Django Testing Best Practices
 
 ```python
-# Always use pytest fixtures for setup
-import pytest
-from datetime import datetime
+# Use Django's TestCase for database-backed tests
+from django.test import TestCase
+from django.contrib.auth.models import User
+from bank_transfers.models import Company, Beneficiary
 
-@pytest.fixture
-def sample_user():
-    """Provide a sample user for testing."""
-    return User(
-        id=123,
-        name="Test User",
-        email="test@example.com",
-        created_at=datetime.now()
-    )
+class BeneficiaryModelTests(TestCase):
+    """Test cases for the Beneficiary model."""
 
-# Use descriptive test names
-def test_user_can_update_email_when_valid(sample_user):
-    """Test that users can update their email with valid input."""
-    new_email = "newemail@example.com"
-    sample_user.update_email(new_email)
-    assert sample_user.email == new_email
+    def setUp(self):
+        """Set up test data before each test method."""
+        self.company = Company.objects.create(
+            name="Test Company",
+            tax_id="12345678",
+            is_active=True
+        )
 
-# Test edge cases and error conditions
-def test_user_update_email_fails_with_invalid_format(sample_user):
-    """Test that invalid email formats are rejected."""
-    with pytest.raises(ValidationError) as exc_info:
-        sample_user.update_email("not-an-email")
-    assert "Invalid email format" in str(exc_info.value)
+    def test_beneficiary_creation_with_valid_data(self):
+        """Test that beneficiaries can be created with valid data."""
+        beneficiary = Beneficiary.objects.create(
+            company=self.company,
+            name="Test Beneficiary",
+            account_number="1234567890123456"
+        )
+        self.assertEqual(beneficiary.name, "Test Beneficiary")
+        self.assertTrue(beneficiary.is_active)
+
+    def test_beneficiary_vat_number_validation(self):
+        """Test that VAT number validation works correctly."""
+        from django.core.exceptions import ValidationError
+
+        beneficiary = Beneficiary(
+            company=self.company,
+            name="Test Person",
+            vat_number="invalid_vat"
+        )
+
+        with self.assertRaises(ValidationError):
+            beneficiary.full_clean()
+
+# Use Django's APITestCase for API endpoint testing
+from rest_framework.test import APITestCase
+from rest_framework import status
+
+class BeneficiaryAPITests(APITestCase):
+    """Test cases for Beneficiary API endpoints."""
+
+    def setUp(self):
+        """Set up authentication and test data."""
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='testpass123'
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_create_beneficiary_success(self):
+        """Test successful beneficiary creation via API."""
+        data = {
+            'name': 'New Beneficiary',
+            'account_number': '1234567890123456'
+        }
+        response = self.client.post('/api/beneficiaries/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 ```
 
 ### Test Organization
@@ -350,57 +390,257 @@ def get_settings() -> Settings:
 settings = get_settings()
 ```
 
-## 🏗️ Data Models and Validation
+## 🏗️ Django Models and Serializers
 
-### Example Pydantic Models strict with pydantic v2
+### Django Model Example with Validation
 
 ```python
-from pydantic import BaseModel, Field, validator, EmailStr
-from datetime import datetime
-from typing import Optional, List
+from django.db import models
+from django.core.validators import RegexValidator, MinValueValidator, MaxValueValidator
+from django.core.exceptions import ValidationError
 from decimal import Decimal
 
-class ProductBase(BaseModel):
-    """Base product model with common fields."""
-    name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = None
-    price: Decimal = Field(..., gt=0, decimal_places=2)
-    category: str
-    tags: List[str] = []
+class Beneficiary(models.Model):
+    """Model for transfer beneficiaries with tax number support."""
 
-    @validator('price')
-    def validate_price(cls, v):
-        if v > Decimal('1000000'):
-            raise ValueError('Price cannot exceed 1,000,000')
-        return v
+    # Company isolation (multi-tenant architecture)
+    company = models.ForeignKey('Company', on_delete=models.CASCADE, related_name='beneficiaries')
 
-    class Config:
-        json_encoders = {
-            Decimal: str,
-            datetime: lambda v: v.isoformat()
-        }
+    # Basic beneficiary information
+    name = models.CharField(max_length=200, help_text="Full legal name of beneficiary")
+    account_number = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        validators=[RegexValidator(r'^\d{16}|\d{8}-\d{8}|\d{8}-\d{8}-\d{8}$',
+                                   'Invalid Hungarian account number format')]
+    )
 
-class ProductCreate(ProductBase):
-    """Model for creating new products."""
+    # Tax identification (mutually exclusive)
+    vat_number = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        help_text="10-digit personal VAT number"
+    )
+    tax_number = models.CharField(
+        max_length=8,
+        blank=True,
+        null=True,
+        help_text="8-digit company tax number"
+    )
+
+    # Status and metadata
+    is_active = models.BooleanField(default=True)
+    is_frequent = models.BooleanField(default=False)
+    description = models.CharField(max_length=200, blank=True)
+    remittance_information = models.TextField(blank=True)
+
+    # Audit fields
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'bank_transfers_beneficiary'
+        indexes = [
+            models.Index(fields=['company', 'is_active']),
+            models.Index(fields=['company', 'tax_number']),
+            models.Index(fields=['company', 'vat_number']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['company', 'account_number'],
+                name='unique_account_per_company',
+                condition=models.Q(account_number__isnull=False)
+            ),
+        ]
+
+    def clean(self):
+        """Custom validation for business rules."""
+        super().clean()
+
+        # Ensure at least one identifier is provided
+        if not any([self.account_number, self.vat_number, self.tax_number]):
+            raise ValidationError(
+                "At least one of account_number, vat_number, or tax_number must be provided"
+            )
+
+        # Ensure mutual exclusivity between VAT and tax numbers
+        if self.vat_number and self.tax_number:
+            raise ValidationError(
+                "Cannot have both VAT number (individuals) and tax number (companies)"
+            )
+
+        # Validate VAT number format
+        if self.vat_number and len(self.vat_number) != 10:
+            raise ValidationError("VAT number must be exactly 10 digits")
+
+        # Validate tax number format
+        if self.tax_number and len(self.tax_number) != 8:
+            raise ValidationError("Tax number must be exactly 8 digits")
+
+    def __str__(self):
+        return f"{self.name} ({self.company.name})"
+```
+
+### Django REST Framework Serializer
+
+```python
+from rest_framework import serializers
+from .models import Beneficiary
+
+class BeneficiarySerializer(serializers.ModelSerializer):
+    """Serializer for Beneficiary model with custom validation."""
+
+    class Meta:
+        model = Beneficiary
+        fields = [
+            'id', 'name', 'account_number', 'vat_number', 'tax_number',
+            'description', 'is_active', 'is_frequent', 'remittance_information',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def validate(self, data):
+        """Cross-field validation."""
+        # Call model's clean method for business rule validation
+        instance = Beneficiary(**data)
+        instance.clean()
+        return data
+
+    def create(self, validated_data):
+        """Create beneficiary with company context."""
+        # Company is set from request context in the view
+        validated_data['company'] = self.context['request'].user.active_company
+        return super().create(validated_data)
+
+class BeneficiaryCreateSerializer(BeneficiarySerializer):
+    """Serializer for creating beneficiaries."""
     pass
 
-class ProductUpdate(BaseModel):
-    """Model for updating products - all fields optional."""
-    name: Optional[str] = Field(None, min_length=1, max_length=255)
-    description: Optional[str] = None
-    price: Optional[Decimal] = Field(None, gt=0, decimal_places=2)
-    category: Optional[str] = None
-    tags: Optional[List[str]] = None
+class BeneficiaryUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for updating beneficiaries - all fields optional."""
 
-class Product(ProductBase):
-    """Complete product model with database fields."""
-    id: int
-    created_at: datetime
-    updated_at: datetime
-    is_active: bool = True
+    class Meta:
+        model = Beneficiary
+        fields = ['name', 'account_number', 'vat_number', 'tax_number',
+                  'description', 'is_active', 'is_frequent', 'remittance_information']
+        extra_kwargs = {field: {'required': False} for field in fields}
+```
 
-    class Config:
-        from_attributes = True  # Enable ORM mode
+## 🏦 Project-Specific Patterns
+
+### Multi-Company Architecture
+
+This project implements a **multi-tenant architecture** where companies are isolated data containers:
+
+```python
+# All business models must include company scoping
+class BaseCompanyModel(models.Model):
+    """Abstract base model for company-scoped entities."""
+    company = models.ForeignKey('Company', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+
+# Permission class for company isolation
+class CompanyContextPermission(BasePermission):
+    """Ensure user has access to the specified company."""
+
+    def has_permission(self, request, view):
+        return hasattr(request.user, 'active_company') and request.user.active_company
+
+    def has_object_permission(self, request, view, obj):
+        return obj.company == request.user.active_company
+```
+
+### NAV Integration Patterns
+
+```python
+# Service pattern for complex business logic
+class BeneficiaryMatchingService:
+    """Service for matching NAV invoices to beneficiaries by tax number."""
+
+    @staticmethod
+    def find_beneficiary_by_tax_number(company, supplier_tax_number):
+        """
+        Find beneficiary by tax number with flexible format matching.
+
+        Supports three levels of matching:
+        1. Exact match
+        2. Normalized match (remove dashes/spaces)
+        3. Base match (first 8 digits)
+        """
+        # Implementation here...
+
+    @staticmethod
+    def _normalize_tax_number(tax_number):
+        """Remove dashes and spaces, keeping only digits."""
+        return ''.join(filter(str.isdigit, tax_number))
+```
+
+### Export Generation Patterns
+
+```python
+# Utility functions for XML/CSV generation
+def generate_xml(transfers, originator_account):
+    """
+    Generate SEPA-compatible XML for Hungarian bank transfers.
+
+    Args:
+        transfers: List of Transfer objects
+        originator_account: BankAccount object for originator
+
+    Returns:
+        tuple: (xml_content, batch_object)
+    """
+    # XML generation logic here...
+
+def generate_kh_export(transfers, originator_account):
+    """
+    Generate KH Bank CSV export (max 40 transfers per batch).
+
+    Args:
+        transfers: List of Transfer objects (max 40)
+        originator_account: BankAccount object for originator
+
+    Returns:
+        tuple: (csv_content, batch_object)
+    """
+    # CSV generation logic here...
+```
+
+### Database Configuration Patterns
+
+```python
+# Environment-specific settings
+ENVIRONMENT = config('ENVIRONMENT', default='local')
+
+if ENVIRONMENT == 'production':
+    # PostgreSQL for Railway deployment
+    DATABASES = {
+        'default': dj_database_url.parse(
+            config('DATABASE_URL'),
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+    }
+else:
+    # SQL Server for local development
+    DATABASES = {
+        'default': {
+            'ENGINE': 'mssql',
+            'NAME': 'administration',
+            'HOST': 'localhost,1435',
+            'USER': config('DB_USER', default='sa'),
+            'PASSWORD': config('DB_PASSWORD'),
+            'OPTIONS': {
+                'driver': 'ODBC Driver 17 for SQL Server',
+            },
+        }
+    }
 ```
 
 ## 🔄 Git Workflow
@@ -441,100 +681,113 @@ Closes #123
 
 ````
 
-## 🗄️ Database Naming Standards
+## 🗄️ Django Database & Model Standards
 
-### Entity-Specific Primary Keys
-All database tables use entity-specific primary keys for clarity and consistency:
+### Django Model Conventions
+Follow Django's standard conventions with project-specific patterns:
 
-```sql
--- ✅ STANDARDIZED: Entity-specific primary keys
-sessions.session_id UUID PRIMARY KEY
-leads.lead_id UUID PRIMARY KEY
-messages.message_id UUID PRIMARY KEY
-daily_metrics.daily_metric_id UUID PRIMARY KEY
-agencies.agency_id UUID PRIMARY KEY
-````
+```python
+# ✅ DJANGO STANDARD: Auto-incrementing integer primary keys
+class Company(models.Model):
+    # Django auto-creates: id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=200)
+    tax_id = models.CharField(max_length=20, unique=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'bank_transfers_company'
+        verbose_name_plural = 'Companies'
+```
 
 ### Field Naming Conventions
 
 ```sql
--- Primary keys: {entity}_id
-session_id, lead_id, message_id
+-- Primary keys: Auto-incrementing integers (Django default)
+id INTEGER PRIMARY KEY AUTO_INCREMENT
 
--- Foreign keys: {referenced_entity}_id
-session_id REFERENCES sessions(session_id)
-agency_id REFERENCES agencies(agency_id)
+-- Foreign keys: {referenced_model}_id
+company_id, beneficiary_id, template_id
 
 -- Timestamps: {action}_at
-created_at, updated_at, started_at, expires_at
+created_at, updated_at, executed_at, expires_at
 
 -- Booleans: is_{state}
-is_connected, is_active, is_qualified
+is_active, is_frequent, is_processed, is_default
 
--- Counts: {entity}_count
-message_count, lead_count, notification_count
+-- Money fields: Use DecimalField for precision
+amount DECIMAL(15,2), total_amount DECIMAL(15,2)
 
--- Durations: {property}_{unit}
-duration_seconds, timeout_minutes
+-- Text fields: Use appropriate max_length
+name VARCHAR(200), description TEXT, notes TEXT
+
+-- Choices: Use CharField with choices
+status VARCHAR(20), currency VARCHAR(3), direction VARCHAR(10)
 ```
 
-### Repository Pattern Auto-Derivation
+### Multi-Company Architecture Pattern
 
-The enhanced BaseRepository automatically derives table names and primary keys:
+All business models include company isolation:
 
 ```python
-# ✅ STANDARDIZED: Convention-based repositories
-class LeadRepository(BaseRepository[Lead]):
-    def __init__(self):
-        super().__init__()  # Auto-derives "leads" and "lead_id"
+class Beneficiary(models.Model):
+    """Company-scoped beneficiary with tax number support."""
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='beneficiaries')
+    name = models.CharField(max_length=200)
+    account_number = models.CharField(max_length=50, blank=True, null=True)
+    vat_number = models.CharField(max_length=20, blank=True, null=True,
+                                  help_text="10-digit personal VAT number")
+    tax_number = models.CharField(max_length=8, blank=True, null=True,
+                                  help_text="8-digit company tax number")
 
-class SessionRepository(BaseRepository[AvatarSession]):
-    def __init__(self):
-        super().__init__()  # Auto-derives "sessions" and "session_id"
+    class Meta:
+        db_table = 'bank_transfers_beneficiary'
+        indexes = [
+            models.Index(fields=['company', 'is_active']),
+            models.Index(fields=['company', 'tax_number']),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=['company', 'account_number'],
+                                    name='unique_account_per_company'),
+        ]
 ```
 
-**Benefits**:
-
-- ✅ Self-documenting schema
-- ✅ Clear foreign key relationships
-- ✅ Eliminates repository method overrides
-- ✅ Consistent with entity naming patterns
-
-### Model-Database Alignment
-
-Models mirror database fields exactly to eliminate field mapping complexity:
+### Django REST Framework API Standards
 
 ```python
-# ✅ STANDARDIZED: Models mirror database exactly
-class Lead(BaseModel):
-    lead_id: UUID = Field(default_factory=uuid4)  # Matches database field
-    session_id: UUID                               # Matches database field
-    agency_id: str                                 # Matches database field
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+# ✅ DJANGO REST: ViewSet with standard endpoints
+class BeneficiaryViewSet(viewsets.ModelViewSet):
+    """CRUD operations for beneficiaries with company isolation."""
+    serializer_class = BeneficiarySerializer
+    permission_classes = [IsAuthenticated, CompanyContextPermission]
 
-    model_config = ConfigDict(
-        use_enum_values=True,
-        populate_by_name=True,
-        alias_generator=None  # Use exact field names
-    )
+    def get_queryset(self):
+        # Always filter by company context
+        return Beneficiary.objects.filter(
+            company=self.request.user.active_company
+        )
+
+# Standard URL patterns
+urlpatterns = [
+    path('api/beneficiaries/', BeneficiaryViewSet.as_view({'get': 'list', 'post': 'create'})),
+    path('api/beneficiaries/<int:pk>/', BeneficiaryViewSet.as_view({
+        'get': 'retrieve', 'put': 'update', 'delete': 'destroy'
+    })),
+]
 ```
 
-### API Route Standards
+### Database Table Naming
+Django automatically generates table names: `{app_label}_{model_name}`
 
-```python
-# ✅ STANDARDIZED: RESTful with consistent parameter naming
-router = APIRouter(prefix="/api/v1/leads", tags=["leads"])
-
-@router.get("/{lead_id}")           # GET /api/v1/leads/{lead_id}
-@router.put("/{lead_id}")           # PUT /api/v1/leads/{lead_id}
-@router.delete("/{lead_id}")        # DELETE /api/v1/leads/{lead_id}
-
-# Sub-resources
-@router.get("/{lead_id}/messages")  # GET /api/v1/leads/{lead_id}/messages
-@router.get("/agency/{agency_id}")  # GET /api/v1/leads/agency/{agency_id}
+```sql
+-- Auto-generated table names
+bank_transfers_company
+bank_transfers_beneficiary
+bank_transfers_transfertemplate
+bank_transfers_transfer
+bank_transfers_transferbatch
 ```
-
-For complete naming standards, see [NAMING_CONVENTIONS.md](./NAMING_CONVENTIONS.md).
 
 ## 📝 Documentation Standards
 
@@ -546,33 +799,58 @@ For complete naming standards, see [NAMING_CONVENTIONS.md](./NAMING_CONVENTIONS.
 - Keep README.md updated with setup instructions and examples
 - Maintain CHANGELOG.md for version history
 
-### API Documentation
+### Django REST Framework API Documentation
 
 ```python
-from fastapi import APIRouter, HTTPException, status
-from typing import List
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
-router = APIRouter(prefix="/products", tags=["products"])
-
-@router.get(
-    "/",
-    response_model=List[Product],
-    summary="List all products",
-    description="Retrieve a paginated list of all active products"
-)
-async def list_products(
-    skip: int = 0,
-    limit: int = 100,
-    category: Optional[str] = None
-) -> List[Product]:
+class BeneficiaryViewSet(viewsets.ModelViewSet):
     """
-    Retrieve products with optional filtering.
+    ViewSet for managing beneficiaries with company isolation.
 
-    - **skip**: Number of products to skip (for pagination)
-    - **limit**: Maximum number of products to return
-    - **category**: Filter by product category
+    Provides CRUD operations for beneficiaries within the authenticated
+    user's company context. Supports filtering by active status and
+    frequent usage patterns.
     """
-    # Implementation here
+    serializer_class = BeneficiarySerializer
+    permission_classes = [IsAuthenticated, CompanyContextPermission]
+
+    @swagger_auto_schema(
+        operation_summary="List beneficiaries",
+        operation_description="Retrieve a paginated list of company beneficiaries",
+        manual_parameters=[
+            openapi.Parameter(
+                'search', openapi.IN_QUERY,
+                description="Search by beneficiary name",
+                type=openapi.TYPE_STRING
+            ),
+            openapi.Parameter(
+                'is_frequent', openapi.IN_QUERY,
+                description="Filter by frequent beneficiaries",
+                type=openapi.TYPE_BOOLEAN
+            ),
+        ]
+    )
+    def list(self, request):
+        """
+        List company beneficiaries with optional filtering.
+
+        - **search**: Filter by beneficiary name (case-insensitive)
+        - **is_frequent**: Show only frequently used beneficiaries
+        - **is_active**: Show only active beneficiaries (default: true)
+        """
+        return super().list(request)
+
+    @action(detail=False, methods=['get'])
+    def frequent(self, request):
+        """Get frequently used beneficiaries for quick selection."""
+        frequent_beneficiaries = self.get_queryset().filter(is_frequent=True)
+        serializer = self.get_serializer(frequent_beneficiaries, many=True)
+        return Response(serializer.data)
 ```
 
 ## 🚀 Performance Considerations

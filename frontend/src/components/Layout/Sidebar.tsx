@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
   Drawer,
@@ -59,6 +59,24 @@ const adminNavigation: NavigationItem[] = [
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) => {
   const isAdmin = useIsCompanyAdmin();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleTransferClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+
+    // If already on transfers page, force a reset by navigating with reset flag
+    if (location.pathname === '/transfers') {
+      navigate('/transfers', {
+        replace: true,
+        state: { reset: true, timestamp: Date.now() }
+      });
+    } else {
+      navigate('/transfers');
+    }
+
+    if (isMobile) onClose();
+  };
   const drawerContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Header with Logo */}
@@ -101,9 +119,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
           {navigation.map((item) => (
             <ListItem key={item.name} disablePadding sx={{ mb: 0.5 }}>
               <ListItemButton
-                component={NavLink}
-                to={item.href}
-                onClick={isMobile ? onClose : undefined}
+                component={item.href === '/transfers' ? 'div' : NavLink}
+                to={item.href === '/transfers' ? undefined : item.href}
+                onClick={item.href === '/transfers' ? handleTransferClick : (isMobile ? onClose : undefined)}
                 sx={{
                   borderRadius: 1,
                   '&.active': {
@@ -116,12 +134,19 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
                   '&:hover': {
                     bgcolor: 'grey.50',
                   },
+                  ...(item.href === '/transfers' && location.pathname === '/transfers' && {
+                    bgcolor: 'primary.50',
+                    color: 'primary.600',
+                    '& .MuiListItemIcon-root': {
+                      color: 'primary.600',
+                    },
+                  }),
                 }}
               >
                 <ListItemIcon sx={{ minWidth: 40 }}>
                   <item.icon />
                 </ListItemIcon>
-                <ListItemText 
+                <ListItemText
                   primary={item.name}
                   primaryTypographyProps={{
                     fontWeight: 600,
@@ -129,16 +154,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
                   }}
                 />
                 {(item as any).badge && (
-                  <Chip 
-                    label={(item as any).badge} 
-                    size="small" 
-                    color="primary" 
+                  <Chip
+                    label={(item as any).badge}
+                    size="small"
+                    color="primary"
                     variant="filled"
-                    sx={{ 
-                      height: 20, 
+                    sx={{
+                      height: 20,
                       fontSize: '0.7rem',
                       fontWeight: 'bold'
-                    }} 
+                    }}
                   />
                 )}
               </ListItemButton>

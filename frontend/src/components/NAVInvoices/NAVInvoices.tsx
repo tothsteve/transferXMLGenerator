@@ -758,12 +758,14 @@ const NAVInvoices: React.FC = () => {
               NAV-ból szinkronizált számlák megtekintése és keresése
             </Typography>
           </Box>
-          <Stack direction="row" spacing={2}>
+          <Stack direction="row" spacing={1}>
             <Button
               variant="outlined"
-              startIcon={<RefreshIcon />}
+              startIcon={<RefreshIcon fontSize="small" />}
               onClick={refetch}
               disabled={loading}
+              size="small"
+              sx={{ fontSize: '0.7rem', py: 0.25, px: 0.75, minHeight: '28px' }}
             >
               Frissítés
             </Button>
@@ -773,7 +775,7 @@ const NAVInvoices: React.FC = () => {
 
       {/* Search and Filters - Same pattern as BeneficiaryManager */}
       <Box sx={{ mb: 1 }}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 1 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mb: 1 }}>
           {/* Search */}
           <TextField
             fullWidth
@@ -783,19 +785,21 @@ const NAVInvoices: React.FC = () => {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon />
+                  <SearchIcon fontSize="small" />
                 </InputAdornment>
               ),
             }}
             size="small"
+            sx={{ '& .MuiInputBase-input': { fontSize: '0.8rem' } }}
           />
 
           {/* Filters */}
           <Button
             variant="outlined"
-            startIcon={<FilterIcon />}
+            startIcon={<FilterIcon fontSize="small" />}
             onClick={handleFilterClick}
-            sx={{ minWidth: 140 }}
+            size="small"
+            sx={{ minWidth: 120, fontSize: '0.7rem', py: 0.25, px: 0.75, minHeight: '28px' }}
           >
             Szűrők
           </Button>
@@ -894,7 +898,7 @@ const NAVInvoices: React.FC = () => {
         </Stack>
 
         {/* Quick Filter Buttons */}
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mt: 1 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 0.5 }}>
           <Button
             variant={inboundTransferFilter ? "contained" : "outlined"}
             color="primary"
@@ -906,30 +910,32 @@ const NAVInvoices: React.FC = () => {
                 setDirectionFilter('');
               }
             }}
-            startIcon={<SwapHoriz />}
+            startIcon={<SwapHoriz fontSize="small" />}
+            sx={{ fontSize: '0.7rem', py: 0.25, px: 0.75, minHeight: '28px' }}
           >
             Bejövő átutalások
           </Button>
 
           {/* Date Interval Filter */}
-          <Stack direction="row" spacing={1} alignItems="center">
-            <FormControl size="small" sx={{ minWidth: 140 }}>
-              <InputLabel>Dátum típus</InputLabel>
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel sx={{ fontSize: '0.8rem' }}>Dátum típus</InputLabel>
               <Select
                 value={dateFilterType}
                 label="Dátum típus"
                 onChange={(e) => handleDateFilterTypeChange(e.target.value as 'issue_date' | 'fulfillment_date' | 'payment_due_date' | '')}
+                sx={{ fontSize: '0.8rem' }}
               >
-                <MenuItem value="">Nincs</MenuItem>
-                <MenuItem value="issue_date">Kiállítás</MenuItem>
-                <MenuItem value="fulfillment_date">Teljesítés</MenuItem>
-                <MenuItem value="payment_due_date">Fizetési határidő</MenuItem>
+                <MenuItem value="" sx={{ fontSize: '0.8rem' }}>Nincs</MenuItem>
+                <MenuItem value="issue_date" sx={{ fontSize: '0.8rem' }}>Kiállítás</MenuItem>
+                <MenuItem value="fulfillment_date" sx={{ fontSize: '0.8rem' }}>Teljesítés</MenuItem>
+                <MenuItem value="payment_due_date" sx={{ fontSize: '0.8rem' }}>Fizetési határidő</MenuItem>
               </Select>
             </FormControl>
             
             {dateFilterType && (
               <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={hu}>
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack direction="row" spacing={0.5} alignItems="center">
                   <TextField
                     label="Dátum-tól"
                     type="date"
@@ -937,7 +943,11 @@ const NAVInvoices: React.FC = () => {
                     value={dateFrom}
                     onChange={(e) => setDateFrom(e.target.value)}
                     InputLabelProps={{ shrink: true }}
-                    sx={{ minWidth: 140 }}
+                    sx={{
+                      minWidth: 120,
+                      '& .MuiInputLabel-root': { fontSize: '0.8rem' },
+                      '& .MuiInputBase-input': { fontSize: '0.8rem' }
+                    }}
                   />
                   <TextField
                     label="Dátum-ig"
@@ -946,49 +956,59 @@ const NAVInvoices: React.FC = () => {
                     value={dateTo}
                     onChange={(e) => setDateTo(e.target.value)}
                     InputLabelProps={{ shrink: true }}
-                    sx={{ minWidth: 140 }}
+                    sx={{
+                      minWidth: 120,
+                      '& .MuiInputLabel-root': { fontSize: '0.8rem' },
+                      '& .MuiInputBase-input': { fontSize: '0.8rem' }
+                    }}
                   />
-                  
+
                   {/* Month Navigation Stepper */}
-                  <Stack direction="row" spacing={0.5} alignItems="center">
+                  <Stack direction="row" spacing={0.25} alignItems="center">
                     <IconButton
                       size="small"
                       onClick={() => navigateMonth('previous')}
-                      sx={{ 
+                      sx={{
                         border: '1px solid',
                         borderColor: 'primary.main',
                         borderRadius: 1,
-                        '&:hover': { bgcolor: 'primary.50' }
+                        p: 0.25,
+                        '&:hover': { bgcolor: 'primary.50' },
+                        '& .MuiSvgIcon-root': { fontSize: 16 }
                       }}
                     >
-                      <ChevronLeftIcon fontSize="small" />
+                      <ChevronLeftIcon />
                     </IconButton>
-                    
+
                     <Button
                       size="small"
                       variant="contained"
                       onClick={() => applyDatePreset('current')}
-                      sx={{ 
-                        whiteSpace: 'nowrap', 
-                        fontSize: '0.75rem',
-                        minWidth: '90px',
-                        py: 0.5
+                      sx={{
+                        whiteSpace: 'nowrap',
+                        fontSize: '0.7rem',
+                        minWidth: '80px',
+                        py: 0.25,
+                        px: 0.75,
+                        minHeight: '28px'
                       }}
                     >
                       Aktuális hónap
                     </Button>
-                    
+
                     <IconButton
                       size="small"
                       onClick={() => navigateMonth('next')}
-                      sx={{ 
+                      sx={{
                         border: '1px solid',
                         borderColor: 'primary.main',
                         borderRadius: 1,
-                        '&:hover': { bgcolor: 'primary.50' }
+                        p: 0.25,
+                        '&:hover': { bgcolor: 'primary.50' },
+                        '& .MuiSvgIcon-root': { fontSize: 16 }
                       }}
                     >
-                      <ChevronRightIcon fontSize="small" />
+                      <ChevronRightIcon />
                     </IconButton>
                   </Stack>
                 </Stack>
@@ -1066,9 +1086,9 @@ const NAVInvoices: React.FC = () => {
             <Button
               variant="outlined"
               size="small"
-              startIcon={<ClearIcon />}
+              startIcon={<ClearIcon fontSize="small" />}
               onClick={clearFilters}
-              sx={{ ml: 1 }}
+              sx={{ ml: 0.5, fontSize: '0.7rem', py: 0.25, px: 0.75, minHeight: '28px' }}
             >
               Összes szűrő törlése
             </Button>
@@ -1090,21 +1110,21 @@ const NAVInvoices: React.FC = () => {
 
       {/* Totals Summary Card */}
       {totals && (
-        <Paper 
-          elevation={2} 
-          sx={{ 
-            p: 2, 
-            mb: 1, 
+        <Paper
+          elevation={1}
+          sx={{
+            p: 1,
+            mb: 0.5,
             bgcolor: 'primary.50',
             border: '1px solid',
             borderColor: 'primary.200'
           }}
         >
-          <Stack spacing={2}>
+          <Stack spacing={0.5}>
             {/* Header with collapse button */}
-            <Stack direction="row" alignItems="center" justifyContent="space-between">
-              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                {selectedInvoices.length > 0 
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ minHeight: '24px' }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', fontWeight: 'medium' }}>
+                {selectedInvoices.length > 0
                   ? `${selectedInvoices.length} kiválasztott számla összesen:`
                   : `${totals.total.count} szűrt számla összesen:`
                 }
@@ -1112,7 +1132,7 @@ const NAVInvoices: React.FC = () => {
               <IconButton
                 size="small"
                 onClick={() => setTotalsCollapsed(!totalsCollapsed)}
-                sx={{ ml: 1 }}
+                sx={{ p: 0.25, '& .MuiSvgIcon-root': { fontSize: 16 } }}
               >
                 {totalsCollapsed ? <ExpandMoreIcon /> : <ExpandLessIcon />}
               </IconButton>
@@ -1120,82 +1140,82 @@ const NAVInvoices: React.FC = () => {
             
             {/* Collapsible direction-specific totals - Compact Table Design */}
             <Collapse in={!totalsCollapsed}>
-              <Box sx={{ 
-                border: '1px solid', 
-                borderColor: 'divider', 
-                borderRadius: 1, 
+              <Box sx={{
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 1,
                 overflow: 'hidden',
-                mt: 1
+                mt: 0.5
               }}>
                 {/* Table Header */}
-                <Box sx={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: '120px 1fr 1fr 1fr', 
-                  gap: 1,
+                <Box sx={{
+                  display: 'grid',
+                  gridTemplateColumns: '100px 1fr 1fr 1fr',
+                  gap: 0.5,
                   bgcolor: 'grey.50',
-                  p: 1,
+                  p: 0.5,
                   borderBottom: '1px solid',
                   borderBottomColor: 'divider'
                 }}>
-                  <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.75rem' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.65rem' }}>
                     Irány
                   </Typography>
-                  <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.75rem', textAlign: 'center' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.65rem', textAlign: 'center' }}>
                     Nettó
                   </Typography>
-                  <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.75rem', textAlign: 'center' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.65rem', textAlign: 'center' }}>
                     ÁFA
                   </Typography>
-                  <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.75rem', textAlign: 'center' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.65rem', textAlign: 'center' }}>
                     Bruttó
                   </Typography>
                 </Box>
                 
                 {/* Outbound Row */}
                 {totals.outbound.count > 0 && (
-                  <Box sx={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: '120px 1fr 1fr 1fr', 
-                    gap: 1,
-                    p: 1,
+                  <Box sx={{
+                    display: 'grid',
+                    gridTemplateColumns: '100px 1fr 1fr 1fr',
+                    gap: 0.5,
+                    p: 0.5,
                     borderBottom: totals.inbound.count > 0 ? '1px solid' : 'none',
                     borderBottomColor: 'divider',
                     '&:hover': { bgcolor: 'action.hover' }
                   }}>
-                    <Typography variant="body2" color="primary.main" sx={{ fontSize: '0.75rem', fontWeight: 'medium' }}>
+                    <Typography variant="caption" color="primary.main" sx={{ fontSize: '0.65rem', fontWeight: 'medium' }}>
                       Kimenő ({totals.outbound.count})
                     </Typography>
-                    <Typography variant="body2" sx={{ fontSize: '0.75rem', textAlign: 'center', color: 'success.main', fontWeight: 'medium' }}>
+                    <Typography variant="caption" sx={{ fontSize: '0.65rem', textAlign: 'center', color: 'success.main', fontWeight: 'medium' }}>
                       {formatAmount(totals.outbound.net, 'HUF')}
                     </Typography>
-                    <Typography variant="body2" sx={{ fontSize: '0.75rem', textAlign: 'center', color: 'warning.main', fontWeight: 'medium' }}>
+                    <Typography variant="caption" sx={{ fontSize: '0.65rem', textAlign: 'center', color: 'warning.main', fontWeight: 'medium' }}>
                       {formatAmount(totals.outbound.vat, 'HUF')}
                     </Typography>
-                    <Typography variant="body2" sx={{ fontSize: '0.75rem', textAlign: 'center', color: 'primary.main', fontWeight: 'bold' }}>
+                    <Typography variant="caption" sx={{ fontSize: '0.65rem', textAlign: 'center', color: 'primary.main', fontWeight: 'bold' }}>
                       {formatAmount(totals.outbound.gross, 'HUF')}
                     </Typography>
                   </Box>
                 )}
-                
+
                 {/* Inbound Row */}
                 {totals.inbound.count > 0 && (
-                  <Box sx={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: '120px 1fr 1fr 1fr', 
-                    gap: 1,
-                    p: 1,
+                  <Box sx={{
+                    display: 'grid',
+                    gridTemplateColumns: '100px 1fr 1fr 1fr',
+                    gap: 0.5,
+                    p: 0.5,
                     '&:hover': { bgcolor: 'action.hover' }
                   }}>
-                    <Typography variant="body2" color="secondary.main" sx={{ fontSize: '0.75rem', fontWeight: 'medium' }}>
+                    <Typography variant="caption" color="secondary.main" sx={{ fontSize: '0.65rem', fontWeight: 'medium' }}>
                       Bejövő ({totals.inbound.count})
                     </Typography>
-                    <Typography variant="body2" sx={{ fontSize: '0.75rem', textAlign: 'center', color: 'success.main', fontWeight: 'medium' }}>
+                    <Typography variant="caption" sx={{ fontSize: '0.65rem', textAlign: 'center', color: 'success.main', fontWeight: 'medium' }}>
                       {formatAmount(totals.inbound.net, 'HUF')}
                     </Typography>
-                    <Typography variant="body2" sx={{ fontSize: '0.75rem', textAlign: 'center', color: 'warning.main', fontWeight: 'medium' }}>
+                    <Typography variant="caption" sx={{ fontSize: '0.65rem', textAlign: 'center', color: 'warning.main', fontWeight: 'medium' }}>
                       {formatAmount(totals.inbound.vat, 'HUF')}
                     </Typography>
-                    <Typography variant="body2" sx={{ fontSize: '0.75rem', textAlign: 'center', color: 'secondary.main', fontWeight: 'bold' }}>
+                    <Typography variant="caption" sx={{ fontSize: '0.65rem', textAlign: 'center', color: 'secondary.main', fontWeight: 'bold' }}>
                       {formatAmount(totals.inbound.gross, 'HUF')}
                     </Typography>
                   </Box>
@@ -1208,92 +1228,91 @@ const NAVInvoices: React.FC = () => {
 
       {/* Action buttons for selected invoices */}
       {selectedInvoices.length > 0 && (
-        <Paper elevation={1} sx={{ p: 2, mb: 1, backgroundColor: 'action.hover' }}>
-          <Typography variant="subtitle2" sx={{ mb: 1.5, color: 'primary.main', fontWeight: 'medium' }}>
-            Tömeges műveletek ({selectedInvoices.length} számla kiválasztva)
+        <Paper elevation={1} sx={{ p: 1, mb: 0.5, backgroundColor: 'action.hover' }}>
+          <Typography variant="caption" sx={{ mb: 0.5, color: 'primary.main', fontWeight: 'medium', fontSize: '0.75rem', display: 'block' }}>
+            Tömeges műveletek ({selectedInvoices.length} számla)
           </Typography>
-          
-          <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
-            {/* Generate transfers button */}
+
+          <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
             <Button
               variant="contained"
               color="primary"
               size="small"
-              startIcon={<AddIcon />}
+              startIcon={<AddIcon fontSize="small" />}
               onClick={handleGenerateTransfers}
+              sx={{ fontSize: '0.7rem', py: 0.25, px: 0.75, minHeight: '28px' }}
             >
-              Eseti utalás generálás
+              Utalás generálás
             </Button>
-            
-            {/* Payment status buttons */}
+
             <Button
               variant="outlined"
               color="warning"
               size="small"
-              startIcon={<UnpaidIcon />}
+              startIcon={<UnpaidIcon fontSize="small" />}
               onClick={handleBulkMarkUnpaid}
               disabled={bulkMarkUnpaidMutation.isPending}
+              sx={{ fontSize: '0.7rem', py: 0.25, px: 0.75, minHeight: '28px' }}
             >
-              {bulkMarkUnpaidMutation.isPending ? 'Frissítés...' : 'Fizetésre vár'}
+              Fizetésre vár
             </Button>
-            
+
             <Button
               variant="outlined"
               color="info"
               size="small"
-              startIcon={<PreparedIcon />}
+              startIcon={<PreparedIcon fontSize="small" />}
               onClick={handleBulkMarkPrepared}
               disabled={bulkMarkPreparedMutation.isPending}
+              sx={{ fontSize: '0.7rem', py: 0.25, px: 0.75, minHeight: '28px' }}
             >
-              {bulkMarkPreparedMutation.isPending ? 'Frissítés...' : 'Előkészítve'}
+              Előkészítve
             </Button>
-            
-            <Stack direction="column" spacing={1}>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={usePaymentDueDate}
-                    onChange={(e) => setUsePaymentDueDate(e.target.checked)}
-                    size="small"
-                  />
-                }
-                label="Fizetési határidőre állítás"
-                sx={{ fontSize: '0.875rem' }}
-              />
-              
-              <Stack direction="row" spacing={1} alignItems="center">
-                {!usePaymentDueDate && (
-                  <TextField
-                    label="Fizetés dátuma"
-                    type="date"
-                    value={paymentDate}
-                    onChange={(e) => setPaymentDate(e.target.value)}
-                    size="small"
-                    sx={{ minWidth: '150px' }}
-                    InputLabelProps={{
-                      shrink: true,
-                    }}
-                  />
-                )}
-                
-                <Button
-                  variant="outlined"
-                  color="success"
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={usePaymentDueDate}
+                  onChange={(e) => setUsePaymentDueDate(e.target.checked)}
                   size="small"
-                  startIcon={<PaidIcon />}
-                  onClick={handleBulkMarkPaid}
-                  disabled={bulkMarkPaidMutation.isPending}
-                >
-                  {bulkMarkPaidMutation.isPending ? 'Frissítés...' : 'Kifizetve'}
-                </Button>
-                
-                {usePaymentDueDate && (
-                  <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic', maxWidth: '200px' }}>
-                    Minden számla saját fizetési határidejével lesz megjelölve
-                  </Typography>
-                )}
-              </Stack>
-            </Stack>
+                  sx={{ '& .MuiSvgIcon-root': { fontSize: 16 } }}
+                />
+              }
+              label="Fizetési határidő"
+              sx={{
+                fontSize: '0.7rem',
+                mx: 0.5,
+                '& .MuiFormControlLabel-label': { fontSize: '0.7rem' }
+              }}
+            />
+
+            {!usePaymentDueDate && (
+              <TextField
+                label="Dátum"
+                type="date"
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+                size="small"
+                sx={{
+                  minWidth: '120px',
+                  '& .MuiInputBase-input': { fontSize: '0.7rem', py: 0.5 },
+                  '& .MuiInputLabel-root': { fontSize: '0.7rem' }
+                }}
+                InputLabelProps={{ shrink: true }}
+              />
+            )}
+
+            <Button
+              variant="outlined"
+              color="success"
+              size="small"
+              startIcon={<PaidIcon fontSize="small" />}
+              onClick={handleBulkMarkPaid}
+              disabled={bulkMarkPaidMutation.isPending}
+              sx={{ fontSize: '0.7rem', py: 0.25, px: 0.75, minHeight: '28px' }}
+            >
+              Kifizetve
+            </Button>
           </Stack>
         </Paper>
       )}
