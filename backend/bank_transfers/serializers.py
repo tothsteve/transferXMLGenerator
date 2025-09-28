@@ -33,8 +33,8 @@ class BeneficiarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Beneficiary
         fields = [
-            'id', 'name', 'account_number', 'vat_number', 'description', 
-            'is_frequent', 'is_active', 'remittance_information', 
+            'id', 'name', 'account_number', 'vat_number', 'tax_number', 'description',
+            'is_frequent', 'is_active', 'remittance_information',
             'company_name', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at', 'company', 'company_name']
@@ -85,6 +85,36 @@ class BeneficiarySerializer(serializers.ModelSerializer):
         
         # Return the cleaned VAT number
         return clean_vat
+
+    def validate_tax_number(self, value):
+        """Validate Hungarian company tax number format"""
+        if not value:
+            return value
+
+        # Clean the tax number (remove spaces and dashes)
+        clean_tax = value.replace(' ', '').replace('-', '')
+
+        # Validate format: exactly 8 digits
+        if not clean_tax.isdigit() or len(clean_tax) != 8:
+            raise serializers.ValidationError(
+                "Magyar céges adószám 8 számjegyből kell álljon (pl. 12345678)"
+            )
+
+        # Return the cleaned tax number
+        return clean_tax
+
+    def validate(self, data):
+        """Validate that at least one identifier is provided"""
+        account_number = data.get('account_number')
+        vat_number = data.get('vat_number')
+        tax_number = data.get('tax_number')
+
+        if not account_number and not vat_number and not tax_number:
+            raise serializers.ValidationError(
+                "Meg kell adni a számlaszámot, adóazonosító jelet vagy céges adószámot"
+            )
+
+        return data
 
 class TemplateBeneficiarySerializer(serializers.ModelSerializer):
     beneficiary = BeneficiarySerializer(read_only=True)

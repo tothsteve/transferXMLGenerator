@@ -43,8 +43,10 @@ const ToastComponent: React.FC<ToastProps> = ({ toast, onClose }) => {
         }
         sx={{
           mb: 1,
+          maxWidth: toast.message && toast.message.length > 100 ? '600px' : '400px',
           '& .MuiAlert-message': {
             width: '100%',
+            whiteSpace: 'pre-line',
           },
         }}
       >

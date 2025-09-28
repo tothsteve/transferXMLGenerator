@@ -21,16 +21,19 @@ import {
   CheckCircle as CheckCircleIcon,
   PlayArrow as PlayIcon
 } from '@mui/icons-material';
-import { 
-  useTemplates, 
-  useLoadTemplate, 
-  useBulkCreateTransfers, 
+import {
+  useTemplates,
+  useLoadTemplate,
+  useBulkCreateTransfers,
   useBulkUpdateTransfers,
+  useUpdateTransfer,
+  useDeleteTransfer,
   useGenerateXml,
   useGenerateKHExport,
   useDefaultBankAccount,
   useBeneficiaries,
-  useCreateBeneficiary
+  useCreateBeneficiary,
+  useTransfers
 } from '../../hooks/api';
 import { Transfer, TransferTemplate, LoadTemplateResponse, Beneficiary } from '../../types/api';
 import TemplateSelector from './TemplateSelector';
@@ -58,22 +61,72 @@ const TransferWorkflow: React.FC = () => {
   const { data: templatesData } = useTemplates();
   const { data: defaultAccount } = useDefaultBankAccount();
   const { data: beneficiariesData, isLoading: beneficiariesLoading } = useBeneficiaries({ page: 1 });
+  const { data: transfersData, refetch: refetchTransfers } = useTransfers({
+    is_processed: false,
+    ordering: '-created_at',
+    page_size: 100
+  });
   const loadTemplateMutation = useLoadTemplate();
   const bulkCreateMutation = useBulkCreateTransfers();
   const bulkUpdateMutation = useBulkUpdateTransfers();
+  const updateTransferMutation = useUpdateTransfer();
+  const deleteTransferMutation = useDeleteTransfer();
   const generateXmlMutation = useGenerateXml();
   const generateKHExportMutation = useGenerateKHExport();
   const createBeneficiaryMutation = useCreateBeneficiary();
 
   const templates = templatesData?.results || [];
   const beneficiaries = beneficiariesData?.results || [];
+  const existingTransfers = transfersData?.results || [];
 
-  // Handle preloaded transfers from NAV invoices
+  // Reset workflow state when navigating to transfers without specific state or with reset flag
   useEffect(() => {
     const state = location.state as any;
-    if (state?.preloadedTransfers && state?.source === 'nav_invoices') {
+
+    // If navigating to transfers page without any special state (fresh navigation from menu),
+    // or with explicit reset flag, reset the workflow to initial state
+    if (!state || state.reset || (!state.source && !state.templateData && !state.loadFromTemplate && !state.preloadedTransfers)) {
+      console.log('Resetting transfer workflow to initial state');
+      setSelectedTemplate(null);
+      setTransfers([]);
+      setXmlPreview(null);
+      setValidationErrors([]);
+      return;
+    }
+  }, [location.pathname, location.state, location.key]);
+
+  // Handle transfers from NAV invoices or load existing transfers
+  useEffect(() => {
+    const state = location.state as any;
+
+    if (state?.source === 'nav_invoices_generated' && state?.transfers) {
+      // New API response - use the newly created transfers directly
+      console.log('Transfers were generated from NAV invoices, using response data:', state.transfers);
+
+      // Convert API response transfers to TransferData format
+      const convertedTransfers: TransferData[] = state.transfers.map((transfer: any, index: number) => ({
+        id: transfer.id,
+        tempId: `generated_${index}`,
+        beneficiary: transfer.beneficiary.id,
+        beneficiary_data: transfer.beneficiary,
+        amount: transfer.amount,
+        currency: transfer.currency as 'HUF' | 'EUR' | 'USD',
+        execution_date: transfer.execution_date,
+        remittance_info: transfer.remittance_info,
+        nav_invoice: transfer.nav_invoice,
+        order: transfer.order,
+        is_processed: transfer.is_processed,
+      }));
+
+      setTransfers(convertedTransfers);
+
+      // Clear the location state
+      window.history.replaceState({}, document.title);
+
+    } else if (state?.preloadedTransfers && state?.source === 'nav_invoices') {
+      // Legacy preloaded transfers format (for backward compatibility)
       console.log('Loading preloaded transfers from NAV invoices:', state.preloadedTransfers);
-      
+
       // Convert preloaded data to TransferData format
       const convertedTransfers: TransferData[] = state.preloadedTransfers.map((transfer: any, index: number) => ({
         tempId: `nav_${index}`,
@@ -97,6 +150,32 @@ const TransferWorkflow: React.FC = () => {
       }));
 
       setTransfers(convertedTransfers);
+
+    } else if (existingTransfers.length > 0 && state?.source) {
+      // Only load existing transfers if we have a specific source (not fresh navigation)
+      console.log('Loading existing transfers:', existingTransfers);
+
+      const convertedTransfers: TransferData[] = existingTransfers.map((transfer: any) => ({
+        id: transfer.id,
+        beneficiary: transfer.beneficiary.id,
+        beneficiary_data: transfer.beneficiary,
+        amount: transfer.amount,
+        currency: transfer.currency,
+        execution_date: transfer.execution_date,
+        remittance_info: transfer.remittance_info,
+        nav_invoice: transfer.nav_invoice,
+        order: transfer.order,
+        is_processed: transfer.is_processed,
+      }));
+
+      setTransfers(convertedTransfers);
+    }
+  }, [location.state, existingTransfers, refetchTransfers]);
+
+  // Clear location state after processing
+  useEffect(() => {
+    const state = location.state as any;
+    if (state?.source) {
       // Clear the location state so it doesn't reload on refresh
       window.history.replaceState({}, document.title);
     }
@@ -221,14 +300,58 @@ const TransferWorkflow: React.FC = () => {
     }
   }, [location.search, templates, defaultAccount, selectedTemplate]);
 
-  const handleUpdateTransfer = (index: number, updatedData: Partial<TransferData>) => {
-    setTransfers(prev => prev.map((transfer, i) => 
-      i === index ? { ...transfer, ...updatedData } : transfer
-    ));
+  const handleUpdateTransfer = async (index: number, updatedData: Partial<TransferData>) => {
+    const transfer = transfers[index];
+
+    if (transfer.id) {
+      // Transfer exists in database, update via API
+      try {
+        await updateTransferMutation.mutateAsync({
+          id: transfer.id,
+          data: {
+            amount: updatedData.amount ? parseFloat(updatedData.amount).toFixed(2) : undefined,
+            execution_date: updatedData.execution_date,
+            remittance_info: updatedData.remittance_info,
+          }
+        });
+
+        // Update local state after successful API call
+        setTransfers(prev => prev.map((t, i) =>
+          i === index ? { ...t, ...updatedData } : t
+        ));
+
+        console.log(`Transfer ${transfer.id} updated successfully`);
+      } catch (error) {
+        console.error('Failed to update transfer:', error);
+        setValidationErrors(['Hiba történt az átutalás frissítése során.']);
+        return;
+      }
+    } else {
+      // New transfer, only update local state
+      setTransfers(prev => prev.map((t, i) =>
+        i === index ? { ...t, ...updatedData } : t
+      ));
+    }
+
     setValidationErrors([]);
   };
 
-  const handleDeleteTransfer = (index: number) => {
+  const handleDeleteTransfer = async (index: number) => {
+    const transfer = transfers[index];
+
+    if (transfer.id) {
+      // Transfer exists in database, delete via API
+      try {
+        await deleteTransferMutation.mutateAsync(transfer.id);
+        console.log(`Transfer ${transfer.id} deleted successfully`);
+      } catch (error) {
+        console.error('Failed to delete transfer:', error);
+        setValidationErrors(['Hiba történt az átutalás törlése során.']);
+        return;
+      }
+    }
+
+    // Remove from local state (works for both new and existing transfers)
     setTransfers(prev => prev.filter((_, i) => i !== index));
   };
 
@@ -664,7 +787,7 @@ const TransferWorkflow: React.FC = () => {
     sum + (parseFloat(transfer.amount) || 0), 0
   );
 
-  const isGenerating = bulkCreateMutation.isPending || bulkUpdateMutation.isPending || generateXmlMutation.isPending || generateKHExportMutation.isPending;
+  const isGenerating = bulkCreateMutation.isPending || bulkUpdateMutation.isPending || updateTransferMutation.isPending || deleteTransferMutation.isPending || generateXmlMutation.isPending || generateKHExportMutation.isPending;
 
   return (
     <Box sx={{ p: 3 }}>
@@ -758,9 +881,11 @@ const TransferWorkflow: React.FC = () => {
                   }
                 }}
               >
-                {bulkCreateMutation.isPending ? 'Új átutalások mentése...' : 
+                {bulkCreateMutation.isPending ? 'Új átutalások mentése...' :
                  bulkUpdateMutation.isPending ? 'Változások mentése...' :
-                 generateXmlMutation.isPending ? 'Generálás...' : 
+                 updateTransferMutation.isPending ? 'Átutalás frissítése...' :
+                 deleteTransferMutation.isPending ? 'Átutalás törlése...' :
+                 generateXmlMutation.isPending ? 'Generálás...' :
                  'Generálás'}
               </Button>
               <Button

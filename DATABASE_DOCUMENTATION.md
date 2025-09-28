@@ -3,7 +3,7 @@
 
 **Last Updated:** 2025-09-14  
 **Database:** PostgreSQL (Production on Railway) / SQL Server (Local Development)  
-**Schema Version:** Multi-Company Architecture with Feature Flags, NAV Invoice Payment Status Tracking, Trusted Partners Auto-Payment System, and VAT Number Beneficiary Support (Migration 0036)  
+**Schema Version:** Multi-Company Architecture with Feature Flags, NAV Invoice Payment Status Tracking, Trusted Partners Auto-Payment System, VAT Number and Tax Number Beneficiary Support (Migration 0037)  
 
 > **Note:** This documentation is the **single source of truth** for database schema. All database comment scripts should be generated from this document.
 
@@ -52,7 +52,7 @@ The system implements a **multi-tenant architecture** where:
 ---
 
 ## 2. **bank_transfers_beneficiary**
-**Table Comment:** *Company-scoped beneficiary information for bank transfers. Contains payees, suppliers, employees, and tax authorities. Supports both bank account and VAT number identification.*
+**Table Comment:** *Company-scoped beneficiary information for bank transfers. Contains payees, suppliers, employees, and tax authorities. Supports bank account, VAT number (individuals), and tax number (companies) identification with NAV integration fallback.*
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -61,6 +61,7 @@ The system implements a **multi-tenant architecture** where:
 | `name` | VARCHAR(200) | NOT NULL | Full legal name of the beneficiary (person or organization) |
 | `account_number` | VARCHAR(50) | NULL | Beneficiary's bank account number in Hungarian format (validated and formatted) |
 | `vat_number` | VARCHAR(20) | NULL | Hungarian personal VAT number (személyi adóazonosító jel) - 10 digits (e.g. 8440961790) |
+| `tax_number` | VARCHAR(8) | NULL | Hungarian company tax number - 8 digits (first 8 digits of full tax ID, e.g. "12345678") |
 | `description` | VARCHAR(200) | | Additional information about the beneficiary (bank name, organization details, etc.) |
 | `is_frequent` | BOOLEAN | DEFAULT FALSE | Marks frequently used beneficiaries for quick access in UI |
 | `is_active` | BOOLEAN | DEFAULT TRUE | Soft delete flag - inactive beneficiaries are hidden from selection |
@@ -75,13 +76,17 @@ The system implements a **multi-tenant architecture** where:
 - Index on `is_frequent` for frequent beneficiary lookup
 - Index on `is_active` for active filtering
 - Index on `vat_number` for VAT number-based search and lookup
+- Index on `tax_number` for tax number-based search and lookup
 
 **Business Rules:**
-- Either `account_number` OR `vat_number` must be provided (application-level validation)
+- Either `account_number` OR `vat_number` OR `tax_number` must be provided (application-level validation)
+- **Mutual exclusivity**: Cannot have both `vat_number` and `tax_number` - individuals use VAT numbers, companies use tax numbers
 - Account numbers are validated using Hungarian banking rules (16 or 24 digits) when provided
 - Account numbers are automatically formatted (8-8 or 8-8-8 with dashes) when provided
 - VAT numbers must be exactly 10 digits (Hungarian personal VAT format) when provided
 - VAT numbers are automatically cleaned (spaces and dashes removed) during validation
+- Tax numbers must be exactly 8 digits (Hungarian company tax format - first 8 digits of full tax ID) when provided
+- Tax numbers are used for NAV invoice integration fallback when bank account is missing
 
 ---
 
@@ -779,6 +784,85 @@ def has_permission(request, required_feature):
 
 ---
 
+## Tax Number Beneficiary Matching System
+
+### Overview
+The system implements a sophisticated **tax number matching system** for NAV invoice integration. When NAV invoices lack bank account information, the system can fallback to tax number matching to automatically resolve beneficiaries.
+
+### Business Logic
+1. **NAV Invoice Processing**: When generating transfers from NAV invoices
+2. **Missing Bank Account**: If invoice `supplier_bank_account_number` is empty/null
+3. **Tax Number Fallback**: System searches for beneficiaries with matching `tax_number`
+4. **Automatic Resolution**: Matching beneficiary's account details are used for transfer
+
+### Matching Algorithm
+Located in `bank_transfers/services/beneficiary_service.py`:
+
+#### Three-Level Matching Approach
+1. **Exact Match**: Direct comparison of supplier tax number with beneficiary tax number
+2. **Normalized Match**: Remove dashes/spaces, compare cleaned tax numbers
+3. **Base Match**: Compare first 8 digits for cross-format compatibility
+
+#### Supported Tax Number Formats
+- **8-digit**: Base company tax number (stored format: "12345678")
+- **11-digit**: Full tax number with check digits (invoice format: "12345678-2-16")
+- **13-digit**: Tax number with dashes (various formats: "12345678-2-16")
+
+#### Implementation Example
+```python
+def find_beneficiary_by_tax_number(company, supplier_tax_number):
+    """
+    Find beneficiary by tax number with flexible format matching
+    """
+    # Normalize tax numbers for comparison
+    normalized_supplier = _normalize_tax_number(supplier_tax_number)
+    base_supplier = _get_base_tax_number(supplier_tax_number)
+
+    # Search company beneficiaries
+    for beneficiary in company.beneficiaries.filter(
+        tax_number__isnull=False,
+        is_active=True
+    ):
+        # Three-level matching
+        if (supplier_tax_number == beneficiary.tax_number or  # Exact
+            normalized_supplier == _normalize_tax_number(beneficiary.tax_number) or  # Normalized
+            base_supplier == _get_base_tax_number(beneficiary.tax_number)):  # Base
+            return beneficiary
+
+    return None
+```
+
+### Integration Points
+
+#### NAV Invoice Transfer Generation
+- **Endpoint**: `POST /api/nav-invoices/generate_transfers/`
+- **Process**: When bank account missing → tax number lookup → beneficiary resolution
+- **Response**: Warning messages indicate when tax number matching was used
+
+#### Beneficiary Management
+- **Form Validation**: Ensures mutual exclusivity between VAT and tax numbers
+- **Search Integration**: Tax number searchable in beneficiary lists
+- **UI Display**: Tax number shown in beneficiary tables and forms
+
+### Data Validation
+
+#### Database Constraints
+- **Length**: Exactly 8 characters for tax numbers
+- **Mutual Exclusivity**: CHECK constraint prevents both VAT and tax number
+- **Company Scoping**: All searches are company-isolated
+
+#### Application Validation
+- **Format**: 8-digit numeric validation in forms
+- **Uniqueness**: Prevents duplicate tax numbers within company
+- **Required Fields**: Either account_number OR vat_number OR tax_number required
+
+### Performance Optimizations
+- **Indexed Searches**: `tax_number` field has dedicated index for fast lookups
+- **Company Scoping**: All queries include `company_id` for optimal performance
+- **Caching**: Beneficiary lookups cached during bulk transfer generation
+
+---
+
 ## Performance Optimizations
 
 ### Database Indexes
@@ -808,7 +892,8 @@ def has_permission(request, required_feature):
 - **0020**: Added feature flag system (`FeatureTemplate`, `CompanyFeature`)
 - **0021**: Enhanced CompanyUser with role-based permissions (`role`, `custom_permissions`, `permission_restrictions`)
 - **0033**: Added trusted partners auto-payment system (`TrustedPartner` table) with NAV integration
-- **Current**: Full multi-tenant isolation with feature flags, role-based access control, complete NAV integration, and trusted partners auto-payment system
+- **0037**: Added tax number support to beneficiaries with NAV integration fallback and mutual exclusivity validation
+- **Current**: Full multi-tenant isolation with feature flags, role-based access control, complete NAV integration, trusted partners auto-payment system, and tax number beneficiary matching
 
 ---
 

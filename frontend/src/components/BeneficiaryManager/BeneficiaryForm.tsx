@@ -37,6 +37,7 @@ interface FormData {
   name: string;
   account_number?: string;
   vat_number?: string;
+  tax_number?: string;
   description?: string;
   remittance_information?: string;
   is_frequent: boolean;
@@ -70,6 +71,7 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
       name: beneficiary?.name || '',
       account_number: beneficiary?.account_number || '',
       vat_number: beneficiary?.vat_number || '',
+      tax_number: beneficiary?.tax_number || '',
       description: beneficiary?.description || '',
       remittance_information: beneficiary?.remittance_information || '',
       is_frequent: beneficiary?.is_frequent || false,
@@ -79,10 +81,10 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
 
   const handleFormSubmit = async (data: FormData) => {
     // Validate that at least one identifier is provided
-    if (!data.account_number && !data.vat_number) {
-      setError('account_number', { 
-        type: 'manual', 
-        message: 'Meg kell adni a számlaszámot vagy az adóazonosító jelet' 
+    if (!data.account_number && !data.vat_number && !data.tax_number) {
+      setError('account_number', {
+        type: 'manual',
+        message: 'Meg kell adni a számlaszámot, adóazonosító jelet vagy céges adószámot'
       });
       return;
     }
@@ -105,9 +107,21 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
     if (data.vat_number) {
       const cleanVat = data.vat_number.replace(/[\s-]/g, '');
       if (!/^\d{10}$/.test(cleanVat)) {
-        setError('vat_number', { 
-          type: 'manual', 
-          message: 'Magyar személyi adóazonosító jel 10 számjegyből kell álljon (pl. 8450782546)' 
+        setError('vat_number', {
+          type: 'manual',
+          message: 'Magyar személyi adóazonosító jel 10 számjegyből kell álljon (pl. 8450782546)'
+        });
+        return;
+      }
+    }
+
+    // Validate tax number if provided (8 digits)
+    if (data.tax_number) {
+      const cleanTax = data.tax_number.replace(/[\s-]/g, '');
+      if (!/^\d{8}$/.test(cleanTax)) {
+        setError('tax_number', {
+          type: 'manual',
+          message: 'Magyar céges adószám 8 számjegyből kell álljon (pl. 12345678)'
         });
         return;
       }
@@ -140,6 +154,7 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
       name: normalizeWhitespace(data.name),
       account_number: formattedAccountNumber,
       vat_number: data.vat_number ? data.vat_number.replace(/[\s-]/g, '') : undefined,
+      tax_number: data.tax_number ? data.tax_number.replace(/[\s-]/g, '') : undefined,
       description: data.description || '',
       remittance_information: data.remittance_information ? normalizeWhitespace(data.remittance_information) : ''
     };
@@ -269,6 +284,30 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
               helperText={
                 errors.vat_number?.message || 
                 'Magyar személyi adóazonosító jel 10 számjegyből áll (alkalmazottak azonosítására)'
+              }
+              InputProps={{
+                sx: { fontFamily: 'monospace', letterSpacing: '0.5px' }
+              }}
+            />
+
+            <TextField
+              label="Céges adószám"
+              fullWidth
+              placeholder="12345678"
+              {...register('tax_number', {
+                validate: (value) => {
+                  if (!value) return true; // Optional field
+                  const cleanTax = value.replace(/[\s-]/g, '');
+                  if (!/^\d{8}$/.test(cleanTax)) {
+                    return 'Magyar céges adószám 8 számjegyből kell álljon (pl. 12345678)';
+                  }
+                  return true;
+                }
+              })}
+              error={!!errors.tax_number}
+              helperText={
+                errors.tax_number?.message ||
+                'Magyar céges adószám első 8 számjegye (cégek és szervezetek azonosítására)'
               }
               InputProps={{
                 sx: { fontFamily: 'monospace', letterSpacing: '0.5px' }
