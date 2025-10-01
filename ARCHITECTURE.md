@@ -9,24 +9,28 @@ Transfer Generator is a multi-tenant Django + React application designed for Hun
 ### High-Level Architecture
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   React Client  │    │  Django API     │    │  PostgreSQL     │    │ NAV Online API  │
-│                 │    │                 │    │   (Railway)     │    │   (Hungary)     │
-│ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │
-│ │Auth Context │ │◄──►│ │JWT Auth     │ │    │ │Company Data │ │    │ │Invoice API  │ │
-│ └─────────────┘ │    │ └─────────────┘ │    │ └─────────────┘ │    │ └─────────────┘ │
-│ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │
-│ │Company      │ │◄──►│ │Company      │ │◄──►│ │User Data    │ │    │ │Tax Authority│ │
-│ │Context      │ │    │ │Middleware   │ │    │ └─────────────┘ │    │ │Integration  │ │
-│ └─────────────┘ │    │ └─────────────┘ │    │ ┌─────────────┐ │    │ └─────────────┘ │
-│ ┌─────────────┐ │    │ ┌─────────────┐ │    │ │Transfer     │ │    └─────────────────┘
-│ │Business     │ │◄──►│ │Business     │ │◄──►│ │Data         │ │             ▲
-│ │Components   │ │    │ │Logic        │ │    │ └─────────────┘ │             │
-│ └─────────────┘ │    │ └─────────────┘ │    │ ┌─────────────┐ │             │
-│                 │    │ ┌─────────────┐ │    │ │NAV Invoice  │ │             │
-│                 │    │ │NAV Scheduler│ │◄───┤ │Data         │ │─────────────┘
-│                 │    │ │(APScheduler)│ │    │ └─────────────┘ │
-│                 │    │ └─────────────┘ │    └─────────────────┘
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   React Client  │    │  Django API     │    │  PostgreSQL     │    │ NAV Online API  │    │   MNB API       │
+│                 │    │                 │    │   (Railway)     │    │   (Hungary)     │    │   (Hungary)     │
+│ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │
+│ │Auth Context │ │◄──►│ │JWT Auth     │ │    │ │Company Data │ │    │ │Invoice API  │ │    │ │Exchange Rate│ │
+│ └─────────────┘ │    │ └─────────────┘ │    │ └─────────────┘ │    │ └─────────────┘ │    │ │SOAP API     │ │
+│ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │    │ └─────────────┘ │
+│ │Company      │ │◄──►│ │Company      │ │◄──►│ │User Data    │ │    │ │Tax Authority│ │    │       ▲         │
+│ │Context      │ │    │ │Middleware   │ │    │ └─────────────┘ │    │ │Integration  │ │    │       │         │
+│ └─────────────┘ │    │ └─────────────┘ │    │ ┌─────────────┐ │    │ └─────────────┘ │    │       │         │
+│ ┌─────────────┐ │    │ ┌─────────────┐ │    │ │Transfer     │ │    └─────────────────┘    │       │         │
+│ │Business     │ │◄──►│ │Business     │ │◄──►│ │Data         │ │             ▲              │       │         │
+│ │Components   │ │    │ │Logic        │ │    │ └─────────────┘ │             │              │       │         │
+│ └─────────────┘ │    │ └─────────────┘ │    │ ┌─────────────┐ │             │              │       │         │
+│                 │    │ ┌─────────────┐ │    │ │NAV Invoice  │ │             │              │       │         │
+│                 │    │ │NAV Scheduler│ │◄───┤ │Data         │ │─────────────┘              │       │         │
+│                 │    │ │(APScheduler)│ │    │ └─────────────┘ │                            │       │         │
+│                 │    │ └─────────────┘ │    │ ┌─────────────┐ │                            │       │         │
+│                 │    │ ┌─────────────┐ │    │ │Exchange Rate│ │                            │       │         │
+│                 │    │ │MNB Scheduler│ │◄───┤ │Data         │ │────────────────────────────┼───────┘         │
+│                 │    │ │(APScheduler)│ │    │ └─────────────┘ │                            │                 │
+│                 │    │ └─────────────┘ │    └─────────────────┘                            └─────────────────┘
 └─────────────────┘    └─────────────────┘
 ```
 
@@ -70,6 +74,15 @@ TransferTemplate(company, name, is_active)
 TemplateBeneficiary(template, beneficiary, default_amount, default_remittance_info)
 Transfer(company, beneficiary, amount, currency, execution_date, remittance_info)
 TransferBatch(company, created_at, xml_content, file_name)
+
+# NAV Integration Models
+Invoice(company, invoice_number, supplier_name, supplier_tax_number, issue_date, total_amount)
+InvoiceSyncLog(company, sync_date, invoices_synced, success)
+TrustedPartner(company, partner_name, tax_number, is_active, auto_pay)
+
+# MNB Exchange Rate Models (Global - no company FK)
+ExchangeRate(rate_date, currency, rate, unit, sync_date, source)
+ExchangeRateSyncLog(sync_start_time, currencies_synced, date_range_start, date_range_end, sync_status)
 ```
 
 ### Authentication Flow
@@ -105,6 +118,22 @@ TransferBatch(company, created_at, xml_content, file_name)
 - `POST /api/transfers/bulk_create/` - Bulk transfer creation
 - `POST /api/transfers/generate_xml/` - XML file generation
 - `GET /api/company/users/` - Company user management (admin only)
+
+#### NAV Integration Endpoints
+- `GET /api/nav-invoices/` - Company-scoped invoice list with filtering
+- `POST /api/nav-invoices/sync/` - Trigger NAV invoice sync (admin only)
+- `POST /api/nav-invoices/bulk_mark_paid/` - Bulk payment status updates
+- `GET /api/trusted-partners/` - Company-scoped trusted partner list
+
+#### MNB Exchange Rate Endpoints
+- `GET /api/exchange-rates/` - List exchange rates with filtering (date, currency)
+- `GET /api/exchange-rates/current/` - Today's USD/EUR rates
+- `GET /api/exchange-rates/latest/` - Most recent available rates
+- `POST /api/exchange-rates/convert/` - Currency conversion calculator
+- `POST /api/exchange-rates/sync_current/` - Trigger current rate sync (admin only)
+- `POST /api/exchange-rates/sync_historical/` - Trigger historical sync (admin only)
+- `GET /api/exchange-rates/sync_history/` - View sync logs
+- `GET /api/exchange-rates/history/` - Rate history for charting
 
 ### Middleware Stack
 
@@ -280,6 +309,63 @@ def api_endpoint(request):
 - **Field Selection**: Sparse fieldsets to reduce payload size
 - **Compression**: GZIP compression for API responses
 
+## External Integrations
+
+### NAV Online Invoice API Integration
+
+**Purpose**: Automatic invoice synchronization from Hungarian Tax Authority (NAV Online Számla)
+
+**Architecture**:
+- **Protocol**: SOAP/XML over HTTPS
+- **Authentication**: Technical user credentials with cryptographic exchange
+- **Encryption**: Company-specific credentials stored with Fernet encryption
+- **Scheduler**: APScheduler background task (every 6 hours)
+- **Data Storage**: Invoice and InvoiceSyncLog models
+
+**Key Features**:
+- Automatic invoice synchronization from NAV
+- Payment status tracking (UNPAID, PREPARED, PAID)
+- Trusted partners auto-payment system
+- Complete audit trail with sync logs
+- XML storage for invoice data
+
+**Performance**:
+- Typical sync: 30 days of invoices in ~5-10 seconds
+- Error handling: Continues on individual invoice failures
+- Rate limiting: Respects NAV API quotas
+
+### MNB Exchange Rate API Integration
+
+**Purpose**: Official USD/EUR exchange rates from Magyar Nemzeti Bank (Hungarian Central Bank)
+
+**Architecture**:
+- **Protocol**: SOAP/XML over HTTP
+- **API Endpoint**: `http://www.mnb.hu/arfolyamok.asmx`
+- **Authentication**: None required (public API)
+- **Scheduler**: APScheduler background task (every 6 hours)
+- **Data Storage**: ExchangeRate and ExchangeRateSyncLog models
+
+**Key Features**:
+- Automatic exchange rate synchronization (USD, EUR)
+- Historical data support (2+ years in ~2 seconds)
+- Currency conversion utilities
+- Smart fallback to latest available rate
+- Complete audit trail with sync logs
+
+**Performance**:
+- Current rate sync: < 0.1 seconds (2 currencies)
+- 2-year historical sync: 994 rates in ~2.3 seconds
+- Database: Upsert logic prevents duplicates
+
+**Integration Details**:
+- **SOAP Methods**:
+  - `GetCurrentExchangeRates`: Today's rates (fast)
+  - `GetExchangeRates`: Historical date range
+  - `GetCurrencies`: Available currency list
+- **Data Format**: XML with comma-separated decimals
+- **Namespace**: Child elements require `web:` prefix
+- **Weekend/Holiday**: Returns last business day rate
+
 ## Deployment Architecture
 
 ### Development Environment
@@ -324,6 +410,10 @@ Database Server (SQL Server)
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: 2025-08-17  
+**Document Version**: 1.1
+**Last Updated**: 2025-10-01
 **Architecture Review**: Quarterly
+
+**Changelog**:
+- **v1.1 (2025-10-01)**: Added MNB Exchange Rate API integration with automatic scheduler
+- **v1.0 (2025-08-17)**: Initial architecture documentation with multi-company and NAV integration
