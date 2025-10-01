@@ -878,6 +878,150 @@ def find_beneficiary_by_tax_number(company, supplier_tax_number):
 
 ---
 
+## 18. **bank_transfers_exchangerate**
+**Table Comment:** *Official exchange rates from Magyar Nemzeti Bank (MNB) for USD and EUR currencies. Provides accurate, government-sourced exchange rates for currency conversion and financial calculations.*
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for exchange rate record |
+| `rate_date` | DATE | NOT NULL | Date for which this exchange rate is valid |
+| `currency` | VARCHAR(3) | NOT NULL, CHECK IN ('USD', 'EUR') | ISO currency code (USD or EUR) |
+| `rate` | DECIMAL(12,6) | NOT NULL | Exchange rate: 1 unit of currency = X HUF |
+| `unit` | INTEGER | DEFAULT 1 | Number of currency units this rate applies to (typically 1) |
+| `sync_date` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Timestamp when this rate was fetched from MNB API |
+| `source` | VARCHAR(20) | DEFAULT 'MNB' | Data source identifier (always 'MNB' for official rates) |
+| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Record creation timestamp |
+| `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
+
+**Indexes:**
+- Primary key on `id`
+- Unique index on `(rate_date, currency)` for preventing duplicate rates per date
+- Index on `(rate_date, currency)` for fast lookups
+- Index on `-rate_date` for latest rates queries
+- Index on `currency` for currency-specific filtering
+
+**Constraints:**
+- Unique constraint on `(rate_date, currency)` - ensures one rate per currency per date
+- Check constraint on `currency` - only 'USD' and 'EUR' allowed
+
+**Business Rules:**
+- **Daily Sync**: Exchange rates are synchronized from MNB API multiple times daily
+- **Official Source**: All rates come from Magyar Nemzeti Bank (Hungarian Central Bank)
+- **Decimal Precision**: 6 decimal places ensure accurate currency conversion
+- **Unit Normalization**: All rates normalized to per-1-unit format (e.g., 1 USD = 331.16 HUF)
+- **Historical Data**: System stores complete rate history for auditing and analysis
+- **Global Data**: Exchange rates are NOT company-scoped (shared across all companies)
+- **Weekend/Holiday Handling**: MNB returns last business day rate for non-trading days
+
+**Integration with MNB API:**
+- **SOAP Endpoint**: `http://www.mnb.hu/arfolyamok.asmx`
+- **WSDL**: `https://www.mnb.hu/arfolyamok.asmx?wsdl`
+- **Methods Used**:
+  - `GetCurrentExchangeRates`: Fetches today's rates (fast, < 0.1 seconds)
+  - `GetExchangeRates`: Fetches historical rates for date range (2 years in ~2 seconds)
+- **Data Format**: MNB uses comma-separated decimals (e.g., "331,16") which are converted to standard decimal format
+
+**Usage Examples:**
+```python
+# Get rate for specific date
+rate = ExchangeRate.objects.get(rate_date='2025-10-01', currency='USD')
+# rate.rate → Decimal('331.160000')
+
+# Convert USD to HUF
+usd_amount = Decimal('100.00')
+huf_amount = usd_amount * rate.rate  # → 33116.00 HUF
+
+# Get latest USD rate
+latest_usd = ExchangeRate.objects.filter(currency='USD').order_by('-rate_date').first()
+```
+
+**API Access:**
+- `GET /api/exchange-rates/` - List rates with filtering
+- `GET /api/exchange-rates/current/` - Today's rates
+- `GET /api/exchange-rates/latest/` - Most recent available rates
+- `POST /api/exchange-rates/convert/` - Currency conversion calculator
+- `GET /api/exchange-rates/history/?currency=USD&days=30` - Historical rates for charts
+
+---
+
+## 19. **bank_transfers_exchangeratesynclog**
+**Table Comment:** *Audit trail for MNB exchange rate synchronization operations. Tracks all sync attempts with statistics, errors, and performance metrics.*
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for sync log record |
+| `sync_start_time` | TIMESTAMP | NOT NULL | Exact timestamp when sync operation started |
+| `sync_end_time` | TIMESTAMP | NULL | Timestamp when sync operation completed (NULL if still running) |
+| `currencies_synced` | VARCHAR(50) | NOT NULL | Comma-separated list of currency codes synced (e.g., 'USD,EUR') |
+| `date_range_start` | DATE | NOT NULL | Start date of the sync range (inclusive) |
+| `date_range_end` | DATE | NOT NULL | End date of the sync range (inclusive) |
+| `rates_created` | INTEGER | DEFAULT 0 | Number of new exchange rate records created during sync |
+| `rates_updated` | INTEGER | DEFAULT 0 | Number of existing exchange rate records updated during sync |
+| `sync_status` | VARCHAR(20) | NOT NULL, CHECK IN ('RUNNING', 'SUCCESS', 'PARTIAL_SUCCESS', 'FAILED') | Sync operation status |
+| `error_message` | TEXT | | Error details if sync failed (NULL if successful) |
+| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Log record creation timestamp |
+| `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
+
+**Indexes:**
+- Primary key on `id`
+- Index on `-sync_start_time` for recent sync queries
+- Index on `sync_status` for filtering by status
+
+**Constraints:**
+- Check constraint on `sync_status` - only valid status values allowed
+
+**Business Rules:**
+- **Audit Trail**: Every sync operation creates a log entry, even if it fails
+- **Performance Tracking**: Duration calculated as `sync_end_time - sync_start_time`
+- **Statistics**: Total processed = `rates_created + rates_updated`
+- **Status Transitions**:
+  - `RUNNING` → Created when sync starts
+  - `SUCCESS` → All rates synced without errors
+  - `PARTIAL_SUCCESS` → Some rates synced, some failed (currently unused)
+  - `FAILED` → Sync operation failed completely
+- **Error Handling**: Failures capture full error message for troubleshooting
+
+**Calculated Fields (via properties):**
+```python
+@property
+def duration_seconds(self):
+    """Sync duration in seconds"""
+    if self.sync_end_time and self.sync_start_time:
+        return (self.sync_end_time - self.sync_start_time).total_seconds()
+    return None
+
+@property
+def total_rates_processed(self):
+    """Total rates created + updated"""
+    return self.rates_created + self.rates_updated
+```
+
+**Usage Examples:**
+```python
+# Get latest sync status
+latest_sync = ExchangeRateSyncLog.objects.order_by('-sync_start_time').first()
+print(f"Status: {latest_sync.sync_status}")
+print(f"Duration: {latest_sync.duration_seconds:.2f}s")
+print(f"Rates processed: {latest_sync.total_rates_processed}")
+
+# Check for failed syncs
+failed_syncs = ExchangeRateSyncLog.objects.filter(sync_status='FAILED')
+for sync in failed_syncs:
+    print(f"{sync.sync_start_time}: {sync.error_message}")
+```
+
+**Typical Sync Statistics:**
+- **Current rates (2 currencies)**: 2 rates created, ~0.1 seconds
+- **2-year historical (730 days)**: 994 rates created, ~2.3 seconds
+- **Daily scheduled sync**: < 0.1 seconds per execution
+
+**API Access:**
+- `GET /api/exchange-rates/sync_history/` - Recent sync logs
+- `POST /api/exchange-rates/sync_current/` - Trigger current rate sync (ADMIN only)
+- `POST /api/exchange-rates/sync_historical/` - Trigger historical sync (ADMIN only)
+
+---
+
 ## Migration History
 
 - **0008**: Added multi-company architecture (`Company`, `CompanyUser`, `UserProfile`)

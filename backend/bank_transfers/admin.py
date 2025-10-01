@@ -10,7 +10,8 @@ from django.contrib import admin
 from .models import (
     BankAccount, Beneficiary, Transfer, TransferTemplate, TransferBatch,
     NavConfiguration, Invoice, InvoiceLineItem, InvoiceSyncLog,
-    FeatureTemplate, CompanyFeature, Company, CompanyUser, UserProfile
+    FeatureTemplate, CompanyFeature, Company, CompanyUser, UserProfile,
+    ExchangeRate, ExchangeRateSyncLog
 )
 
 @admin.register(BankAccount)
@@ -442,3 +443,119 @@ class UserProfileAdmin(admin.ModelAdmin):
         return obj.user.email
     user_email.short_description = 'Email'
     user_email.admin_order_field = 'user__email'
+
+
+# MNB Exchange Rate Admin
+
+@admin.register(ExchangeRate)
+class ExchangeRateAdmin(admin.ModelAdmin):
+    """
+    Admin interface for MNB Exchange Rates.
+    Provides read-only view with filtering and search capabilities.
+    """
+    list_display = ['rate_date', 'currency', 'rate', 'unit', 'rate_display', 'sync_date', 'source']
+    list_filter = ['currency', 'source', 'rate_date', 'sync_date']
+    search_fields = ['currency']
+    date_hierarchy = 'rate_date'
+    ordering = ['-rate_date', 'currency']
+
+    # Make all fields read-only (rates should only be updated via sync)
+    readonly_fields = ['rate_date', 'currency', 'rate', 'unit', 'sync_date', 'source', 'created_at', 'updated_at']
+
+    fieldsets = (
+        ('Árfolyam adatok', {
+            'fields': ('rate_date', 'currency', 'rate', 'unit')
+        }),
+        ('Szinkronizáció', {
+            'fields': ('source', 'sync_date')
+        }),
+        ('Időbélyegek', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def rate_display(self, obj):
+        """Display formatted exchange rate"""
+        return f"{obj.rate:.4f} HUF"
+    rate_display.short_description = 'Árfolyam (formázott)'
+
+    def has_add_permission(self, request):
+        """Disable manual creation (only via sync)"""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """Disable manual deletion"""
+        return request.user.is_superuser
+
+
+@admin.register(ExchangeRateSyncLog)
+class ExchangeRateSyncLogAdmin(admin.ModelAdmin):
+    """
+    Admin interface for Exchange Rate Sync Logs.
+    Provides audit trail and troubleshooting capabilities.
+    """
+    list_display = ['sync_start_time', 'date_range_display', 'currencies_synced',
+                   'rates_created', 'rates_updated', 'total_rates_processed',
+                   'duration_seconds', 'sync_status']
+    list_filter = ['sync_status', 'currencies_synced', 'sync_start_time']
+    search_fields = ['currencies_synced', 'error_message']
+    date_hierarchy = 'sync_start_time'
+    ordering = ['-sync_start_time']
+
+    readonly_fields = ['sync_start_time', 'sync_end_time', 'currencies_synced',
+                      'date_range_start', 'date_range_end', 'rates_created',
+                      'rates_updated', 'total_rates_processed', 'duration_seconds',
+                      'sync_status', 'error_message', 'created_at', 'updated_at']
+
+    fieldsets = (
+        ('Szinkronizáció időpontja', {
+            'fields': ('sync_start_time', 'sync_end_time', 'duration_seconds')
+        }),
+        ('Szinkronizált adatok', {
+            'fields': ('currencies_synced', 'date_range_start', 'date_range_end')
+        }),
+        ('Eredmények', {
+            'fields': ('sync_status', 'rates_created', 'rates_updated', 'total_rates_processed')
+        }),
+        ('Hibák', {
+            'fields': ('error_message',),
+            'classes': ('collapse',)
+        }),
+        ('Időbélyegek', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def date_range_display(self, obj):
+        """Display date range in compact format"""
+        if obj.date_range_start == obj.date_range_end:
+            return f"{obj.date_range_start}"
+        return f"{obj.date_range_start} - {obj.date_range_end}"
+    date_range_display.short_description = 'Dátum tartomány'
+
+    def duration_seconds(self, obj):
+        """Calculate and display sync duration"""
+        if obj.sync_end_time and obj.sync_start_time:
+            duration = (obj.sync_end_time - obj.sync_start_time).total_seconds()
+            return f"{duration:.2f}s"
+        return "N/A"
+    duration_seconds.short_description = 'Időtartam'
+
+    def total_rates_processed(self, obj):
+        """Show total rates processed"""
+        return obj.rates_created + obj.rates_updated
+    total_rates_processed.short_description = 'Összes feldolgozott'
+
+    def has_add_permission(self, request):
+        """Disable manual creation (only via sync)"""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """Only superusers can delete logs"""
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        """Make logs read-only"""
+        return False
