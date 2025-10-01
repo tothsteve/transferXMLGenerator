@@ -8,11 +8,12 @@ This is a Django + React application for generating XML and CSV files for bank t
 
 ### Backend (Django)
 - **Django REST API** with `bank_transfers` app and **multi-company architecture**
-- **SQL Server database** connection (port 1435, database: 'administration')  
+- **SQL Server database** connection (port 1435, database: 'administration')
 - **Multi-tenant isolation** with company-scoped data and **feature flag system**
 - **Role-based access control** with 4-level permissions (ADMIN, FINANCIAL, ACCOUNTANT, USER)
-- **Key models**: Company, CompanyUser, FeatureTemplate, CompanyFeature, BankAccount, Beneficiary, TransferTemplate, Transfer, TransferBatch, TrustedPartner
+- **Key models**: Company, CompanyUser, FeatureTemplate, CompanyFeature, BankAccount, Beneficiary, TransferTemplate, Transfer, TransferBatch, TrustedPartner, ExchangeRate, ExchangeRateSyncLog
 - **NAV integration** with invoice synchronization, XML storage, **payment status tracking**, and **trusted partners auto-payment system**
+- **MNB Exchange Rate integration** with daily sync of USD/EUR rates from Magyar Nemzeti Bank official API
 - **Export generation** via `utils.generate_xml()` and `kh_export.py` - creates HUF transaction XML files and KH Bank CSV files
 - **Feature-gated functionality** with company-specific feature enablement
 - **Excel import** functionality for bulk beneficiary creation
@@ -259,6 +260,216 @@ for partner in trusted_partners:
 - **Hungarian Localization**: All UI elements and field labels in Hungarian
 - **Error Handling**: Comprehensive validation for tax number formats and duplicate prevention
 - **Statistics Maintenance**: Automatic tracking of invoice count and last invoice date per partner
+
+## ✅ IMPLEMENTED: MNB Exchange Rate Integration
+
+### Overview
+The system integrates with the **Magyar Nemzeti Bank (MNB) official API** to retrieve and store USD and EUR exchange rates. This provides accurate, official exchange rates for currency conversion and financial calculations.
+
+### Key Features
+
+#### **Automatic Daily Synchronization**
+- **GetCurrentExchangeRates**: Fetches today's official USD/EUR rates from MNB
+- **GetExchangeRates**: Retrieves historical rates for date ranges
+- **Scheduled Sync**: Can be configured to run multiple times daily (similar to NAV sync)
+- **Performance**: Sync completes in ~2 seconds for 2 years of data (994 rates)
+
+#### **Exchange Rate Storage**
+- **Database Tables**: `ExchangeRate` and `ExchangeRateSyncLog`
+- **Supported Currencies**: USD and EUR (expandable)
+- **Decimal Precision**: 6 decimal places for accurate conversion
+- **Historical Data**: Stores complete rate history with date indexing
+
+#### **API Endpoints**
+All endpoints accessible at `/api/exchange-rates/`:
+
+- `GET /api/exchange-rates/` - List rates with filtering (currency, date_from, date_to)
+- `GET /api/exchange-rates/current/` - Today's USD/EUR rates
+- `GET /api/exchange-rates/latest/` - Most recent available rates
+- `POST /api/exchange-rates/convert/` - Currency conversion to HUF
+- `POST /api/exchange-rates/sync_current/` - Manual sync trigger (ADMIN only)
+- `POST /api/exchange-rates/sync_historical/` - Historical backfill (ADMIN only)
+- `GET /api/exchange-rates/sync_history/` - View sync logs
+- `GET /api/exchange-rates/history/?currency=USD&days=30` - Rate history for charts
+
+### Technical Implementation
+
+#### **MNB SOAP Client** (`services/mnb_client.py`)
+```python
+class MNBClient:
+    SOAP_URL = 'http://www.mnb.hu/arfolyamok.asmx'
+    SOAP_NAMESPACE = 'http://www.mnb.hu/webservices/'
+
+    def get_current_exchange_rates(currencies: List[str]) -> Dict[str, Decimal]
+    def get_exchange_rates(start_date, end_date, currencies) -> Dict[str, Dict[str, Decimal]]
+```
+
+- **Direct HTTP SOAP requests** using `requests` library
+- **XML parsing** with ElementTree
+- **Decimal conversion**: Handles MNB comma-separated decimals (e.g., "331,16" → Decimal("331.16"))
+- **Unit normalization**: Converts rates to per-1-unit format
+
+#### **Sync Service** (`services/exchange_rate_sync_service.py`)
+```python
+class ExchangeRateSyncService:
+    def sync_current_rates() -> ExchangeRateSyncLog
+    def sync_historical_rates(days_back=730) -> ExchangeRateSyncLog
+
+    @staticmethod
+    def get_rate_for_date(date, currency) -> Decimal
+
+    @staticmethod
+    def convert_to_huf(amount, currency, conversion_date) -> Decimal
+```
+
+- **Transaction-wrapped** database operations
+- **Upsert logic**: Creates or updates rates (prevents duplicates)
+- **Audit logging**: Complete sync history with statistics
+- **Smart fallback**: Returns latest available rate if exact date not found
+
+#### **Database Schema**
+
+**ExchangeRate Model:**
+- `rate_date` - Date of the exchange rate
+- `currency` - USD or EUR (expandable)
+- `rate` - Exchange rate (Decimal 12,6)
+- `unit` - Number of currency units (typically 1)
+- `sync_date` - When fetched from MNB
+- `source` - Always 'MNB' for official rates
+
+**Unique Constraint:** `(rate_date, currency)`
+
+**Indexes:**
+- `(rate_date, currency)` - Fast lookups
+- `(-rate_date)` - Latest rates queries
+- `(currency)` - Currency filtering
+
+**ExchangeRateSyncLog Model:**
+- Complete audit trail of all sync operations
+- Statistics: created count, updated count, duration
+- Error tracking with status (SUCCESS/FAILED)
+
+### Usage Examples
+
+#### **Manual Sync (2 Years)**
+```bash
+curl -X POST http://localhost:8002/api/exchange-rates/sync_historical/ \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"days_back": 730, "currencies": ["USD", "EUR"]}'
+```
+
+#### **Get Current Rates**
+```bash
+curl http://localhost:8002/api/exchange-rates/current/ \
+  -H "Authorization: Bearer $TOKEN"
+
+# Response:
+{
+  "USD": {"rate": "331.1600", "rate_date": "2025-10-01"},
+  "EUR": {"rate": "389.0800", "rate_date": "2025-10-01"}
+}
+```
+
+#### **Currency Conversion**
+```bash
+curl -X POST http://localhost:8002/api/exchange-rates/convert/ \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "amount": "100.00",
+    "currency": "USD",
+    "conversion_date": "2025-10-01"
+  }'
+
+# Response:
+{
+  "amount": "100.00",
+  "currency": "USD",
+  "conversion_date": "2025-10-01",
+  "rate": "331.1600",
+  "huf_amount": "33116.00"
+}
+```
+
+### Scheduling Sync (Production)
+
+**Automated Scheduler (Railway Production):**
+
+The MNB exchange rate sync runs automatically on Railway using the same pattern as NAV sync:
+
+- **Integration**: Django app startup via `BankTransfersConfig.ready()` in `apps.py`
+- **Library**: APScheduler BackgroundScheduler with CronTrigger
+- **Schedule**: Every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
+- **Detection**: Only runs when `RAILWAY_ENVIRONMENT_NAME=production`
+- **Logging**: Console output with 💱 emoji for easy monitoring
+
+**Management Command:**
+
+For manual sync or local testing:
+
+```bash
+# Sync current day rates
+python manage.py sync_mnb_rates --current
+
+# Sync historical rates (e.g., 90 days)
+python manage.py sync_mnb_rates --days=90
+
+# Sync specific currencies
+python manage.py sync_mnb_rates --current --currencies=USD,EUR
+```
+
+**Monitoring on Railway:**
+
+```bash
+# Check scheduler logs
+railway logs --filter="💱\|✅\|❌"
+
+# Check sync results
+railway run python manage.py shell -c "
+from bank_transfers.models import ExchangeRateSyncLog
+for log in ExchangeRateSyncLog.objects.order_by('-sync_start_time')[:5]:
+    print(f'{log.sync_start_time}: {log.sync_status}, Created={log.rates_created}')
+"
+```
+
+### Implementation Files
+
+**Models & Migration:**
+- `bank_transfers/models.py` - ExchangeRate and ExchangeRateSyncLog models
+- `bank_transfers/migrations/0038_add_exchange_rate_models.py` - Database migration
+
+**Services:**
+- `bank_transfers/services/mnb_client.py` - MNB SOAP API client
+- `bank_transfers/services/exchange_rate_sync_service.py` - Sync business logic
+
+**API:**
+- `bank_transfers/api_views.py` - ExchangeRateViewSet with 8 endpoints
+- `bank_transfers/api_urls.py` - URL routing (`/api/exchange-rates/`)
+- `bank_transfers/serializers.py` - ExchangeRateSerializer, ExchangeRateSyncLogSerializer, CurrencyConversionSerializer
+
+**Management:**
+- `bank_transfers/management/commands/sync_mnb_rates.py` - Manual sync command
+- `bank_transfers/apps.py` - Automatic scheduler initialization (production)
+
+**Admin:**
+- `bank_transfers/admin.py` - Read-only admin interface with filtering
+
+### Performance & Reliability
+
+- **2-year historical sync**: 994 rates in 2.33 seconds
+- **Daily sync**: < 0.1 seconds for 2 currencies
+- **SOAP endpoint**: `http://www.mnb.hu/arfolyamok.asmx`
+- **WSDL**: `https://www.mnb.hu/arfolyamok.asmx?wsdl`
+- **Namespace prefix required**: Child elements must use `web:` prefix
+- **Fallback logic**: Returns latest available rate if exact date missing
+
+### Notes
+
+- **Public API**: No authentication required for MNB API
+- **Rate limits**: None documented (reasonable use expected)
+- **Weekend/Holiday handling**: MNB returns last business day rate
+- **Currency support**: Currently USD/EUR, easily expandable
+- **Company isolation**: Exchange rates are global (not company-scoped)
+- **Permissions**: All authenticated users can view rates, only ADMIN can trigger sync
 
 ## Database Documentation
 

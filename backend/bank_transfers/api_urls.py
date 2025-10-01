@@ -5,7 +5,7 @@ from .api_views import (
     BankAccountViewSet, BeneficiaryViewSet, TransferTemplateViewSet,
     TransferViewSet, TransferBatchViewSet, ExcelImportView,
     CompanyUsersView, CompanyUserDetailView, InvoiceViewSet, InvoiceSyncLogViewSet,
-    TrustedPartnerViewSet
+    TrustedPartnerViewSet, ExchangeRateViewSet
 )
 from .authentication import AuthenticationViewSet
 from .views.nav_views import (
@@ -28,6 +28,9 @@ router.register(r'nav/sync-logs', InvoiceSyncLogViewSet, basename='invoicesynclo
 
 # Trusted Partners endpoints
 router.register(r'trusted-partners', TrustedPartnerViewSet, basename='trustedpartner')
+
+# MNB Exchange Rate endpoints
+router.register(r'exchange-rates', ExchangeRateViewSet, basename='exchangerate')
 
 urlpatterns = [
     path('', include(router.urls)),

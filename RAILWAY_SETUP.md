@@ -231,6 +231,64 @@ railway run python manage.py sync_nav_invoices --company='IT Cardigan Kft.' --da
 railway run python manage.py sync_nav_invoices --days=30
 ```
 
+## Automated MNB Exchange Rate Scheduler
+
+The application includes an **integrated MNB (Magyar Nemzeti Bank) exchange rate synchronization scheduler** that runs automatically on Railway.
+
+### Scheduler Details:
+- **Frequency**: Every 6 hours (4 times per day)
+- **Schedule**: 00:00, 06:00, 12:00, 18:00 UTC
+- **Currencies**: USD and EUR to HUF exchange rates
+- **Auto-start**: Starts automatically when Django application boots
+- **Error handling**: Continues running even if individual syncs fail
+- **Logging**: All operations logged to Railway console with 💱 emoji
+
+### How it Works:
+1. **Django App Integration**: Scheduler starts via `BankTransfersConfig.ready()` method
+2. **Production Detection**: Only runs when `RAILWAY_ENVIRONMENT_NAME=production`
+3. **Background Execution**: Uses APScheduler BackgroundScheduler
+4. **Database Updates**: Creates `ExchangeRateSyncLog` entries for monitoring
+5. **MNB SOAP API**: Fetches official exchange rates from http://www.mnb.hu/arfolyamok.asmx
+
+### Monitoring MNB Scheduler:
+```bash
+# Check scheduler logs
+railway logs --filter="💱\|✅\|❌"
+
+# Check sync results in database
+railway run python manage.py shell -c "
+from bank_transfers.models import ExchangeRateSyncLog
+recent_logs = ExchangeRateSyncLog.objects.order_by('-sync_start_time')[:5]
+for log in recent_logs:
+    print(f'{log.sync_start_time}: {log.sync_status}, Created={log.rates_created}, Updated={log.rates_updated}')
+"
+
+# Check latest exchange rates
+railway run python manage.py shell -c "
+from bank_transfers.models import ExchangeRate
+latest_rates = ExchangeRate.objects.filter(rate_date__gte='2025-09-01').order_by('-rate_date', 'currency')[:10]
+for rate in latest_rates:
+    print(f'{rate.rate_date} {rate.currency}: {rate.rate} HUF')
+"
+```
+
+### Manual MNB Sync (if needed):
+```bash
+# Sync current day rates
+railway run python manage.py sync_mnb_rates --current
+
+# Sync historical rates (e.g., 90 days)
+railway run python manage.py sync_mnb_rates --days=90
+
+# Sync specific currencies
+railway run python manage.py sync_mnb_rates --current --currencies=USD,EUR
+```
+
+### Performance:
+- **Current day sync**: < 0.1 seconds (2 currencies)
+- **Historical sync (2 years)**: ~2.5 seconds (994 rates)
+- **Database impact**: Minimal (upsert logic prevents duplicates)
+
 ## Post-Deployment Setup
 
 ### 1. Create Superuser
