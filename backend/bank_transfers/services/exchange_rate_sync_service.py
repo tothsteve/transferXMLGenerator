@@ -55,26 +55,27 @@ class ExchangeRateSyncService:
         if currencies is None:
             currencies = self.DEFAULT_CURRENCIES
 
-        today = date.today()
-
         logger.info(f"Starting current rate sync for {','.join(currencies)}")
-
-        # Create sync log
-        sync_log = ExchangeRateSyncLog.objects.create(
-            sync_start_time=timezone.now(),
-            currencies_synced=','.join(currencies),
-            date_range_start=today,
-            date_range_end=today,
-            sync_status='RUNNING'
-        )
 
         try:
             # Fetch current rates using dedicated SOAP method
-            current_rates = self.client.get_current_exchange_rates(currencies)
+            # Returns tuple: (date_str, rates_dict) - use MNB's actual date!
+            rate_date_str, current_rates = self.client.get_current_exchange_rates(currencies)
+
+            # Parse the date string from MNB
+            rate_date = datetime.strptime(rate_date_str, '%Y-%m-%d').date()
+
+            # Create sync log with MNB's actual date
+            sync_log = ExchangeRateSyncLog.objects.create(
+                sync_start_time=timezone.now(),
+                currencies_synced=','.join(currencies),
+                date_range_start=rate_date,
+                date_range_end=rate_date,
+                sync_status='RUNNING'
+            )
 
             # Convert to format expected by _save_rates_to_database
-            today_str = today.strftime('%Y-%m-%d')
-            rates_data = {today_str: current_rates} if current_rates else {}
+            rates_data = {rate_date_str: current_rates} if current_rates else {}
 
             # Process and save rates
             created_count, updated_count = self._save_rates_to_database(rates_data)

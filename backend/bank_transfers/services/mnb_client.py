@@ -11,7 +11,7 @@ WSDL: https://www.mnb.hu/arfolyamok.asmx?wsdl
 import logging
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 import xml.etree.ElementTree as ET
 
 import requests
@@ -134,7 +134,7 @@ class MNBClient:
             logger.error(f"Failed to get currencies: {str(e)}")
             raise MNBClientError(f"Failed to retrieve currency list: {str(e)}")
 
-    def get_current_exchange_rates(self, currencies: Optional[List[str]] = None) -> Dict[str, Decimal]:
+    def get_current_exchange_rates(self, currencies: Optional[List[str]] = None) -> Tuple[str, Dict[str, Decimal]]:
         """
         Get current day's exchange rates for specified currencies.
 
@@ -142,8 +142,8 @@ class MNBClient:
             currencies: List of currency codes (default: ['USD', 'EUR'])
 
         Returns:
-            Dictionary mapping currency code to exchange rate
-            Example: {'USD': Decimal('385.5'), 'EUR': Decimal('410.2')}
+            Tuple of (date_string, rates_dict)
+            Example: ('2025-10-01', {'USD': Decimal('385.5'), 'EUR': Decimal('410.2')})
         """
         if currencies is None:
             currencies = ['USD', 'EUR']
@@ -155,10 +155,14 @@ class MNBClient:
             # Parse the current exchange rates XML (root: MNBCurrentExchangeRates)
             root = ET.fromstring(result_xml)
             current_rates = {}
+            rate_date = None
 
             # Find the Day element (should be only one for current rates)
             day = root.find('Day')
             if day is not None:
+                # Extract the actual date from MNB response (don't use date.today()!)
+                rate_date = day.get('date')
+
                 for rate_elem in day.findall('Rate'):
                     currency = rate_elem.get('curr')
                     rate_value = rate_elem.text
@@ -184,8 +188,11 @@ class MNBClient:
                             )
                             continue
 
-            logger.info(f"Retrieved current exchange rates for: {', '.join(current_rates.keys())}")
-            return current_rates
+            if not rate_date:
+                raise MNBClientError("No date found in MNB response")
+
+            logger.info(f"Retrieved current exchange rates for {rate_date}: {', '.join(current_rates.keys())}")
+            return (rate_date, current_rates)
 
         except Exception as e:
             logger.error(f"Failed to get current exchange rates: {str(e)}")
@@ -352,12 +359,13 @@ class MNBClient:
 
 # Convenience functions for common operations
 
-def get_current_usd_eur_rates() -> Dict[str, Decimal]:
+def get_current_usd_eur_rates() -> Tuple[str, Dict[str, Decimal]]:
     """
     Quick helper to get current USD and EUR rates.
 
     Returns:
-        Dictionary with 'USD' and 'EUR' keys
+        Tuple of (date_string, rates_dict) with 'USD' and 'EUR' keys
+        Example: ('2025-10-01', {'USD': Decimal('331.16'), 'EUR': Decimal('389.08')})
     """
     client = MNBClient()
     return client.get_current_exchange_rates(['USD', 'EUR'])
