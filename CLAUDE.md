@@ -467,9 +467,102 @@ for log in ExchangeRateSyncLog.objects.order_by('-sync_start_time')[:5]:
 - **Public API**: No authentication required for MNB API
 - **Rate limits**: None documented (reasonable use expected)
 - **Weekend/Holiday handling**: MNB returns last business day rate
-- **Currency support**: Currently USD/EUR, easily expandable
 - **Company isolation**: Exchange rates are global (not company-scoped)
 - **Permissions**: All authenticated users can view rates, only ADMIN can trigger sync
+
+### Currency Support & Limitations
+
+#### **Current Limitation: USD and EUR Only**
+
+The system is currently **restricted to USD and EUR** due to database model constraints:
+
+```python
+# bank_transfers/models.py - ExchangeRate model
+CURRENCY_CHOICES = [
+    ('USD', 'US Dollar'),
+    ('EUR', 'Euro'),
+]
+```
+
+This constraint is enforced at three levels:
+1. **Database Model**: `currency` field has `choices=CURRENCY_CHOICES`
+2. **Service Default**: `DEFAULT_CURRENCIES = ['USD', 'EUR']`
+3. **Command Default**: `--currencies=USD,EUR`
+
+#### **MNB API Supports 33 Currencies**
+
+The MNB API provides exchange rates for **33 currencies**, not just USD and EUR:
+
+```
+AUD (Australian Dollar), BGN (Bulgarian Lev), BRL (Brazilian Real),
+CAD (Canadian Dollar), CHF (Swiss Franc), CNY (Chinese Yuan),
+CZK (Czech Koruna), DKK (Danish Krone), EUR (Euro), GBP (British Pound),
+HKD (Hong Kong Dollar), IDR (Indonesian Rupiah), ILS (Israeli Shekel),
+INR (Indian Rupee), ISK (Icelandic Krona), JPY (Japanese Yen),
+KRW (South Korean Won), MXN (Mexican Peso), MYR (Malaysian Ringgit),
+NOK (Norwegian Krone), NZD (New Zealand Dollar), PHP (Philippine Peso),
+PLN (Polish Zloty), RON (Romanian Leu), RSD (Serbian Dinar),
+RUB (Russian Ruble), SEK (Swedish Krona), SGD (Singapore Dollar),
+THB (Thai Baht), TRY (Turkish Lira), UAH (Ukrainian Hryvnia),
+USD (US Dollar), ZAR (South African Rand)
+```
+
+#### **How to Add More Currencies**
+
+**Step 1: Update Model**
+```python
+# bank_transfers/models.py
+CURRENCY_CHOICES = [
+    ('USD', 'US Dollar'),
+    ('EUR', 'Euro'),
+    ('GBP', 'British Pound'),
+    ('CHF', 'Swiss Franc'),
+    ('JPY', 'Japanese Yen'),
+    # ... add more as needed
+]
+
+# OR remove constraint to accept any currency:
+currency = models.CharField(
+    max_length=3,
+    # Remove choices parameter
+    verbose_name="Deviza kód",
+)
+```
+
+**Step 2: Create and Apply Migration**
+```bash
+python manage.py makemigrations bank_transfers -n add_currencies
+python manage.py migrate
+```
+
+**Step 3: Update Service Defaults (Optional)**
+```python
+# bank_transfers/services/exchange_rate_sync_service.py
+DEFAULT_CURRENCIES = ['USD', 'EUR', 'GBP', 'CHF']
+```
+
+**Step 4: Update Scheduler (Optional)**
+```python
+# bank_transfers/apps.py - start_mnb_scheduler()
+call_command('sync_mnb_rates', '--current', '--currencies=USD,EUR,GBP,CHF')
+```
+
+#### **Manual Sync with Custom Currencies**
+
+Once model constraints are updated, sync any supported currency:
+
+```bash
+# Sync specific currencies
+python manage.py sync_mnb_rates --current --currencies=USD,EUR,GBP,CHF,JPY
+
+# Historical sync with custom currencies
+python manage.py sync_mnb_rates --days=730 --currencies=GBP,CHF
+
+# Production (Railway)
+railway run python manage.py sync_mnb_rates --current --currencies=USD,EUR,GBP
+```
+
+**Important**: The `--currencies` parameter works immediately for the MNB API call, but the **database will reject** currencies not in `CURRENCY_CHOICES`. Update the model first!
 
 ## Database Documentation
 
