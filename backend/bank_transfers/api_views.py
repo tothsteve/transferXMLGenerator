@@ -815,11 +815,13 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         """Company-scoped queryset with comprehensive filtering support"""
         queryset = Invoice.objects.filter(company=self.request.company).select_related('company')
-        
-        # For detail view, prefetch line items
+
+        # For detail view (retrieve by ID), only prefetch line items - NO FILTERING
         if self.action == 'retrieve':
-            queryset = queryset.prefetch_related('line_items')
-        
+            return queryset.prefetch_related('line_items')
+
+        # All filters below only apply to LIST view
+
         # Filter by direction (INBOUND/OUTBOUND)
         direction = self.request.query_params.get('direction', None)
         if direction and direction in ['INBOUND', 'OUTBOUND']:
