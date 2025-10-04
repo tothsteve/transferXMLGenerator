@@ -1321,11 +1321,17 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
                     continue
 
                 # Create transfer data for bulk creation
+                # Round HUF amounts to whole numbers (no decimals for HUF)
+                amount = Decimal(str(invoice.invoice_gross_amount))
+                currency = invoice.currency_code or 'HUF'
+                if currency == 'HUF':
+                    amount = amount.quantize(Decimal('1'))  # Round to whole number
+
                 transfer_data = {
                     'originator_account': originator_account,
                     'beneficiary': beneficiary,
-                    'amount': Decimal(str(invoice.invoice_gross_amount)),
-                    'currency': invoice.currency_code or 'HUF',
+                    'amount': amount,
+                    'currency': currency,
                     'execution_date': execution_date,
                     'remittance_info': invoice.nav_invoice_number,
                     'nav_invoice': invoice,

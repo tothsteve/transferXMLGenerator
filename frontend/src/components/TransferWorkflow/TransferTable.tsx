@@ -66,6 +66,7 @@ interface TransferTableProps {
   onAddTransfer: () => void;
   onAddFromInvoice: () => void;
   onReorderTransfers: (transfers: TransferData[]) => void;
+  onGetSortedTransfers?: () => TransferData[];  // Optional callback to get sorted order
 }
 
 // Sortable Row Component
@@ -337,7 +338,7 @@ const TransferTable: React.FC<TransferTableProps> = ({
     setSortOrder(newOrder);
     setSortField(field);
 
-    // Apply sorting and update parent component with sorted order
+    // Immediately apply sorting and update parent
     const sorted = [...transfers].sort((a, b) => {
       let aValue: any;
       let bValue: any;
@@ -368,7 +369,6 @@ const TransferTable: React.FC<TransferTableProps> = ({
       return 0;
     });
 
-    // Update parent component with new sorted order
     onReorderTransfers(sorted);
   };
 
@@ -406,6 +406,26 @@ const TransferTable: React.FC<TransferTableProps> = ({
       return 0;
     });
   }, [transfers, sortField, sortOrder]);
+
+  // Track when we last updated parent to prevent infinite loops
+  const lastSortedRef = React.useRef<TransferData[]>([]);
+
+  // Re-apply sort when transfers array changes (new transfers added) and sorting is active
+  React.useEffect(() => {
+    if (sortField && sortedTransfers.length > 0) {
+      // Check if sorted order actually changed to prevent infinite loops
+      const hasChanged = sortedTransfers.length !== lastSortedRef.current.length ||
+        sortedTransfers.some((t, i) => {
+          const prev = lastSortedRef.current[i];
+          return !prev || (t.id && prev.id && t.id !== prev.id) || (t.tempId && prev.tempId && t.tempId !== prev.tempId);
+        });
+
+      if (hasChanged) {
+        lastSortedRef.current = sortedTransfers;
+        onReorderTransfers(sortedTransfers);
+      }
+    }
+  }, [sortedTransfers, sortField]);
 
   const handleStartEdit = (index: number, transfer: TransferData) => {
     setEditingIndex(index);
