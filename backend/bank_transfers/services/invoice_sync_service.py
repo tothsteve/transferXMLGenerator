@@ -706,7 +706,10 @@ class InvoiceSyncService:
         
         # Check if supplier is a trusted partner and auto-mark as paid
         self._check_trusted_partner_auto_payment(invoice)
-        
+
+        # Auto-mark STORNO invoices as paid (they cancel the original, no payment needed)
+        self._check_storno_auto_payment(invoice)
+
         logger.info(f"Új számla létrehozva: {invoice.nav_invoice_number}")
         return invoice
     
@@ -756,7 +759,11 @@ class InvoiceSyncService:
         # Check if supplier is a trusted partner and auto-mark as paid (only if not already paid)
         if invoice.payment_status == 'UNPAID':
             self._check_trusted_partner_auto_payment(invoice)
-        
+
+        # Auto-mark STORNO invoices as paid (only if not already paid)
+        if invoice.payment_status == 'UNPAID':
+            self._check_storno_auto_payment(invoice)
+
         logger.info(f"Számla frissítve: {invoice.nav_invoice_number}")
     
     def _create_line_item_from_nav_data(self, invoice: Invoice, line_data: Dict):
@@ -888,10 +895,19 @@ class InvoiceSyncService:
                 
                 logger.info(f"Számla automatikusan kifizetve - megbízható partner: {trusted_partner.partner_name} ({invoice.nav_invoice_number})")
                 logger.info(f"Tax number match: Invoice '{invoice.supplier_tax_number}' matched with Partner '{trusted_partner.tax_number}'")
-                
+
         except Exception as e:
             logger.error(f"Hiba a megbízható partner ellenőrzésnél: {e}")
-    
+
+    def _check_storno_auto_payment(self, invoice):
+        """Auto-mark STORNO invoices as paid (they cancel the original invoice)."""
+        try:
+            if invoice.invoice_operation in ['STORNO', 'MODIFY']:
+                invoice.mark_as_paid(auto_marked=True)
+                logger.info(f"STORNO számla automatikusan kifizetve: {invoice.nav_invoice_number}")
+        except Exception as e:
+            logger.error(f"Hiba a STORNO számla automatikus fizetésnél: {e}")
+
     def sync_all_companies(
         self, 
         date_from: datetime = None, 

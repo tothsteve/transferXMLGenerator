@@ -16,7 +16,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 
-from ..models import NavConfiguration, InvoiceLineItem
+from ..models import NavConfiguration, Invoice, InvoiceSyncLog, InvoiceLineItem
 from ..serializers import NavConfigurationSerializer, InvoiceLineItemSerializer
 from ..services.invoice_sync_service import InvoiceSyncService
 
