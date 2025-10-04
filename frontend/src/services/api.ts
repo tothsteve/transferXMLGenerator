@@ -14,6 +14,7 @@ import {
   ExcelImportResponse,
   TrustedPartner,
   AvailablePartner,
+  NAVInvoice,
 } from '../types/api';
 
 const API_BASE_URL = process.env.NODE_ENV === 'production' 
@@ -219,16 +220,16 @@ export const userManagementApi = {
 
 // NAV Invoices API
 export const navInvoicesApi = {
-  getAll: (params?: { 
-    search?: string; 
-    direction?: string; 
-    currency?: string; 
-    page?: number; 
-    page_size?: number; 
+  getAll: (params?: {
+    search?: string;
+    direction?: string;
+    currency?: string;
+    page?: number;
+    page_size?: number;
     ordering?: string;
     hide_storno_invoices?: boolean;
   }) =>
-    apiClient.get('/nav/invoices/', { params }),
+    apiClient.get<ApiResponse<NAVInvoice>>('/nav/invoices/', { params }),
   
   getById: (id: number) =>
     apiClient.get(`/nav/invoices/${id}/`),

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -19,7 +19,8 @@ import {
   Download as DownloadIcon,
   Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
-  PlayArrow as PlayIcon
+  PlayArrow as PlayIcon,
+  Receipt as ReceiptIcon
 } from '@mui/icons-material';
 import {
   useTemplates,
@@ -35,10 +36,12 @@ import {
   useCreateBeneficiary,
   useTransfers
 } from '../../hooks/api';
+import { navInvoicesApi, bankAccountsApi } from '../../services/api';
 import { Transfer, TransferTemplate, LoadTemplateResponse, Beneficiary } from '../../types/api';
 import TemplateSelector from './TemplateSelector';
 import TransferTable from './TransferTable';
 import AddTransferModal from './AddTransferModal';
+import InvoiceSelectionModal from './InvoiceSelectionModal';
 import XMLPreview from './XMLPreview';
 
 interface TransferData extends Omit<Transfer, 'id' | 'is_processed' | 'created_at'> {
@@ -49,9 +52,11 @@ interface TransferData extends Omit<Transfer, 'id' | 'is_processed' | 'created_a
 
 const TransferWorkflow: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [selectedTemplate, setSelectedTemplate] = useState<TransferTemplate | null>(null);
   const [transfers, setTransfers] = useState<TransferData[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [xmlPreview, setXmlPreview] = useState<{
     content: string;
     filename: string;
@@ -361,6 +366,49 @@ const TransferWorkflow: React.FC = () => {
       tempId: `temp-${Date.now()}`,
     }]);
     setValidationErrors([]);
+  };
+
+  const handleInvoiceSelect = async (invoiceIds: number[]) => {
+    try {
+      // Get default bank account for originator
+      const defaultAccountResponse = await bankAccountsApi.getDefault();
+      const originatorAccountId = defaultAccountResponse.data.id;
+
+      // Call the generate_transfers endpoint (same as NAV invoices page)
+      const response = await navInvoicesApi.generateTransfers({
+        invoice_ids: invoiceIds,
+        originator_account_id: originatorAccountId,
+        execution_date: new Date().toISOString().split('T')[0],
+      });
+
+      const { transfers: newTransfers, transfer_count } = response.data;
+
+      // Convert API response transfers to TransferData format
+      const convertedTransfers: TransferData[] = newTransfers.map((transfer: any, index: number) => ({
+        id: transfer.id,
+        tempId: `nav_generated_${Date.now()}_${index}`,
+        beneficiary: transfer.beneficiary.id,
+        beneficiary_data: transfer.beneficiary,
+        amount: transfer.amount,
+        currency: transfer.currency as 'HUF' | 'EUR' | 'USD',
+        execution_date: transfer.execution_date,
+        remittance_info: transfer.remittance_info,
+        nav_invoice: transfer.nav_invoice,
+        is_processed: transfer.is_processed,
+      }));
+
+      // MERGE with existing transfers instead of navigating (preserves template/PDF-loaded transfers)
+      setTransfers(prev => [...prev, ...convertedTransfers]);
+
+      setValidationErrors([]);
+
+      console.log(`${transfer_count} átutalás létrehozva NAV számlákból és hozzáadva a listához`);
+
+    } catch (error: any) {
+      console.error('Failed to generate transfers from invoices:', error);
+      setValidationErrors([error.response?.data?.detail || 'Hiba történt az átutalás generálása során.']);
+      throw error; // Re-throw to let the modal handle it
+    }
   };
 
   const handleReorderTransfers = (reorderedTransfers: TransferData[]) => {
@@ -919,6 +967,7 @@ const TransferWorkflow: React.FC = () => {
           onUpdateTransfer={handleUpdateTransfer}
           onDeleteTransfer={handleDeleteTransfer}
           onAddTransfer={() => setShowAddModal(true)}
+          onAddFromInvoice={() => setShowInvoiceModal(true)}
           onReorderTransfers={handleReorderTransfers}
         />
       </Box>
@@ -954,6 +1003,13 @@ const TransferWorkflow: React.FC = () => {
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onAdd={handleAddTransfer}
+      />
+
+      {/* Invoice Selection Modal */}
+      <InvoiceSelectionModal
+        isOpen={showInvoiceModal}
+        onClose={() => setShowInvoiceModal(false)}
+        onSelect={handleInvoiceSelect}
       />
 
       {/* XML Preview */}

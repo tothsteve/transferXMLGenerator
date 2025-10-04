@@ -63,6 +63,7 @@ interface TransferTableProps {
   onUpdateTransfer: (index: number, transfer: Partial<TransferData>) => void;
   onDeleteTransfer: (index: number) => void;
   onAddTransfer: () => void;
+  onAddFromInvoice: () => void;
   onReorderTransfers: (transfers: TransferData[]) => void;
 }
 
@@ -290,6 +291,7 @@ const TransferTable: React.FC<TransferTableProps> = ({
   onUpdateTransfer,
   onDeleteTransfer,
   onAddTransfer,
+  onAddFromInvoice,
   onReorderTransfers,
 }) => {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -380,26 +382,48 @@ const TransferTable: React.FC<TransferTableProps> = ({
             <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 400, mx: 'auto' }}>
               Válasszon ki egy sablont vagy adjon hozzá manuálisan átutalásokat a kezdéshez.
             </Typography>
-            <Button
-              variant="contained"
-              size="large"
-              startIcon={<AddIcon />}
-              onClick={onAddTransfer}
-              sx={{
-                borderRadius: 3,
-                px: 4,
-                py: 1.5,
-                background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
-                boxShadow: '0 4px 16px rgba(37, 99, 235, 0.3)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 6px 20px rgba(37, 99, 235, 0.4)',
-                }
-              }}
-            >
-              Átutalás hozzáadása
-            </Button>
+            <Stack direction="row" spacing={2}>
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={<AddIcon />}
+                onClick={onAddTransfer}
+                sx={{
+                  borderRadius: 3,
+                  px: 4,
+                  py: 1.5,
+                  background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
+                  boxShadow: '0 4px 16px rgba(37, 99, 235, 0.3)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 6px 20px rgba(37, 99, 235, 0.4)',
+                  }
+                }}
+              >
+                Átutalás hozzáadása
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<ReceiptIcon />}
+                onClick={onAddFromInvoice}
+                sx={{
+                  borderRadius: 3,
+                  px: 4,
+                  py: 1.5,
+                  borderColor: 'primary.main',
+                  color: 'primary.main',
+                  '&:hover': {
+                    borderColor: 'primary.dark',
+                    bgcolor: 'primary.50',
+                    transform: 'translateY(-2px)',
+                  }
+                }}
+              >
+                NAV számlából
+              </Button>
+            </Stack>
           </Box>
         </CardContent>
       </Card>
@@ -442,24 +466,44 @@ const TransferTable: React.FC<TransferTableProps> = ({
             Átutalások ({transfers.length})
           </Typography>
         </Stack>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={onAddTransfer}
-          size="small"
-          sx={{
-            borderRadius: 2,
-            background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
-            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
-            '&:hover': {
-              background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
-              transform: 'translateY(-1px)',
-              boxShadow: '0 6px 16px rgba(37, 99, 235, 0.4)',
-            }
-          }}
-        >
-          Hozzáadás
-        </Button>
+        <Stack direction="row" spacing={1}>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={onAddTransfer}
+            size="small"
+            sx={{
+              borderRadius: 2,
+              background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
+                transform: 'translateY(-1px)',
+                boxShadow: '0 6px 16px rgba(37, 99, 235, 0.4)',
+              }
+            }}
+          >
+            Hozzáadás
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<ReceiptIcon />}
+            onClick={onAddFromInvoice}
+            size="small"
+            sx={{
+              borderRadius: 2,
+              borderColor: 'primary.main',
+              color: 'primary.main',
+              '&:hover': {
+                borderColor: 'primary.dark',
+                bgcolor: 'primary.50',
+                transform: 'translateY(-1px)',
+              }
+            }}
+          >
+            NAV számla
+          </Button>
+        </Stack>
       </Box>
 
       {/* Table */}

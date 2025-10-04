@@ -14,6 +14,7 @@ import {
   Transfer,
   BulkCreateTransferRequest,
   GenerateXmlRequest,
+  NAVInvoice,
 } from '../types/api';
 
 // Query Keys
@@ -25,6 +26,7 @@ export const queryKeys = {
   transfers: ['transfers'] as const,
   bankAccountDefault: ['bankAccount', 'default'] as const,
   batches: ['batches'] as const,
+  navInvoices: ['navInvoices'] as const,
 };
 
 // Beneficiaries Hooks
@@ -239,8 +241,8 @@ export function useBulkCreateTransfers() {
 
 export function useUpdateTransfer() {
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Transfer> }) => 
-      transfersApi.update(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<Transfer> }) =>
+      transfersApi.partialUpdate(id, data),
   });
 }
 
@@ -356,6 +358,22 @@ export function useDeleteBatch() {
 }
 
 // NAV Invoices Hooks
+export function useNAVInvoices(params?: {
+  search?: string;
+  direction?: string;
+  currency?: string;
+  page?: number;
+  page_size?: number;
+  ordering?: string;
+  hide_storno_invoices?: boolean;
+}) {
+  return useQuery({
+    queryKey: [...queryKeys.navInvoices, params],
+    queryFn: () => navInvoicesApi.getAll(params),
+    select: (data) => data.data,
+  });
+}
+
 export function useBulkMarkUnpaid() {
   return useMutation({
     mutationFn: (invoice_ids: number[]) => navInvoicesApi.bulkMarkUnpaid(invoice_ids),
@@ -370,8 +388,8 @@ export function useBulkMarkPrepared() {
 
 export function useBulkMarkPaid() {
   return useMutation({
-    mutationFn: (data: { 
-      invoice_ids?: number[], 
+    mutationFn: (data: {
+      invoice_ids?: number[],
       payment_date?: string,
       invoices?: { invoice_id: number, payment_date: string }[]
     }) => navInvoicesApi.bulkMarkPaid(data),

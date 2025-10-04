@@ -153,3 +153,67 @@ export interface AvailablePartner {
   invoice_count: number;
   last_invoice_date: string | null;
 }
+
+export interface NAVInvoice {
+  id: number;
+  nav_invoice_number: string;
+  invoice_direction: 'INBOUND' | 'OUTBOUND';
+  invoice_direction_display: string;
+  partner_name: string;
+  partner_tax_number: string;
+
+  // Dates
+  issue_date: string;
+  issue_date_formatted: string;
+  fulfillment_date: string | null;
+  fulfillment_date_formatted: string | null;
+  payment_due_date: string | null;
+  payment_due_date_formatted: string | null;
+  payment_date: string | null;
+  payment_date_formatted: string | null;
+  completion_date?: string | null;
+  last_modified_date?: string | null;
+
+  // Financial
+  currency_code: string;
+  invoice_net_amount: number;
+  invoice_net_amount_formatted: string;
+  invoice_vat_amount: number;
+  invoice_vat_amount_formatted: string;
+  invoice_gross_amount: number;
+  invoice_gross_amount_formatted: string;
+
+  // Business
+  invoice_operation: string | null;
+  invoice_category?: string | null;
+  invoice_appearance?: string | null;
+  payment_method: string | null;
+  original_invoice_number: string | null;
+  payment_status: {
+    status: string;
+    label: string;
+    icon: string;
+    class: string;
+  };
+  payment_status_date: string | null;
+  payment_status_date_formatted: string | null;
+  auto_marked_paid: boolean;
+  is_overdue: boolean;
+  is_paid: boolean;
+
+  // System
+  sync_status: string;
+  created_at: string;
+
+  // NAV metadata (available in detail view)
+  nav_source?: string | null;
+  original_request_version?: string | null;
+
+  // Partners (available in detail view)
+  supplier_name?: string;
+  customer_name?: string;
+  supplier_tax_number?: string;
+  customer_tax_number?: string;
+  supplier_bank_account_number?: string;
+  customer_bank_account_number?: string;
+}
