@@ -6,6 +6,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TableSortLabel,
   Typography,
   Button,
   IconButton,
@@ -286,6 +287,9 @@ const SortableRow: React.FC<{
   );
 };
 
+type SortField = 'beneficiary' | 'amount' | 'execution_date' | 'remittance_info';
+type SortOrder = 'asc' | 'desc';
+
 const TransferTable: React.FC<TransferTableProps> = ({
   transfers,
   onUpdateTransfer,
@@ -296,6 +300,8 @@ const TransferTable: React.FC<TransferTableProps> = ({
 }) => {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editData, setEditData] = useState<Partial<TransferData>>({});
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -324,6 +330,82 @@ const TransferTable: React.FC<TransferTableProps> = ({
       }
     }
   };
+
+  const handleSort = (field: SortField) => {
+    const isAsc = sortField === field && sortOrder === 'asc';
+    const newOrder = isAsc ? 'desc' : 'asc';
+    setSortOrder(newOrder);
+    setSortField(field);
+
+    // Apply sorting and update parent component with sorted order
+    const sorted = [...transfers].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (field) {
+        case 'beneficiary':
+          aValue = a.beneficiary_data?.name || '';
+          bValue = b.beneficiary_data?.name || '';
+          break;
+        case 'amount':
+          aValue = parseFloat(a.amount) || 0;
+          bValue = parseFloat(b.amount) || 0;
+          break;
+        case 'execution_date':
+          aValue = a.execution_date || '';
+          bValue = b.execution_date || '';
+          break;
+        case 'remittance_info':
+          aValue = a.remittance_info || '';
+          bValue = b.remittance_info || '';
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue < bValue) return newOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return newOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    // Update parent component with new sorted order
+    onReorderTransfers(sorted);
+  };
+
+  // Sort transfers
+  const sortedTransfers = React.useMemo(() => {
+    if (!sortField) return transfers;
+
+    return [...transfers].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortField) {
+        case 'beneficiary':
+          aValue = a.beneficiary_data?.name || '';
+          bValue = b.beneficiary_data?.name || '';
+          break;
+        case 'amount':
+          aValue = parseFloat(a.amount) || 0;
+          bValue = parseFloat(b.amount) || 0;
+          break;
+        case 'execution_date':
+          aValue = a.execution_date || '';
+          bValue = b.execution_date || '';
+          break;
+        case 'remittance_info':
+          aValue = a.remittance_info || '';
+          bValue = b.remittance_info || '';
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [transfers, sortField, sortOrder]);
 
   const handleStartEdit = (index: number, transfer: TransferData) => {
     setEditingIndex(index);
@@ -517,34 +599,73 @@ const TransferTable: React.FC<TransferTableProps> = ({
             <TableHead>
               <TableRow>
                 <TableCell sx={{ width: 48 }}></TableCell>
-                <TableCell>Kedvezményezett</TableCell>
-                <TableCell>Összeg (HUF)</TableCell>
-                <TableCell>Teljesítés dátuma</TableCell>
-                <TableCell>Közlemény</TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={sortField === 'beneficiary'}
+                    direction={sortField === 'beneficiary' ? sortOrder : 'asc'}
+                    onClick={() => handleSort('beneficiary')}
+                  >
+                    Kedvezményezett
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={sortField === 'amount'}
+                    direction={sortField === 'amount' ? sortOrder : 'asc'}
+                    onClick={() => handleSort('amount')}
+                  >
+                    Összeg (HUF)
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={sortField === 'execution_date'}
+                    direction={sortField === 'execution_date' ? sortOrder : 'asc'}
+                    onClick={() => handleSort('execution_date')}
+                  >
+                    Teljesítés dátuma
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={sortField === 'remittance_info'}
+                    direction={sortField === 'remittance_info' ? sortOrder : 'asc'}
+                    onClick={() => handleSort('remittance_info')}
+                  >
+                    Közlemény
+                  </TableSortLabel>
+                </TableCell>
                 <TableCell align="right">Műveletek</TableCell>
               </TableRow>
             </TableHead>
-            <SortableContext 
-              items={transfers.map((transfer, index) => 
+            <SortableContext
+              items={sortedTransfers.map((transfer, index) =>
                 transfer.id || transfer.tempId || `transfer-${index}`
               )}
               strategy={verticalListSortingStrategy}
             >
               <TableBody>
-                {transfers.map((transfer, index) => (
-                  <SortableRow
-                    key={transfer.id || transfer.tempId || `transfer-${index}`}
-                    transfer={transfer}
-                    index={index}
-                    editingIndex={editingIndex}
-                    editData={editData}
-                    onStartEdit={handleStartEdit}
-                    onSaveEdit={handleSaveEdit}
-                    onCancelEdit={handleCancelEdit}
-                    onDelete={onDeleteTransfer}
-                    onUpdateEditData={setEditData}
-                  />
-                ))}
+                {sortedTransfers.map((transfer, index) => {
+                  // Find the original index in the unsorted array for update/delete operations
+                  const originalIndex = transfers.findIndex(t =>
+                    (t.id && t.id === transfer.id) || (t.tempId && t.tempId === transfer.tempId)
+                  );
+
+                  return (
+                    <SortableRow
+                      key={transfer.id || transfer.tempId || `transfer-${index}`}
+                      transfer={transfer}
+                      index={originalIndex !== -1 ? originalIndex : index}
+                      editingIndex={editingIndex}
+                      editData={editData}
+                      onStartEdit={handleStartEdit}
+                      onSaveEdit={handleSaveEdit}
+                      onCancelEdit={handleCancelEdit}
+                      onDelete={onDeleteTransfer}
+                      onUpdateEditData={setEditData}
+                    />
+                  );
+                })}
               </TableBody>
             </SortableContext>
           </Table>
