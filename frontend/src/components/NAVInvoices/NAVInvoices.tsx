@@ -64,7 +64,7 @@ import NAVInvoiceTable from './NAVInvoiceTable';
 interface Invoice {
   id: number;
   nav_invoice_number: string;
-  invoice_direction: 'INBOUND' | 'OUTBOUND';
+  invoice_direction: string;  // 'INBOUND' | 'OUTBOUND' - using string for Zod v4 compatibility
   invoice_direction_display: string;
   partner_name: string;
   partner_tax_number: string;
@@ -117,12 +117,12 @@ interface Invoice {
   original_request_version?: string | null;
   
   // Partners (available in detail view)
-  supplier_name?: string;
-  customer_name?: string;
-  supplier_tax_number?: string;
-  customer_tax_number?: string;
-  supplier_bank_account_number?: string;
-  customer_bank_account_number?: string;
+  supplier_name?: string | null;
+  customer_name?: string | null;
+  supplier_tax_number?: string | null;
+  customer_tax_number?: string | null;
+  supplier_bank_account_number?: string | null;
+  customer_bank_account_number?: string | null;
   
   // Line items (available in detail view)
   line_items?: InvoiceLineItem[];
@@ -254,7 +254,7 @@ const NAVInvoices: React.FC = () => {
   const [totalsCollapsed, setTotalsCollapsed] = useState(false);
   
   // Payment date state for bulk update (format: YYYY-MM-DD)
-  const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0] || '');
   const [usePaymentDueDate, setUsePaymentDueDate] = useState<boolean>(true);
   
   // Modal states
@@ -444,7 +444,7 @@ const NAVInvoices: React.FC = () => {
               icon: 'CheckCircle',
               class: 'success'
             },
-            payment_status_date: new Date().toISOString().split('T')[0],
+            payment_status_date: new Date().toISOString().split('T')[0] || null,
             payment_status_date_formatted: new Date().toLocaleDateString('hu-HU'),
             is_paid: true
           } : null);
@@ -608,7 +608,7 @@ const NAVInvoices: React.FC = () => {
       const requestData = {
         invoice_ids: selectedInvoices,
         originator_account_id: originatorAccountId,
-        execution_date: new Date().toISOString().split('T')[0], // Today as default execution date
+        execution_date: new Date().toISOString().split('T')[0] as string, // Today as default execution date
       };
 
       showSuccess('Átutalások generálása folyamatban...');
@@ -708,10 +708,11 @@ const NAVInvoices: React.FC = () => {
       if (usePaymentDueDate) {
         // Option 2: Use individual payment_due_date for each invoice
         const selectedInvoiceObjects = invoices.filter(invoice => selectedInvoices.includes(invoice.id));
+        const today = new Date().toISOString().split('T')[0] as string;
         requestData = {
           invoices: selectedInvoiceObjects.map(invoice => ({
             invoice_id: invoice.id,
-            payment_date: invoice.payment_due_date || new Date().toISOString().split('T')[0]
+            payment_date: invoice.payment_due_date || today
           }))
         };
       } else {
@@ -881,7 +882,7 @@ const NAVInvoices: React.FC = () => {
               <FormControlLabel
                 control={
                   <Checkbox
-                    checked={hideStornoInvoices}
+                    checked={Boolean(hideStornoInvoices)}
                     onChange={(e) => setHideStornoInvoices(e.target.checked)}
                     size="small"
                   />
@@ -1272,7 +1273,7 @@ const NAVInvoices: React.FC = () => {
             <FormControlLabel
               control={
                 <Checkbox
-                  checked={usePaymentDueDate}
+                  checked={Boolean(usePaymentDueDate)}
                   onChange={(e) => setUsePaymentDueDate(e.target.checked)}
                   size="small"
                   sx={{ '& .MuiSvgIcon-root': { fontSize: 16 } }}
@@ -1364,7 +1365,7 @@ const NAVInvoices: React.FC = () => {
           <Pagination
             count={totalPages}
             page={currentPage}
-            onChange={(event, page) => setCurrentPage(page)}
+            onChange={(_event, page) => setCurrentPage(page)}
             color="primary"
             size="small"
           />

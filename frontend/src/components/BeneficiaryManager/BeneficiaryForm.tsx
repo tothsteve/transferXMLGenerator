@@ -51,12 +51,7 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
   beneficiary,
   isLoading = false,
 }) => {
-  const [accountNumberValue, setAccountNumberValue] = useState(beneficiary?.account_number || '');
-
-  // Update account number value when beneficiary prop changes
-  useEffect(() => {
-    setAccountNumberValue(beneficiary?.account_number || '');
-  }, [beneficiary]);
+  const [accountNumberValue, setAccountNumberValue] = useState('');
 
   const {
     register,
@@ -68,16 +63,31 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
     clearErrors,
   } = useForm<FormData>({
     defaultValues: {
-      name: beneficiary?.name || '',
-      account_number: beneficiary?.account_number || '',
-      vat_number: beneficiary?.vat_number || '',
-      tax_number: beneficiary?.tax_number || '',
-      description: beneficiary?.description || '',
-      remittance_information: beneficiary?.remittance_information || '',
-      is_frequent: beneficiary?.is_frequent || false,
-      is_active: beneficiary?.is_active ?? true,
+      name: '',
+      account_number: '',
+      vat_number: '',
+      tax_number: '',
+      description: '',
+      remittance_information: '',
+      is_frequent: false,
+      is_active: true,
     },
   });
+
+  // Reset form when beneficiary prop changes or dialog opens
+  useEffect(() => {
+    reset({
+      name: beneficiary?.name ?? '',
+      account_number: beneficiary?.account_number ?? '',
+      vat_number: beneficiary?.vat_number ?? '',
+      tax_number: beneficiary?.tax_number ?? '',
+      description: beneficiary?.description ?? '',
+      remittance_information: beneficiary?.remittance_information ?? '',
+      is_frequent: beneficiary?.is_frequent ?? false,
+      is_active: beneficiary?.is_active ?? true,
+    });
+    setAccountNumberValue(beneficiary?.account_number ?? '');
+  }, [beneficiary, reset]);
 
   const handleFormSubmit = async (data: FormData) => {
     // Validate that at least one identifier is provided
@@ -339,13 +349,25 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
             />
 
             <Stack spacing={1}>
-              <FormControlLabel
-                control={<Checkbox {...register('is_active')} />}
-                label="Aktív kedvezményezett"
+              <Controller
+                name="is_active"
+                control={control}
+                render={({ field }) => (
+                  <FormControlLabel
+                    control={<Checkbox checked={!!field.value} onChange={field.onChange} />}
+                    label="Aktív kedvezményezett"
+                  />
+                )}
               />
-              <FormControlLabel
-                control={<Checkbox {...register('is_frequent')} />}
-                label="Gyakori kedvezményezett"
+              <Controller
+                name="is_frequent"
+                control={control}
+                render={({ field }) => (
+                  <FormControlLabel
+                    control={<Checkbox checked={!!field.value} onChange={field.onChange} />}
+                    label="Gyakori kedvezményezett"
+                  />
+                )}
               />
             </Stack>
           </Stack>

@@ -16,6 +16,15 @@ import {
   GenerateXmlRequest,
   NAVInvoice,
 } from '../types/api';
+import {
+  BeneficiarySchema,
+  TransferTemplateSchema,
+  TransferSchema,
+  NAVInvoiceSchema,
+  BankAccountSchema,
+  TransferBatchSchema,
+  ApiResponseSchema,
+} from '../schemas/api.schemas';
 
 // Query Keys
 export const queryKeys = {
@@ -29,18 +38,36 @@ export const queryKeys = {
   navInvoices: ['navInvoices'] as const,
 };
 
-// Beneficiaries Hooks
-export function useBeneficiaries(params?: { 
-  search?: string; 
-  is_frequent?: boolean; 
-  is_active?: boolean; 
+/**
+ * Beneficiaries Hooks
+ *
+ * React Query hooks for managing beneficiary data with Zod validation
+ */
+
+export function useBeneficiaries(params?: {
+  search?: string;
+  is_frequent?: boolean;
+  is_active?: boolean;
   page?: number;
   ordering?: string;
 }) {
   return useQuery({
     queryKey: [...queryKeys.beneficiaries, params],
     queryFn: () => beneficiariesApi.getAll(params),
-    select: (data) => data.data,
+    select: (data) => {
+      try {
+        // Validate API response with Zod schema
+        const schema = ApiResponseSchema(BeneficiarySchema);
+        const parsed = schema.parse(data.data);
+        console.log('✅ Beneficiaries data parsed successfully:', parsed);
+        return parsed;
+      } catch (error) {
+        console.error('❌ Zod validation error in useBeneficiaries:', error);
+        console.error('Raw data:', data.data);
+        // Return raw data as fallback
+        return data.data;
+      }
+    },
   });
 }
 
@@ -48,7 +75,10 @@ export function useFrequentBeneficiaries() {
   return useQuery({
     queryKey: queryKeys.beneficiariesFrequent,
     queryFn: () => beneficiariesApi.getFrequent(),
-    select: (data) => data.data,
+    select: (data) => {
+      const schema = ApiResponseSchema(BeneficiarySchema);
+      return schema.parse(data.data);
+    },
   });
 }
 
@@ -89,12 +119,28 @@ export function useDeleteBeneficiary() {
   });
 }
 
-// Templates Hooks
+/**
+ * Templates Hooks
+ *
+ * React Query hooks for managing transfer template data with Zod validation
+ */
+
 export function useTemplates(showInactive?: boolean) {
   return useQuery({
     queryKey: [...queryKeys.templates, showInactive],
     queryFn: () => templatesApi.getAll(showInactive ? { show_inactive: true } : undefined),
-    select: (data) => data.data,
+    select: (data) => {
+      try {
+        const schema = ApiResponseSchema(TransferTemplateSchema);
+        const parsed = schema.parse(data.data);
+        console.log('✅ Templates data parsed successfully:', parsed);
+        return parsed;
+      } catch (error) {
+        console.error('❌ Zod validation error in useTemplates:', error);
+        console.error('Raw data:', data.data);
+        return data.data;
+      }
+    },
   });
 }
 
@@ -102,7 +148,7 @@ export function useTemplate(id: number) {
   return useQuery({
     queryKey: queryKeys.template(id),
     queryFn: () => templatesApi.getById(id),
-    select: (data) => data.data,
+    select: (data) => TransferTemplateSchema.parse(data.data),
     enabled: !!id,
   });
 }
@@ -211,7 +257,12 @@ export function useUpdateTemplateBeneficiary() {
   });
 }
 
-// Transfers Hooks
+/**
+ * Transfers Hooks
+ *
+ * React Query hooks for managing transfer data with Zod validation
+ */
+
 export function useTransfers(params?: {
   page?: number;
   page_size?: number;
@@ -224,7 +275,10 @@ export function useTransfers(params?: {
   return useQuery({
     queryKey: [...queryKeys.transfers, params],
     queryFn: () => transfersApi.getAll(params),
-    select: (data) => data.data,
+    select: (data) => {
+      const schema = ApiResponseSchema(TransferSchema);
+      return schema.parse(data.data);
+    },
   });
 }
 
@@ -288,21 +342,42 @@ export function useGenerateKHExport() {
   });
 }
 
-// Bank Account Hooks
+/**
+ * Bank Account Hooks
+ *
+ * React Query hooks for managing bank account data with Zod validation
+ */
+
 export function useDefaultBankAccount() {
   return useQuery({
     queryKey: queryKeys.bankAccountDefault,
     queryFn: () => bankAccountsApi.getDefault(),
-    select: (data) => data.data,
+    select: (data) => BankAccountSchema.parse(data.data),
   });
 }
 
-// Batches Hooks
+/**
+ * Batches Hooks
+ *
+ * React Query hooks for managing batch data with Zod validation
+ */
+
 export function useBatches() {
   return useQuery({
     queryKey: queryKeys.batches,
     queryFn: () => batchesApi.getAll(),
-    select: (data) => data.data,
+    select: (data) => {
+      try {
+        const schema = ApiResponseSchema(TransferBatchSchema);
+        const parsed = schema.parse(data.data);
+        console.log('✅ Batches data parsed successfully:', parsed);
+        return parsed;
+      } catch (error) {
+        console.error('❌ Zod validation error in useBatches:', error);
+        console.error('Raw data:', data.data);
+        return data.data;
+      }
+    },
   });
 }
 
@@ -310,7 +385,7 @@ export function useBatch(id: number | undefined, enabled = true) {
   return useQuery({
     queryKey: ['batch', id],
     queryFn: () => batchesApi.getById(id!),
-    select: (data) => data.data,
+    select: (data) => TransferBatchSchema.parse(data.data),
     enabled: enabled && !!id,
   });
 }
@@ -357,7 +432,12 @@ export function useDeleteBatch() {
   });
 }
 
-// NAV Invoices Hooks
+/**
+ * NAV Invoices Hooks
+ *
+ * React Query hooks for managing NAV invoice data with Zod validation
+ */
+
 export function useNAVInvoices(params?: {
   search?: string;
   direction?: string;
@@ -370,7 +450,10 @@ export function useNAVInvoices(params?: {
   return useQuery({
     queryKey: [...queryKeys.navInvoices, params],
     queryFn: () => navInvoicesApi.getAll(params),
-    select: (data) => data.data,
+    select: (data) => {
+      const schema = ApiResponseSchema(NAVInvoiceSchema);
+      return schema.parse(data.data);
+    },
   });
 }
 

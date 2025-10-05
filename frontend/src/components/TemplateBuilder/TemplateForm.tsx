@@ -71,8 +71,8 @@ interface TemplateFormData {
 interface BeneficiarySelection {
   beneficiary_id: number;
   beneficiary_name: string;
-  account_number: string | undefined;
-  vat_number: string | undefined;
+  account_number: string | null | undefined;
+  vat_number: string | null | undefined;
   default_amount: string;
   default_remittance_info: string;
   order: number;

@@ -1,9 +1,9 @@
 export interface Beneficiary {
   id: number;
   name: string;
-  account_number?: string;  // Optional for VAT/tax-only beneficiaries
-  vat_number?: string;      // Hungarian VAT number for employee identification
-  tax_number?: string;      // Hungarian company tax number for corporate identification
+  account_number?: string | null;  // Optional for VAT/tax-only beneficiaries
+  vat_number?: string | null;      // Hungarian VAT number for employee identification
+  tax_number?: string | null;      // Hungarian company tax number for corporate identification
   description: string;
   remittance_information: string;
   is_frequent: boolean;
@@ -21,7 +21,7 @@ export interface BankAccount {
 export interface TransferTemplate {
   id: number;
   name: string;
-  description?: string;
+  description?: string | null;
   is_active: boolean;
   beneficiary_count: number;
   created_at: string;
@@ -31,9 +31,9 @@ export interface TransferTemplate {
 
 export interface TemplateBeneficiary {
   id: number;
-  template: number;
+  template?: number;
   beneficiary: Beneficiary;
-  default_amount?: number;
+  default_amount?: string | number | null;
   default_remittance: string;
   order: number;
   is_active: boolean;
@@ -69,18 +69,18 @@ export interface TransferWithBeneficiary {
 export interface TransferBatch {
   id: number;
   name: string;
-  description?: string;
+  description?: string | null;
   transfers: TransferWithBeneficiary[];  // Batches return transfers with expanded beneficiary data
   total_amount: string;
   used_in_bank: boolean;
-  bank_usage_date?: string;
+  bank_usage_date?: string | null;
   order: number;
   transfer_count: number;
   xml_filename: string;
-  xml_generated_at?: string;
+  xml_generated_at?: string | null;
   created_at: string;
-  batch_format?: string;
-  batch_format_display?: string;
+  batch_format?: string | null;
+  batch_format_display?: string | null;
 }
 
 export interface ApiResponse<T> {
@@ -106,7 +106,7 @@ export interface BulkCreateTransferRequest {
 
 export interface GenerateXmlRequest {
   transfer_ids: number[];
-  batch_name?: string;
+  batch_name?: string | null;
 }
 
 export interface GenerateXmlResponse {
@@ -129,7 +129,7 @@ export interface GenerateKHExportResponse {
   content: string;
   filename: string;
   encoding: string;
-  content_encoding?: string;  // Optional field for base64 encoding indicator
+  content_encoding?: string | null;  // Optional field for base64 encoding indicator
   transfer_count: number;
   total_amount: string;
 }
@@ -142,7 +142,7 @@ export interface TrustedPartner {
   auto_pay: boolean;
   invoice_count: number;
   last_invoice_date: string | null;
-  last_invoice_date_formatted?: string;
+  last_invoice_date_formatted?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -157,7 +157,7 @@ export interface AvailablePartner {
 export interface NAVInvoice {
   id: number;
   nav_invoice_number: string;
-  invoice_direction: 'INBOUND' | 'OUTBOUND';
+  invoice_direction: string;  // 'INBOUND' | 'OUTBOUND' - using string for Zod v4 compatibility
   invoice_direction_display: string;
   partner_name: string;
   partner_tax_number: string;
@@ -210,10 +210,10 @@ export interface NAVInvoice {
   original_request_version?: string | null;
 
   // Partners (available in detail view)
-  supplier_name?: string;
-  customer_name?: string;
-  supplier_tax_number?: string;
-  customer_tax_number?: string;
-  supplier_bank_account_number?: string;
-  customer_bank_account_number?: string;
+  supplier_name?: string | null;
+  customer_name?: string | null;
+  supplier_tax_number?: string | null;
+  customer_tax_number?: string | null;
+  supplier_bank_account_number?: string | null;
+  customer_bank_account_number?: string | null;
 }

@@ -306,7 +306,7 @@ const BeneficiaryManager: React.FC = () => {
           <Pagination
             count={totalPages}
             page={currentPage}
-            onChange={(event, page) => setCurrentPage(page)}
+            onChange={(_event, page) => setCurrentPage(page)}
             color="primary"
             size="small"
           />

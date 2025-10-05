@@ -56,7 +56,9 @@ const XMLPreview: React.FC<XMLPreviewProps> = ({
     const result = [];
     
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
+      const currentLine = lines[i];
+      if (!currentLine) continue;
+      const line = currentLine.trim();
       if (!line) continue;
       
       // Adjust indent level BEFORE creating the line

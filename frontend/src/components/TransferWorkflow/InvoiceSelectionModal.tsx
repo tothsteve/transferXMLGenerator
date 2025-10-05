@@ -24,15 +24,50 @@ import {
   Search as SearchIcon,
   Receipt as ReceiptIcon,
 } from '@mui/icons-material';
-import { useNAVInvoices } from '../../hooks/api';
 import { NAVInvoice } from '../../types/api';
 
+/**
+ * Props for the InvoiceSelectionModal component
+ */
 interface InvoiceSelectionModalProps {
+  /** Whether the modal is currently open */
   isOpen: boolean;
+  /** Callback when modal is closed */
   onClose: () => void;
+  /**
+   * Callback when invoices are selected for transfer generation
+   * @param invoiceIds - Array of selected NAV invoice IDs
+   * @returns Promise that resolves when transfers are generated
+   */
   onSelect: (invoiceIds: number[]) => Promise<void>;
 }
 
+/**
+ * Invoice Selection Modal Component
+ *
+ * Modal dialog for selecting NAV invoices to generate bank transfers.
+ * Displays a searchable, filterable list of INBOUND invoices from the NAV system.
+ *
+ * **Features:**
+ * - Search by invoice number or partner name
+ * - Multi-select with checkboxes
+ * - Filter to show only unpaid/pending invoices
+ * - Visual payment status indicators
+ * - Disabled state for already paid invoices
+ * - Batch transfer generation from selected invoices
+ *
+ * **Business Logic:**
+ * - Only shows INBOUND direction invoices (invoices to pay)
+ * - Hides STORNO invoices by default
+ * - Limits results to 50 invoices for performance
+ * - Disables paid invoices from selection
+ * - Generates one transfer per selected invoice with:
+ *   - Amount from invoice gross amount
+ *   - Partner info from invoice supplier
+ *   - Payment due date as execution date
+ *
+ * @component
+ */
 const InvoiceSelectionModal: React.FC<InvoiceSelectionModalProps> = ({
   isOpen,
   onClose,
@@ -42,18 +77,42 @@ const InvoiceSelectionModal: React.FC<InvoiceSelectionModalProps> = ({
   const [selectedInvoices, setSelectedInvoices] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const { data: invoicesData, isLoading } = useNAVInvoices({
-    search: searchTerm,
-    direction: 'INBOUND',
-    page_size: 50,
-    hide_storno_invoices: true,
-  });
+  // Note: useNAVInvoices doesn't support enabled flag, so we need to modify it
+  // For now, let's use a manual fetch approach
+  const [invoices, setInvoices] = useState<NAVInvoice[]>([]);
+  const [isFetching, setIsFetching] = useState(false);
 
-  const availableInvoices = invoicesData?.results || [];
+  // Fetch invoices when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      const fetchInvoices = async () => {
+        setIsFetching(true);
+        try {
+          const { navInvoicesApi } = await import('../../services/api');
+          const response = await navInvoicesApi.getAll({
+            search: searchTerm,
+            direction: 'INBOUND',
+            page_size: 50,
+            hide_storno_invoices: true,
+          });
+          setInvoices(response.data.results);
+        } catch (error) {
+          console.error('Failed to fetch NAV invoices:', error);
+          setInvoices([]);
+        } finally {
+          setIsFetching(false);
+        }
+      };
+      fetchInvoices();
+    }
+  }, [isOpen, searchTerm]);
+
+  const availableInvoices = invoices;
 
   const handleClose = () => {
     setSearchTerm('');
     setSelectedInvoices([]);
+    setInvoices([]);
     onClose();
   };
 
@@ -110,7 +169,7 @@ const InvoiceSelectionModal: React.FC<InvoiceSelectionModalProps> = ({
           />
 
           <Box sx={{ maxHeight: 400, overflowY: 'auto' }}>
-            {isLoading ? (
+            {isFetching ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                 <CircularProgress />
               </Box>

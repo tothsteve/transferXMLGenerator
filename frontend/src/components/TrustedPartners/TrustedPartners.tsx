@@ -89,7 +89,7 @@ const TrustedPartners: React.FC = () => {
   const partners = partnersResponse?.data?.results || [];
   const totalCount = partnersResponse?.data?.count || 0;
 
-  const handleChangePage = (event: unknown, newPage: number) => {
+  const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
   };
 

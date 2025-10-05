@@ -158,7 +158,7 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
   const availablePartners = availablePartnersResponse?.data?.results || [];
   const availablePartnersCount = availablePartnersResponse?.data?.count || 0;
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
     setError('');
     setSuccessMessage('');
@@ -196,7 +196,7 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
     });
   };
 
-  const handleAvailablePartnersPageChange = (event: unknown, newPage: number) => {
+  const handleAvailablePartnersPageChange = (_event: unknown, newPage: number) => {
     setAvailablePartnersPage(newPage);
   };
 

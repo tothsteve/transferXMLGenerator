@@ -18,7 +18,11 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+
+    // Additional strictness for code quality (dial back unused checks)
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true
   },
   "include": [
     "src"

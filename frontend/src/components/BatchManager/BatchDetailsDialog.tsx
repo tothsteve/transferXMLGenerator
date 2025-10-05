@@ -27,7 +27,6 @@ import {
   AccountBalance as AccountBalanceIcon,
   Person as PersonIcon,
   CalendarToday as CalendarIcon,
-  AttachMoney as AttachMoneyIcon,
   Description as DescriptionIcon,
 } from '@mui/icons-material';
 import { TransferBatch } from '../../types/api';
@@ -185,7 +184,7 @@ const BatchDetailsDialog: React.FC<BatchDetailsDialogProps> = ({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {batch.transfers.map((transfer, index) => (
+                    {batch.transfers.map((transfer) => (
                       <TableRow key={transfer.id} hover>
                         <TableCell>
                           <Stack direction="row" alignItems="center" spacing={1}>

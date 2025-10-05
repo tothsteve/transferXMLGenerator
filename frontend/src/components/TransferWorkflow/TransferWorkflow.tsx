@@ -44,12 +44,49 @@ import AddTransferModal from './AddTransferModal';
 import InvoiceSelectionModal from './InvoiceSelectionModal';
 import XMLPreview from './XMLPreview';
 
+/**
+ * Extended transfer interface for working with transfers in the workflow.
+ *
+ * This interface extends the base Transfer type with additional fields needed
+ * for the transfer creation and editing workflow:
+ * - `id`: Optional for new transfers that haven't been saved yet
+ * - `tempId`: Temporary ID for tracking unsaved transfers in the UI
+ * - `beneficiary_data`: Full beneficiary object for display purposes
+ */
 interface TransferData extends Omit<Transfer, 'id' | 'is_processed' | 'created_at'> {
   id?: number;
   tempId?: string;
   beneficiary_data?: Beneficiary;
 }
 
+/**
+ * TransferWorkflow Component
+ *
+ * Main workflow component for creating, editing, and generating bank transfers.
+ * Supports multiple entry points and workflows:
+ *
+ * **Primary Workflows:**
+ * 1. **Template-based**: Load transfers from a saved template with preset amounts
+ * 2. **Manual**: Add individual transfers one by one
+ * 3. **NAV Invoice**: Generate transfers from selected NAV invoices
+ * 4. **Existing Transfers**: Continue working with previously created but unprocessed transfers
+ *
+ * **Key Features:**
+ * - Real-time validation of transfer data (amounts, dates, beneficiaries)
+ * - Support for multiple currencies (HUF, EUR, USD)
+ * - Batch operations for updating multiple transfers
+ * - XML and CSV export generation for bank import
+ * - NAV invoice payment tracking integration
+ * - Beneficiary auto-creation with tax number matching
+ *
+ * **Navigation State Handling:**
+ * - Accepts preloaded transfers from NAV invoice selection
+ * - Accepts template data from template builder
+ * - URL parameter support for direct template loading (?template=123)
+ * - Reset flag for clearing workflow state
+ *
+ * @component
+ */
 const TransferWorkflow: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -175,7 +212,8 @@ const TransferWorkflow: React.FC = () => {
 
       setTransfers(convertedTransfers);
     }
-  }, [location.state, existingTransfers, refetchTransfers]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   // Clear location state after processing
   useEffect(() => {
@@ -194,8 +232,8 @@ const TransferWorkflow: React.FC = () => {
 
     try {
       // Use today's date as default execution date
-      const today = new Date().toISOString().split('T')[0];
-      
+      const today = new Date().toISOString().split('T')[0] as string;
+
       const result = await loadTemplateMutation.mutateAsync({
         templateId,
         data: {
@@ -307,6 +345,7 @@ const TransferWorkflow: React.FC = () => {
 
   const handleUpdateTransfer = async (index: number, updatedData: Partial<TransferData>) => {
     const transfer = transfers[index];
+    if (!transfer) return;
 
     if (transfer.id) {
       // Transfer exists in database, update via API
@@ -343,6 +382,7 @@ const TransferWorkflow: React.FC = () => {
 
   const handleDeleteTransfer = async (index: number) => {
     const transfer = transfers[index];
+    if (!transfer) return;
 
     if (transfer.id) {
       // Transfer exists in database, delete via API
@@ -378,7 +418,7 @@ const TransferWorkflow: React.FC = () => {
       const response = await navInvoicesApi.generateTransfers({
         invoice_ids: invoiceIds,
         originator_account_id: originatorAccountId,
-        execution_date: new Date().toISOString().split('T')[0],
+        execution_date: new Date().toISOString().split('T')[0] as string,
       });
 
       const { transfers: newTransfers, transfer_count } = response.data;
@@ -658,12 +698,12 @@ const TransferWorkflow: React.FC = () => {
         setTransfers(prev => prev.map(t => {
           if (!t.id) {
             // Find the corresponding created transfer
-            const matchingCreated = newTransfers.find(nt => 
-              nt.beneficiary === t.beneficiary && 
+            const matchingCreated = newTransfers.find(nt =>
+              nt.beneficiary === t.beneficiary &&
               nt.amount === t.amount &&
               nt.execution_date === t.execution_date
             );
-            return matchingCreated || t;
+            return (matchingCreated || t) as TransferData;
           }
           return t;
         }));

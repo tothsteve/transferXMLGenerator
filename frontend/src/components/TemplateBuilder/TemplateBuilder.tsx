@@ -96,6 +96,8 @@ const TemplateBuilder: React.FC = () => {
         
         for (let i = 0; i < data.beneficiaries.length; i++) {
           const beneficiary = data.beneficiaries[i];
+          if (!beneficiary) continue;
+
           try {
             await addBeneficiaryMutation.mutateAsync({
               templateId: createdTemplate.id,
@@ -175,7 +177,8 @@ const TemplateBuilder: React.FC = () => {
         // Handle beneficiaries (add new ones and update existing ones)
         for (let i = 0; i < data.beneficiaries.length; i++) {
           const beneficiary = data.beneficiaries[i];
-          
+          if (!beneficiary) continue;
+
           if (!currentBeneficiaryIds.has(beneficiary.beneficiary_id)) {
             // Add new beneficiaries
             try {

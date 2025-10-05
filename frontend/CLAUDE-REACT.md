@@ -1,6 +1,60 @@
-# CLAUDE.md
+# CLAUDE-REACT.md
 
 This file provides guidance to Claude Code when working with React 19 applications.
+
+---
+
+## ⚠️ ACTUAL IMPLEMENTATION STATUS
+
+**This document describes ideal React 19 best practices. The sections below describe the CURRENT IMPLEMENTATION which differs from the ideal.**
+
+### Current Architecture (As Implemented)
+
+**Build Tool**: Create React App (CRA) + CRACO *(not Vite)*
+**Project Structure**: Horizontal Layers *(not Vertical Slice)*
+**Validation**: Zod validation added (Phase 2)
+**Testing**: Jest configured *(not Vitest, minimal coverage)*
+**TypeScript**: Strict mode enabled with additional checks
+
+### Current Project Structure
+
+```
+src/
+├── components/          # UI components organized by feature
+│   ├── TransferWorkflow/
+│   ├── NAVInvoices/
+│   ├── BeneficiaryManager/
+│   ├── Settings/
+│   └── [other features]
+├── hooks/              # Global React Query hooks
+│   └── api.ts         # All API integration hooks with Zod validation
+├── services/          # API clients and utilities
+│   └── api.ts         # Axios API service layer
+├── schemas/           # Zod validation schemas (added Phase 2)
+│   └── api.schemas.ts # API response validation
+├── types/             # TypeScript type definitions
+│   └── api.ts         # API types and interfaces
+└── App.tsx            # Main application component
+```
+
+### Technology Stack (Actual)
+
+- **React 19.1.1** with TypeScript
+- **Create React App** with CRACO for configuration overrides
+- **Material-UI v7** for component library
+- **TanStack Query (React Query)** for server state with Zod validation
+- **React Hook Form** for form handling
+- **React Router v7** for routing
+- **Axios** for HTTP requests
+- **Zod** for runtime validation (added Phase 2)
+
+### Build Configuration
+
+**Development**: `npm start` → `react-scripts start` via CRACO
+**Production**: `npm run build` → `react-scripts build` via CRACO with source maps disabled
+**Testing**: `npm test` → Jest (minimal coverage currently)
+
+---
 
 ## Core Development Philosophy
 

@@ -161,10 +161,13 @@ const validateHungarianBBANChecksum = (digits: string): boolean => {
     // Apply checksum algorithm to the 16-digit account number
     let sum = 0;
     const weights = [9, 7, 3, 1]; // Repeating pattern
-    
+
     for (let i = 0; i < 16; i++) {
-      const digit = parseInt(accountNumber[i]);
-      const weight = weights[i % 4]; // Cycle through [9, 7, 3, 1]
+      const char = accountNumber[i];
+      if (!char) continue;
+      const digit = parseInt(char);
+      const weight = weights[i % 4];
+      if (weight === undefined) continue;
       sum += digit * weight;
     }
 
@@ -205,10 +208,13 @@ export const calculateHungarianBBANChecksum = (
 
   let sum = 0;
   const weights = [9, 7, 3, 1]; // Repeating pattern
-  
+
   for (let i = 0; i < 16; i++) {
-    const digit = parseInt(accountNumber[i]);
-    const weight = weights[i % 4]; // Cycle through [9, 7, 3, 1]
+    const char = accountNumber[i];
+    if (!char) continue;
+    const digit = parseInt(char);
+    const weight = weights[i % 4];
+    if (weight === undefined) continue;
     sum += digit * weight;
   }
 

@@ -25,16 +25,12 @@ import {
   CreditCard as CardIcon,
   Receipt as ReceiptIcon,
   AttachMoney as CashIcon,
-  CheckCircle as PaidIcon,
-  Schedule as UnpaidIcon,
-  Warning as OverdueIcon,
-  Assignment as PreparedIcon,
 } from '@mui/icons-material';
 
 interface Invoice {
   id: number;
   nav_invoice_number: string;
-  invoice_direction: 'INBOUND' | 'OUTBOUND';
+  invoice_direction: string;  // 'INBOUND' | 'OUTBOUND' - using string for Zod v4 compatibility
   invoice_direction_display: string;
   partner_name: string;
   partner_tax_number: string;
@@ -150,13 +146,6 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
     }
   };
 
-  const formatAmount = (amount: number, currency: string) => {
-    if (currency === 'HUF') {
-      return `${amount.toLocaleString('hu-HU', { maximumFractionDigits: 0 })} Ft`;
-    }
-    return `${amount.toLocaleString('hu-HU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
-  };
-
   const getDirectionChip = (direction: string, display: string) => (
     <Chip
       label={display}
@@ -253,7 +242,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
           </Tooltip>
         );
       default:
-        console.log('Unknown payment method:', paymentMethod); // Debug log
+        // Silently handle unknown payment methods (like "OTHER") by showing the text
         return (
           <Tooltip title={paymentMethod}>
             <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>

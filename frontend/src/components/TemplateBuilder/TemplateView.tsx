@@ -37,8 +37,8 @@ interface TemplateViewProps {
 interface TemplateBeneficiaryDetail {
   id: number;
   beneficiary_name: string;
-  account_number: string | undefined;
-  vat_number: string | undefined;
+  account_number: string | null | undefined;
+  vat_number: string | null | undefined;
   description: string;
   default_amount: string;
   default_remittance_info: string;
@@ -179,6 +179,7 @@ const TemplateView: React.FC<TemplateViewProps> = ({
                               {beneficiary.beneficiary_name}
                             </Typography>
                           }
+                          secondaryTypographyProps={{ component: 'div' }}
                           secondary={
                             <Stack spacing={0.5}>
                               {beneficiary.account_number && (
