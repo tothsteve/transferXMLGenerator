@@ -38,6 +38,8 @@
     "test": "craco test",
     "eject": "react-scripts eject",
     "serve": "npx serve -s build -l ${PORT:-3000}",
+    "lint": "eslint src --ext .ts,.tsx --max-warnings 0",
+    "lint:fix": "eslint src --ext .ts,.tsx --max-warnings 0 --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "prepare": "husky"
   },
@@ -45,6 +47,39 @@
     "extends": [
       "react-app",
       "react-app/jest"
+    ],
+    "plugins": [
+      "sonarjs"
+    ],
+    "rules": {
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/explicit-function-return-type": [
+        "warn",
+        {
+          "allowExpressions": true,
+          "allowTypedFunctionExpressions": true,
+          "allowHigherOrderFunctions": true
+        }
+      ],
+      "no-console": [
+        "warn",
+        {
+          "allow": [
+            "warn",
+            "error"
+          ]
+        }
+      ],
+      "sonarjs/cognitive-complexity": [
+        "warn",
+        15
+      ]
+    }
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "prettier --write",
+      "eslint --fix"
     ]
   },
   "browserslist": {
@@ -62,7 +97,9 @@
   "devDependencies": {
     "@commitlint/cli": "^20.1.0",
     "@commitlint/config-conventional": "^20.0.0",
+    "eslint-plugin-sonarjs": "^3.0.5",
     "husky": "^9.1.7",
+    "lint-staged": "^16.2.3",
     "prettier": "^3.6.2",
     "serve": "^10.0.2"
   }
