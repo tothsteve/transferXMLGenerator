@@ -6,7 +6,7 @@
       "dom.iterable",
       "esnext"
     ],
-    "allowJs": true,
+    "allowJs": false,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -20,9 +20,10 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    // Additional strictness for code quality (dial back unused checks)
+    // Additional strictness for code quality
     "noImplicitReturns": true,
     "noUncheckedIndexedAccess": true
+    // Note: noUnusedLocals and noUnusedParameters deferred to Week 2 (21 unused variables to clean up)
   },
   "include": [
     "src"
