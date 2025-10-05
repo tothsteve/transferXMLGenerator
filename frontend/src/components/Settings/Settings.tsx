@@ -141,7 +141,7 @@ const Settings: React.FC = () => {
         is_default: defaultAccount.data.is_default || true,
       });
     }
-  }, [defaultAccount?.data]);
+  }, [defaultAccount?.data, isEditing]);
 
   const handleInputChange =
     (field: string) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Paper,
@@ -285,7 +285,7 @@ const NAVInvoices: React.FC = () => {
   const bulkMarkPaidMutation = useBulkMarkPaid();
 
   // Load invoices
-  const loadInvoices = async () => {
+  const loadInvoices = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -334,7 +334,21 @@ const NAVInvoices: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [
+    currentPage,
+    pageSize,
+    searchTerm,
+    inboundTransferFilter,
+    directionFilter,
+    paymentStatusFilter,
+    sortDirection,
+    sortField,
+    hideStornoInvoices,
+    dateFilterType,
+    dateFrom,
+    dateTo,
+    showError,
+  ]);
 
   // Check if supplier is already a trusted partner
   const checkSupplierTrustedStatus = async (supplierTaxNumber: string) => {
@@ -392,6 +406,7 @@ const NAVInvoices: React.FC = () => {
     // Clear selections when filters or page change
     setSelectedInvoices([]);
   }, [
+    loadInvoices,
     searchTerm,
     directionFilter,
     paymentStatusFilter,
@@ -658,7 +673,7 @@ const NAVInvoices: React.FC = () => {
       showSuccess('Átutalások generálása folyamatban...');
 
       const response = await navInvoicesApi.generateTransfers(requestData);
-      const { transfers, transfer_count, errors, warnings, message: _message } = response.data;
+      const { transfers, transfer_count, errors, warnings } = response.data;
 
       // Show detailed feedback about the generation process
       if (errors.length > 0) {

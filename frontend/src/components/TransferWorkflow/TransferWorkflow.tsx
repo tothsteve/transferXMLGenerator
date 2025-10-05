@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   Box,
@@ -100,10 +100,10 @@ const TransferWorkflow: React.FC = () => {
 
   const { data: templatesData } = useTemplates();
   const { data: defaultAccount } = useDefaultBankAccount();
-  const { data: beneficiariesData, isLoading: _beneficiariesLoading } = useBeneficiaries({
+  const { data: beneficiariesData } = useBeneficiaries({
     page: 1,
   });
-  const { data: transfersData, refetch: _refetchTransfers } = useTransfers({
+  const { data: transfersData } = useTransfers({
     is_processed: false,
     ordering: '-created_at',
     page_size: 100,
@@ -117,8 +117,8 @@ const TransferWorkflow: React.FC = () => {
   const generateKHExportMutation = useGenerateKHExport();
   const createBeneficiaryMutation = useCreateBeneficiary();
 
-  const templates = templatesData?.results || [];
-  const beneficiaries = beneficiariesData?.results || [];
+  const templates = useMemo(() => templatesData?.results || [], [templatesData?.results]);
+  const beneficiaries = useMemo(() => beneficiariesData?.results || [], [beneficiariesData?.results]);
   const existingTransfers = transfersData?.results || [];
 
   // Reset workflow state when navigating to transfers without specific state or with reset flag
@@ -235,7 +235,7 @@ const TransferWorkflow: React.FC = () => {
     }
   }, [location.state]);
 
-  const handleLoadTemplate = async (templateId: number) => {
+  const handleLoadTemplate = useCallback(async (templateId: number) => {
     if (!defaultAccount) {
       console.error('No default account available for template loading');
       return;
@@ -277,7 +277,7 @@ const TransferWorkflow: React.FC = () => {
     } catch (error) {
       console.error('Failed to load template:', error);
     }
-  };
+  }, [defaultAccount, loadTemplateMutation, beneficiaries]);
 
   // Handle template data passed from TemplateBuilder or preloaded transfers from NAV
   useEffect(() => {
@@ -340,7 +340,7 @@ const TransferWorkflow: React.FC = () => {
       // Clear the location state to prevent re-loading on refresh
       window.history.replaceState({}, '');
     }
-  }, [location.state, templates, defaultAccount]);
+  }, [location.state, templates, defaultAccount, handleLoadTemplate]);
 
   // Handle template parameter from URL (e.g., /transfers?template=123)
   useEffect(() => {
@@ -362,7 +362,7 @@ const TransferWorkflow: React.FC = () => {
         window.history.replaceState({}, '', newUrl);
       }
     }
-  }, [location.search, templates, defaultAccount, selectedTemplate]);
+  }, [location.search, location.pathname, templates, defaultAccount, selectedTemplate, handleLoadTemplate]);
 
   const handleUpdateTransfer = async (index: number, updatedData: Partial<TransferData>) => {
     const transfer = transfers[index];

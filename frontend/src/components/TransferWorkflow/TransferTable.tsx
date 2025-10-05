@@ -422,7 +422,7 @@ const TransferTable: React.FC<TransferTableProps> = ({
         onReorderTransfers(sortedTransfers);
       }
     }
-  }, [sortedTransfers, sortField]);
+  }, [sortedTransfers, sortField, onReorderTransfers]);
 
   const handleStartEdit = (index: number, transfer: TransferData) => {
     setEditingIndex(index);
