@@ -33,11 +33,7 @@ function TabPanel(props: TabPanelProps) {
       aria-labelledby={`settings-tab-${index}`}
       {...other}
     >
-      {value === index && (
-        <Box sx={{ py: 3 }}>
-          {children}
-        </Box>
-      )}
+      {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
     </div>
   );
 }
@@ -55,7 +51,11 @@ const Settings: React.FC = () => {
   const queryClient = useQueryClient();
 
   // Fetch default bank account
-  const { data: defaultAccount, isLoading, error } = useQuery({
+  const {
+    data: defaultAccount,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['bankAccount', 'default'],
     queryFn: () => bankAccountsApi.getDefault(),
     retry: false,
@@ -67,13 +67,13 @@ const Settings: React.FC = () => {
       console.log('🚀 saveBankAccountMutation called with data:', data);
       console.log('🔍 Current isEditing state:', isEditing);
       console.log('📍 Stack trace:', new Error().stack);
-      
+
       // CRITICAL SAFEGUARD: Don't allow mutation if not in editing mode
       if (!isEditing) {
         console.log('🚫 BLOCKING MUTATION - not in editing mode');
         throw new Error('Cannot save when not in editing mode');
       }
-      
+
       if (defaultAccount?.data?.id) {
         // Update existing account
         console.log('📝 Updating existing account:', defaultAccount.data.id);
@@ -88,7 +88,7 @@ const Settings: React.FC = () => {
       console.log('✅ saveBankAccountMutation onSuccess called');
       console.log('📦 Response:', response);
       console.log('🔍 Current isEditing state in onSuccess:', isEditing);
-      
+
       // Update form data with the response to prevent flicker
       if (response?.data) {
         setFormData({
@@ -98,20 +98,20 @@ const Settings: React.FC = () => {
           is_default: response.data.is_default || true,
         });
       }
-      
+
       setSuccessMessage('Alapértelmezett bank számla beállításai mentve!');
       setIsEditing(false);
-      
+
       // Invalidate and refetch default account
       queryClient.invalidateQueries({ queryKey: ['bankAccount', 'default'] });
-      
+
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(''), 3000);
     },
     onError: (error: any) => {
       console.error('Error saving bank account:', error);
       setSuccessMessage('Hiba történt a mentés során. Kérlek próbáld újra!');
-      
+
       // Clear error message after 5 seconds
       setTimeout(() => setSuccessMessage(''), 5000);
     },
@@ -119,18 +119,18 @@ const Settings: React.FC = () => {
 
   // Update form when default account is loaded (but NEVER while editing)
   useEffect(() => {
-    console.log('🔍 Settings useEffect triggered:', { 
-      hasData: !!defaultAccount?.data, 
-      isEditing, 
-      accountNumber: defaultAccount?.data?.account_number 
+    console.log('🔍 Settings useEffect triggered:', {
+      hasData: !!defaultAccount?.data,
+      isEditing,
+      accountNumber: defaultAccount?.data?.account_number,
     });
-    
+
     // CRITICAL: Never update form data while editing - this was causing the race condition
     if (isEditing) {
       console.log('⏸️ Skipping form update - currently editing');
       return; // Exit early if editing - do not touch form data
     }
-    
+
     if (defaultAccount?.data) {
       console.log('📝 Updating form data from API response');
       // Only update on initial load or after successful save (when not editing)
@@ -143,25 +143,24 @@ const Settings: React.FC = () => {
     }
   }, [defaultAccount?.data]);
 
-  const handleInputChange = (field: string) => (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: event.target.value
-    }));
-  };
+  const handleInputChange =
+    (field: string) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setFormData((prev) => ({
+        ...prev,
+        [field]: event.target.value,
+      }));
+    };
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     console.log('📝 handleSubmit called, isEditing:', isEditing);
-    
+
     // CRITICAL: Only allow submission if we're actually in editing mode
     if (!isEditing) {
       console.log('🚫 Prevented submission - not in editing mode');
       return;
     }
-    
+
     console.log('✅ Proceeding with mutation');
     saveBankAccountMutation.mutate(formData);
   };
@@ -187,14 +186,14 @@ const Settings: React.FC = () => {
       <Paper elevation={2}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs value={tabValue} onChange={handleTabChange} sx={{ px: 3 }}>
-            <Tab 
-              icon={<AccountBalance />} 
-              label="Bank számla" 
+            <Tab
+              icon={<AccountBalance />}
+              label="Bank számla"
               sx={{ textTransform: 'none', fontWeight: 600 }}
             />
-            <Tab 
-              icon={<People />} 
-              label="Automatikusan Fizetettnek Jelölt Partnerek" 
+            <Tab
+              icon={<People />}
+              label="Automatikusan Fizetettnek Jelölt Partnerek"
               sx={{ textTransform: 'none', fontWeight: 600 }}
             />
           </Tabs>
@@ -202,10 +201,7 @@ const Settings: React.FC = () => {
 
         <TabPanel value={tabValue} index={0}>
           {successMessage && (
-            <Alert 
-              severity={successMessage.includes('Hiba') ? 'error' : 'success'} 
-              sx={{ mb: 3 }}
-            >
+            <Alert severity={successMessage.includes('Hiba') ? 'error' : 'success'} sx={{ mb: 3 }}>
               {successMessage}
             </Alert>
           )}
@@ -246,7 +242,14 @@ const Settings: React.FC = () => {
             )}
 
             <form onSubmit={handleSubmit}>
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3, mb: 3 }}>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                  gap: 3,
+                  mb: 3,
+                }}
+              >
                 <TextField
                   label="Számlaszám"
                   value={formData.account_number}
@@ -281,7 +284,9 @@ const Settings: React.FC = () => {
                 control={
                   <Switch
                     checked={formData.is_default}
-                    onChange={(e) => setFormData(prev => ({ ...prev, is_default: e.target.checked }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, is_default: e.target.checked }))
+                    }
                     disabled={!isEditing}
                   />
                 }
@@ -294,7 +299,9 @@ const Settings: React.FC = () => {
                   <Button
                     type="submit"
                     variant="contained"
-                    startIcon={saveBankAccountMutation.isPending ? <CircularProgress size={20} /> : <Save />}
+                    startIcon={
+                      saveBankAccountMutation.isPending ? <CircularProgress size={20} /> : <Save />
+                    }
                     color="primary"
                     disabled={saveBankAccountMutation.isPending}
                   >
@@ -325,7 +332,8 @@ const Settings: React.FC = () => {
             {!defaultAccount?.data && !error && (
               <Alert severity="warning" sx={{ mt: 3 }}>
                 <Typography variant="body2">
-                  <strong>Nincs alapértelmezett bank számla beállítva.</strong><br />
+                  <strong>Nincs alapértelmezett bank számla beállítva.</strong>
+                  <br />
                   Kérlek add meg a számla adatait a fenti űrlapon keresztül.
                 </Typography>
               </Alert>

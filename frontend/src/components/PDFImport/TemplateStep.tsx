@@ -14,10 +14,7 @@ import {
   ListItemText,
   Stack,
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  Add as AddIcon,
-} from '@mui/icons-material';
+import { CheckCircle as CheckCircleIcon, Add as AddIcon } from '@mui/icons-material';
 import { PDFProcessingResult } from './PDFImportWizard';
 
 interface TemplateStepProps {
@@ -25,10 +22,7 @@ interface TemplateStepProps {
   onCreateTransfers: () => void;
 }
 
-export const TemplateStep: React.FC<TemplateStepProps> = ({
-  previewData,
-  onCreateTransfers,
-}) => {
+export const TemplateStep: React.FC<TemplateStepProps> = ({ previewData, onCreateTransfers }) => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('hu-HU', {
       style: 'currency',
@@ -47,7 +41,7 @@ export const TemplateStep: React.FC<TemplateStepProps> = ({
             width: { xs: 60, sm: 70 },
             height: { xs: 60, sm: 70 },
             bgcolor: 'success.main',
-            fontSize: { xs: 30, sm: 35 }
+            fontSize: { xs: 30, sm: 35 },
           }}
         >
           <CheckCircleIcon fontSize="inherit" />
@@ -56,10 +50,20 @@ export const TemplateStep: React.FC<TemplateStepProps> = ({
 
       {/* Success Message */}
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h5" component="h2" fontWeight="bold" gutterBottom sx={{ fontSize: { xs: '1.4rem', sm: '1.75rem' } }}>
+        <Typography
+          variant="h5"
+          component="h2"
+          fontWeight="bold"
+          gutterBottom
+          sx={{ fontSize: { xs: '1.4rem', sm: '1.75rem' } }}
+        >
           🎉 Sablon Sikeresen {previewData.template_updated ? 'Frissítve' : 'Létrehozva'}!
         </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}>
+        <Typography
+          variant="body1"
+          color="text.secondary"
+          sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}
+        >
           A PDF fájlok feldolgozása befejeződött és a sablon készen áll a használatra.
         </Typography>
       </Box>
@@ -67,10 +71,16 @@ export const TemplateStep: React.FC<TemplateStepProps> = ({
       {/* Template Summary */}
       <Card elevation={1} sx={{ mb: 3 }}>
         <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-          <Typography variant="subtitle1" fontWeight={600} gutterBottom textAlign="center" sx={{ fontSize: { xs: '1rem', sm: '1.1rem' } }}>
+          <Typography
+            variant="subtitle1"
+            fontWeight={600}
+            gutterBottom
+            textAlign="center"
+            sx={{ fontSize: { xs: '1rem', sm: '1.1rem' } }}
+          >
             📄 Sablon Összefoglaló
           </Typography>
-          
+
           <Box sx={{ display: { xs: 'block', md: 'flex' }, gap: 4, textAlign: 'left' }}>
             <Box sx={{ flex: 1, mb: { xs: 3, md: 0 } }}>
               <Typography variant="subtitle1" fontWeight={600} gutterBottom>
@@ -78,16 +88,28 @@ export const TemplateStep: React.FC<TemplateStepProps> = ({
               </Typography>
               <Stack spacing={1}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="body2" color="text.secondary">Sablon neve:</Typography>
-                  <Typography variant="body2" fontWeight={500}>{previewData.template.name}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Sablon neve:
+                  </Typography>
+                  <Typography variant="body2" fontWeight={500}>
+                    {previewData.template.name}
+                  </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="body2" color="text.secondary">Sablon ID:</Typography>
-                  <Typography variant="body2" fontWeight={500}>#{previewData.template.id}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Sablon ID:
+                  </Typography>
+                  <Typography variant="body2" fontWeight={500}>
+                    #{previewData.template.id}
+                  </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="body2" color="text.secondary">Kedvezményezettek:</Typography>
-                  <Typography variant="body2" fontWeight={500}>{previewData.template.beneficiary_count}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Kedvezményezettek:
+                  </Typography>
+                  <Typography variant="body2" fontWeight={500}>
+                    {previewData.template.beneficiary_count}
+                  </Typography>
                 </Box>
               </Stack>
             </Box>
@@ -98,21 +120,37 @@ export const TemplateStep: React.FC<TemplateStepProps> = ({
               </Typography>
               <Stack spacing={1}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="body2" color="text.secondary">Tranzakciók:</Typography>
-                  <Typography variant="body2" fontWeight={500}>{previewData.transactions_processed}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Tranzakciók:
+                  </Typography>
+                  <Typography variant="body2" fontWeight={500}>
+                    {previewData.transactions_processed}
+                  </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="body2" color="text.secondary">Összes összeg:</Typography>
-                  <Typography variant="body2" fontWeight={500}>{formatCurrency(previewData.total_amount)}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Összes összeg:
+                  </Typography>
+                  <Typography variant="body2" fontWeight={500}>
+                    {formatCurrency(previewData.total_amount)}
+                  </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="body2" color="text.secondary">Meglévő kedvezményezett:</Typography>
-                  <Typography variant="body2" fontWeight={500} color="success.main">{previewData.beneficiaries_matched}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Meglévő kedvezményezett:
+                  </Typography>
+                  <Typography variant="body2" fontWeight={500} color="success.main">
+                    {previewData.beneficiaries_matched}
+                  </Typography>
                 </Box>
                 {previewData.beneficiaries_created > 0 && (
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" color="text.secondary">Új kedvezményezett:</Typography>
-                    <Typography variant="body2" fontWeight={500} color="warning.main">{previewData.beneficiaries_created}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Új kedvezményezett:
+                    </Typography>
+                    <Typography variant="body2" fontWeight={500} color="warning.main">
+                      {previewData.beneficiaries_created}
+                    </Typography>
                   </Box>
                 )}
               </Stack>
@@ -141,7 +179,9 @@ export const TemplateStep: React.FC<TemplateStepProps> = ({
         <List dense>
           <ListItem sx={{ px: 0, py: 1 }}>
             <ListItemIcon>
-              <Avatar sx={{ width: 24, height: 24, bgcolor: 'info.main', fontSize: '0.75rem' }}>1</Avatar>
+              <Avatar sx={{ width: 24, height: 24, bgcolor: 'info.main', fontSize: '0.75rem' }}>
+                1
+              </Avatar>
             </ListItemIcon>
             <ListItemText
               primary="Utalások létrehozása"
@@ -150,7 +190,9 @@ export const TemplateStep: React.FC<TemplateStepProps> = ({
           </ListItem>
           <ListItem sx={{ px: 0, py: 1 }}>
             <ListItemIcon>
-              <Avatar sx={{ width: 24, height: 24, bgcolor: 'info.main', fontSize: '0.75rem' }}>2</Avatar>
+              <Avatar sx={{ width: 24, height: 24, bgcolor: 'info.main', fontSize: '0.75rem' }}>
+                2
+              </Avatar>
             </ListItemIcon>
             <ListItemText
               primary="Összegek módosítása"
@@ -159,7 +201,9 @@ export const TemplateStep: React.FC<TemplateStepProps> = ({
           </ListItem>
           <ListItem sx={{ px: 0, py: 1 }}>
             <ListItemIcon>
-              <Avatar sx={{ width: 24, height: 24, bgcolor: 'info.main', fontSize: '0.75rem' }}>3</Avatar>
+              <Avatar sx={{ width: 24, height: 24, bgcolor: 'info.main', fontSize: '0.75rem' }}>
+                3
+              </Avatar>
             </ListItemIcon>
             <ListItemText
               primary="Generálás"
@@ -170,10 +214,10 @@ export const TemplateStep: React.FC<TemplateStepProps> = ({
       </Alert>
 
       {/* Action Buttons */}
-      <Stack 
-        direction={{ xs: 'column', sm: 'row' }} 
-        spacing={2} 
-        justifyContent="center" 
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={2}
+        justifyContent="center"
         sx={{ mb: 4 }}
       >
         <Button

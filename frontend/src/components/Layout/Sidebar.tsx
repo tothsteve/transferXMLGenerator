@@ -69,7 +69,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
     if (location.pathname === '/transfers') {
       navigate('/transfers', {
         replace: true,
-        state: { reset: true, timestamp: Date.now() }
+        state: { reset: true, timestamp: Date.now() },
       });
     } else {
       navigate('/transfers');
@@ -121,7 +121,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
               <ListItemButton
                 component={item.href === '/transfers' ? 'div' : NavLink}
                 to={item.href === '/transfers' ? undefined : item.href}
-                onClick={item.href === '/transfers' ? handleTransferClick : (isMobile ? onClose : undefined)}
+                onClick={
+                  item.href === '/transfers' ? handleTransferClick : isMobile ? onClose : undefined
+                }
                 sx={{
                   borderRadius: 1,
                   '&.active': {
@@ -134,13 +136,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
                   '&:hover': {
                     bgcolor: 'grey.50',
                   },
-                  ...(item.href === '/transfers' && location.pathname === '/transfers' && {
-                    bgcolor: 'primary.50',
-                    color: 'primary.600',
-                    '& .MuiListItemIcon-root': {
+                  ...(item.href === '/transfers' &&
+                    location.pathname === '/transfers' && {
+                      bgcolor: 'primary.50',
                       color: 'primary.600',
-                    },
-                  }),
+                      '& .MuiListItemIcon-root': {
+                        color: 'primary.600',
+                      },
+                    }),
                 }}
               >
                 <ListItemIcon sx={{ minWidth: 40 }}>
@@ -162,21 +165,21 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
                     sx={{
                       height: 20,
                       fontSize: '0.7rem',
-                      fontWeight: 'bold'
+                      fontWeight: 'bold',
                     }}
                   />
                 )}
               </ListItemButton>
             </ListItem>
           ))}
-          
+
           {/* Admin Navigation */}
           {isAdmin && (
             <>
               <Divider sx={{ my: 1 }} />
-              <Typography 
-                variant="caption" 
-                color="text.secondary" 
+              <Typography
+                variant="caption"
+                color="text.secondary"
                 sx={{ px: 2, py: 1, fontWeight: 600, textTransform: 'uppercase' }}
               >
                 Adminisztráció
@@ -204,7 +207,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
                     <ListItemIcon sx={{ minWidth: 40 }}>
                       <item.icon />
                     </ListItemIcon>
-                    <ListItemText 
+                    <ListItemText
                       primary={item.name}
                       primaryTypographyProps={{
                         fontWeight: 600,
@@ -236,7 +239,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
             '& .MuiDrawer-paper': {
               width: width,
               boxSizing: 'border-box',
-              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%)',
+              background:
+                'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%)',
               backdropFilter: 'blur(20px)',
               borderRight: '1px solid rgba(255, 255, 255, 0.2)',
             },
@@ -254,7 +258,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
             '& .MuiDrawer-paper': {
               width: width,
               boxSizing: 'border-box',
-              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%)',
+              background:
+                'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%)',
               backdropFilter: 'blur(20px)',
               borderRight: '1px solid rgba(255, 255, 255, 0.2)',
             },

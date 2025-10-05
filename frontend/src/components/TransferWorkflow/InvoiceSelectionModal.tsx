@@ -117,10 +117,8 @@ const InvoiceSelectionModal: React.FC<InvoiceSelectionModalProps> = ({
   };
 
   const handleToggleInvoice = (invoiceId: number) => {
-    setSelectedInvoices(prev =>
-      prev.includes(invoiceId)
-        ? prev.filter(id => id !== invoiceId)
-        : [...prev, invoiceId]
+    setSelectedInvoices((prev) =>
+      prev.includes(invoiceId) ? prev.filter((id) => id !== invoiceId) : [...prev, invoiceId]
     );
   };
 
@@ -142,9 +140,7 @@ const InvoiceSelectionModal: React.FC<InvoiceSelectionModalProps> = ({
     <Dialog open={isOpen} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6">
-            NAV számla kiválasztása
-          </Typography>
+          <Typography variant="h6">NAV számla kiválasztása</Typography>
           <IconButton onClick={handleClose} edge="end" disabled={loading}>
             <CloseIcon />
           </IconButton>
@@ -189,13 +185,19 @@ const InvoiceSelectionModal: React.FC<InvoiceSelectionModalProps> = ({
                       disabled={loading || invoice.payment_status.status === 'PAID'}
                       sx={{
                         border: 1,
-                        borderColor: selectedInvoices.includes(invoice.id) ? 'primary.main' : 'divider',
+                        borderColor: selectedInvoices.includes(invoice.id)
+                          ? 'primary.main'
+                          : 'divider',
                         borderRadius: 1,
                         mb: 1,
-                        bgcolor: selectedInvoices.includes(invoice.id) ? 'primary.50' : 'transparent',
+                        bgcolor: selectedInvoices.includes(invoice.id)
+                          ? 'primary.50'
+                          : 'transparent',
                         '&:hover': {
-                          bgcolor: selectedInvoices.includes(invoice.id) ? 'primary.100' : 'action.hover'
-                        }
+                          bgcolor: selectedInvoices.includes(invoice.id)
+                            ? 'primary.100'
+                            : 'action.hover',
+                        },
                       }}
                     >
                       <Checkbox
@@ -216,23 +218,39 @@ const InvoiceSelectionModal: React.FC<InvoiceSelectionModalProps> = ({
                                 sx={{
                                   height: 20,
                                   fontSize: '0.65rem',
-                                  bgcolor: invoice.payment_status.class === 'overdue' ? 'error.light' :
-                                           invoice.payment_status.class === 'paid' ? 'success.light' :
-                                           invoice.payment_status.class === 'prepared' ? 'info.light' : 'warning.light',
-                                  color: invoice.payment_status.class === 'overdue' ? 'error.dark' :
-                                         invoice.payment_status.class === 'paid' ? 'success.dark' :
-                                         invoice.payment_status.class === 'prepared' ? 'info.dark' : 'warning.dark',
+                                  bgcolor:
+                                    invoice.payment_status.class === 'overdue'
+                                      ? 'error.light'
+                                      : invoice.payment_status.class === 'paid'
+                                        ? 'success.light'
+                                        : invoice.payment_status.class === 'prepared'
+                                          ? 'info.light'
+                                          : 'warning.light',
+                                  color:
+                                    invoice.payment_status.class === 'overdue'
+                                      ? 'error.dark'
+                                      : invoice.payment_status.class === 'paid'
+                                        ? 'success.dark'
+                                        : invoice.payment_status.class === 'prepared'
+                                          ? 'info.dark'
+                                          : 'warning.dark',
                                 }}
                               />
                             </Stack>
                             <Typography variant="caption" color="text.secondary" display="block">
                               {invoice.partner_name}
                             </Typography>
-                            <Typography variant="caption" color="primary" fontWeight={600} component="span">
+                            <Typography
+                              variant="caption"
+                              color="primary"
+                              fontWeight={600}
+                              component="span"
+                            >
                               {invoice.invoice_gross_amount_formatted}
                             </Typography>
                             <Typography variant="caption" color="text.secondary" component="span">
-                              {' • Esedékes: '}{invoice.payment_due_date_formatted || 'N/A'}
+                              {' • Esedékes: '}
+                              {invoice.payment_due_date_formatted || 'N/A'}
                             </Typography>
                           </Box>
                         }

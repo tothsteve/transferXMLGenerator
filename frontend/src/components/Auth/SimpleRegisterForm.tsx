@@ -8,7 +8,7 @@ import {
   Alert,
   CircularProgress,
   Link,
-  Container
+  Container,
 } from '@mui/material';
 import { useAuth, RegisterData } from '../../contexts/AuthContext';
 
@@ -31,7 +31,7 @@ const SimpleRegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =>
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
@@ -47,14 +47,15 @@ const SimpleRegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =>
     if (!formData.last_name.trim()) return 'Vezetéknév kötelező';
     if (!formData.company_name.trim()) return 'Cég neve kötelező';
     if (!formData.company_tax_id.trim()) return 'Adószám kötelező';
-    if (formData.password.length < 8) return 'A jelszónak legalább 8 karakter hosszúnak kell lennie';
+    if (formData.password.length < 8)
+      return 'A jelszónak legalább 8 karakter hosszúnak kell lennie';
     if (formData.password !== formData.password_confirm) return 'A jelszavak nem egyeznek';
     return null;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const error = validateForm();
     if (error) {
       clearError();
@@ -90,11 +91,11 @@ const SimpleRegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =>
             <img
               src="/logo192.png"
               alt="ITCardigan Logo"
-              style={{ 
-                width: 64, 
-                height: 64, 
+              style={{
+                width: 64,
+                height: 64,
                 borderRadius: '50%',
-                border: '2px solid #e0e0e0'
+                border: '2px solid #e0e0e0',
               }}
             />
             <Box>
@@ -110,7 +111,7 @@ const SimpleRegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =>
           <Typography component="h2" variant="h5" gutterBottom>
             Regisztráció
           </Typography>
-          
+
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
             Hozzon létre új fiókot és céget
           </Typography>
@@ -125,7 +126,7 @@ const SimpleRegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =>
             <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
               Felhasználói adatok
             </Typography>
-            
+
             <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
               <TextField
                 required
@@ -202,7 +203,7 @@ const SimpleRegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =>
             <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
               Céginformációk
             </Typography>
-            
+
             <TextField
               required
               fullWidth

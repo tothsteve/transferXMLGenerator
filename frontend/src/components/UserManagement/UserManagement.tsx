@@ -38,7 +38,6 @@ interface CompanyUser {
   joined_at: string;
 }
 
-
 const UserManagement: React.FC = () => {
   const { state } = useAuth();
   const isAdmin = useIsCompanyAdmin();
@@ -65,13 +64,12 @@ const UserManagement: React.FC = () => {
     }
   };
 
-
   const handleRoleChange = async (userId: number, newRole: 'ADMIN' | 'USER') => {
     try {
       await userManagementApi.updateUserRole(userId, newRole);
-      setUsers(prev => prev.map(user => 
-        user.id === userId ? { ...user, role: newRole } : user
-      ));
+      setUsers((prev) =>
+        prev.map((user) => (user.id === userId ? { ...user, role: newRole } : user))
+      );
     } catch (error: any) {
       setError(error.response?.data?.detail || 'Nem sikerült frissíteni a felhasználó szerepkörét');
     }
@@ -84,7 +82,7 @@ const UserManagement: React.FC = () => {
 
     try {
       await userManagementApi.removeUser(userId);
-      setUsers(prev => prev.filter(user => user.id !== userId));
+      setUsers((prev) => prev.filter((user) => user.id !== userId));
     } catch (error: any) {
       setError(error.response?.data?.detail || 'Nem sikerült eltávolítani a felhasználót');
     }
@@ -151,56 +149,59 @@ const UserManagement: React.FC = () => {
                   Nincsenek felhasználók
                 </TableCell>
               </TableRow>
-            ) : users.map((companyUser) => (
-              <TableRow key={companyUser.id}>
-                <TableCell>
-                  {companyUser.user.first_name} {companyUser.user.last_name}
-                </TableCell>
-                <TableCell>{companyUser.user.email}</TableCell>
-                <TableCell>{companyUser.user.username}</TableCell>
-                <TableCell>
-                  <Chip
-                    icon={companyUser.role === 'ADMIN' ? <AdminIcon /> : <UserIcon />}
-                    label={companyUser.role === 'ADMIN' ? 'Admin' : 'User'}
-                    color={companyUser.role === 'ADMIN' ? 'warning' : 'info'}
-                    size="small"
-                  />
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    label={companyUser.is_active ? 'Aktív' : 'Inaktív'}
-                    color={companyUser.is_active ? 'success' : 'default'}
-                    size="small"
-                  />
-                </TableCell>
-                <TableCell>
-                  {new Date(companyUser.joined_at).toLocaleDateString('hu-HU')}
-                </TableCell>
-                <TableCell align="center">
-                  <FormControl size="small" sx={{ minWidth: 80, mr: 1 }}>
-                    <Select
-                      value={companyUser.role}
-                      onChange={(e) => handleRoleChange(companyUser.id, e.target.value as 'ADMIN' | 'USER')}
-                      disabled={companyUser.user.id === state.user?.id} // Can't change own role
+            ) : (
+              users.map((companyUser) => (
+                <TableRow key={companyUser.id}>
+                  <TableCell>
+                    {companyUser.user.first_name} {companyUser.user.last_name}
+                  </TableCell>
+                  <TableCell>{companyUser.user.email}</TableCell>
+                  <TableCell>{companyUser.user.username}</TableCell>
+                  <TableCell>
+                    <Chip
+                      icon={companyUser.role === 'ADMIN' ? <AdminIcon /> : <UserIcon />}
+                      label={companyUser.role === 'ADMIN' ? 'Admin' : 'User'}
+                      color={companyUser.role === 'ADMIN' ? 'warning' : 'info'}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={companyUser.is_active ? 'Aktív' : 'Inaktív'}
+                      color={companyUser.is_active ? 'success' : 'default'}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {new Date(companyUser.joined_at).toLocaleDateString('hu-HU')}
+                  </TableCell>
+                  <TableCell align="center">
+                    <FormControl size="small" sx={{ minWidth: 80, mr: 1 }}>
+                      <Select
+                        value={companyUser.role}
+                        onChange={(e) =>
+                          handleRoleChange(companyUser.id, e.target.value as 'ADMIN' | 'USER')
+                        }
+                        disabled={companyUser.user.id === state.user?.id} // Can't change own role
+                      >
+                        <MenuItem value="USER">User</MenuItem>
+                        <MenuItem value="ADMIN">Admin</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <IconButton
+                      color="error"
+                      onClick={() => handleRemoveUser(companyUser.id)}
+                      disabled={companyUser.user.id === state.user?.id} // Can't remove self
                     >
-                      <MenuItem value="USER">User</MenuItem>
-                      <MenuItem value="ADMIN">Admin</MenuItem>
-                    </Select>
-                  </FormControl>
-                  <IconButton
-                    color="error"
-                    onClick={() => handleRemoveUser(companyUser.id)}
-                    disabled={companyUser.user.id === state.user?.id} // Can't remove self
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </TableCell>
-              </TableRow>
-            ))}
+                      <DeleteIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>
-
     </Box>
   );
 };

@@ -25,13 +25,7 @@ import {
   Switch,
   FormControlLabel,
 } from '@mui/material';
-import {
-  Add,
-  Search,
-  PersonAdd,
-  ArrowUpward,
-  ArrowDownward,
-} from '@mui/icons-material';
+import { Add, Search, PersonAdd, ArrowUpward, ArrowDownward } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trustedPartnersApi } from '../../services/api';
 import { TrustedPartner, AvailablePartner } from '../../types/api';
@@ -59,11 +53,7 @@ function TabPanel(props: TabPanelProps) {
       aria-labelledby={`partner-tab-${index}`}
       {...other}
     >
-      {value === index && (
-        <Box sx={{ py: 2 }}>
-          {children}
-        </Box>
-      )}
+      {value === index && <Box sx={{ py: 2 }}>{children}</Box>}
     </div>
   );
 }
@@ -103,26 +93,38 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
 
   // Fetch available partners from invoices
   const { data: availablePartnersResponse, isLoading: availablePartnersLoading } = useQuery({
-    queryKey: ['availablePartners', { page: availablePartnersPage + 1, page_size: availablePartnersRowsPerPage, search: availablePartnersSearch }],
-    queryFn: () => trustedPartnersApi.getAvailablePartners({ 
-      page: availablePartnersPage + 1, 
-      page_size: availablePartnersRowsPerPage,
-      search: availablePartnersSearch || undefined,
-    }),
+    queryKey: [
+      'availablePartners',
+      {
+        page: availablePartnersPage + 1,
+        page_size: availablePartnersRowsPerPage,
+        search: availablePartnersSearch,
+      },
+    ],
+    queryFn: () =>
+      trustedPartnersApi.getAvailablePartners({
+        page: availablePartnersPage + 1,
+        page_size: availablePartnersRowsPerPage,
+        search: availablePartnersSearch || undefined,
+      }),
     enabled: open && tabValue === 1, // Only fetch when dialog is open and on "From Invoices" tab
   });
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: Omit<TrustedPartner, 'id' | 'invoice_count' | 'last_invoice_date' | 'created_at' | 'updated_at'>) =>
-      trustedPartnersApi.create(data),
+    mutationFn: (
+      data: Omit<
+        TrustedPartner,
+        'id' | 'invoice_count' | 'last_invoice_date' | 'created_at' | 'updated_at'
+      >
+    ) => trustedPartnersApi.create(data),
     onSuccess: (response) => {
       // Show success message
       setSuccessMessage(`Partner "${response.data.partner_name}" sikeresen hozzáadva!`);
-      
+
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(''), 3000);
-      
+
       // Reset manual form if on manual tab
       if (tabValue === 0) {
         setManualFormData({
@@ -132,14 +134,14 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
           auto_pay: true,
         });
       }
-      
+
       // Invalidate queries to refresh both trusted partners and available partners lists
       queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
       queryClient.invalidateQueries({ queryKey: ['availablePartners'] });
-      
+
       // Call onSuccess for parent component
       onSuccess();
-      
+
       // Do NOT close dialog - user can continue adding partners
     },
     onError: (error: any) => {
@@ -164,15 +166,14 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
     setSuccessMessage('');
   };
 
-  const handleManualInputChange = (field: keyof typeof manualFormData) => (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setManualFormData(prev => ({
-      ...prev,
-      [field]: event.target.type === 'checkbox' ? event.target.checked : event.target.value
-    }));
-    setError('');
-  };
+  const handleManualInputChange =
+    (field: keyof typeof manualFormData) => (event: React.ChangeEvent<HTMLInputElement>) => {
+      setManualFormData((prev) => ({
+        ...prev,
+        [field]: event.target.type === 'checkbox' ? event.target.checked : event.target.value,
+      }));
+      setError('');
+    };
 
   const handleManualSubmit = () => {
     if (!manualFormData.partner_name.trim()) {
@@ -250,7 +251,7 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
             {error}
           </Alert>
         )}
-        
+
         {successMessage && (
           <Alert severity="success" sx={{ mt: 2, mb: 2 }}>
             {successMessage}
@@ -306,7 +307,8 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
         {/* From Invoices Tab */}
         <TabPanel value={tabValue} index={1}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            NAV számláiból származó partnerek, akik még nincsenek hozzáadva az Automatikusan Fizetettnek jelölt Partnerekhez.
+            NAV számláiból származó partnerek, akik még nincsenek hozzáadva az Automatikusan
+            Fizetettnek jelölt Partnerekhez.
           </Typography>
 
           <TextField
@@ -340,11 +342,11 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
                           size="small"
                           onClick={() => handleSort('partner_name')}
                           endIcon={getSortIcon('partner_name')}
-                          sx={{ 
-                            textTransform: 'none', 
+                          sx={{
+                            textTransform: 'none',
                             fontWeight: 600,
                             color: 'text.primary',
-                            '&:hover': { backgroundColor: 'transparent' }
+                            '&:hover': { backgroundColor: 'transparent' },
                           }}
                         >
                           Partner neve
@@ -356,11 +358,11 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
                           size="small"
                           onClick={() => handleSort('tax_number')}
                           endIcon={getSortIcon('tax_number')}
-                          sx={{ 
-                            textTransform: 'none', 
+                          sx={{
+                            textTransform: 'none',
                             fontWeight: 600,
                             color: 'text.primary',
-                            '&:hover': { backgroundColor: 'transparent' }
+                            '&:hover': { backgroundColor: 'transparent' },
                           }}
                         >
                           Adószám
@@ -372,11 +374,11 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
                           size="small"
                           onClick={() => handleSort('invoice_count')}
                           endIcon={getSortIcon('invoice_count')}
-                          sx={{ 
-                            textTransform: 'none', 
+                          sx={{
+                            textTransform: 'none',
                             fontWeight: 600,
                             color: 'text.primary',
-                            '&:hover': { backgroundColor: 'transparent' }
+                            '&:hover': { backgroundColor: 'transparent' },
                           }}
                         >
                           Számlák száma
@@ -388,11 +390,11 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
                           size="small"
                           onClick={() => handleSort('last_invoice_date')}
                           endIcon={getSortIcon('last_invoice_date')}
-                          sx={{ 
-                            textTransform: 'none', 
+                          sx={{
+                            textTransform: 'none',
                             fontWeight: 600,
                             color: 'text.primary',
-                            '&:hover': { backgroundColor: 'transparent' }
+                            '&:hover': { backgroundColor: 'transparent' },
                           }}
                         >
                           Utolsó számla
@@ -443,7 +445,9 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
                       <TableRow>
                         <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                           <Typography variant="body2" color="text.secondary">
-                            {availablePartnersSearch ? 'Nincs találat a keresésre.' : 'Nincsenek elérhető partnerek.'}
+                            {availablePartnersSearch
+                              ? 'Nincs találat a keresésre.'
+                              : 'Nincsenek elérhető partnerek.'}
                           </Typography>
                         </TableCell>
                       </TableRow>

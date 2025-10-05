@@ -44,7 +44,6 @@ const BatchDetailsDialog: React.FC<BatchDetailsDialogProps> = ({
   batch,
   isLoading = false,
 }) => {
-
   const formatAmount = (amount: string) => {
     const num = parseFloat(amount);
     return new Intl.NumberFormat('hu-HU', {
@@ -70,13 +69,13 @@ const BatchDetailsDialog: React.FC<BatchDetailsDialogProps> = ({
   };
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose} 
-      maxWidth="lg" 
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="lg"
       fullWidth
       PaperProps={{
-        sx: { minHeight: '80vh' }
+        sx: { minHeight: '80vh' },
       }}
     >
       <DialogTitle>
@@ -111,156 +110,166 @@ const BatchDetailsDialog: React.FC<BatchDetailsDialogProps> = ({
                 <Typography variant="h6" gutterBottom>
                   Összesítő adatok
                 </Typography>
-            <Stack direction="row" spacing={4} flexWrap="wrap">
-              <Box>
-                <Typography variant="body2" color="text.secondary">
-                  Utalások száma
-                </Typography>
-                <Chip 
-                  label={`${batch.transfer_count} utalás`}
-                  color="primary"
-                  variant="outlined"
-                />
-              </Box>
-              <Box>
-                <Typography variant="body2" color="text.secondary">
-                  Teljes összeg
-                </Typography>
-                <Typography variant="h6" color="primary">
-                  {formatAmount(batch.total_amount)}
-                </Typography>
-              </Box>
-              <Box>
-                <Typography variant="body2" color="text.secondary">
-                  Formátum
-                </Typography>
-                <Chip 
-                  label={batch.batch_format_display?.replace('SEPA XML', 'XML') || batch.batch_format || 'XML'}
-                  size="small"
-                  color="info"
-                />
-              </Box>
-              <Box>
-                <Typography variant="body2" color="text.secondary">
-                  Generálás dátuma
-                </Typography>
-                <Typography variant="body1">
-                  {batch.xml_generated_at ? formatDateTime(batch.xml_generated_at) : 'N/A'}
-                </Typography>
-              </Box>
-            </Stack>
-            
-            {batch.description && (
-              <>
-                <Divider sx={{ my: 2 }} />
-                <Typography variant="body2" color="text.secondary">
-                  Leírás
-                </Typography>
-                <Typography variant="body1">
-                  {batch.description}
-                </Typography>
-              </>
-            )}
-          </CardContent>
-        </Card>
+                <Stack direction="row" spacing={4} flexWrap="wrap">
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">
+                      Utalások száma
+                    </Typography>
+                    <Chip
+                      label={`${batch.transfer_count} utalás`}
+                      color="primary"
+                      variant="outlined"
+                    />
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">
+                      Teljes összeg
+                    </Typography>
+                    <Typography variant="h6" color="primary">
+                      {formatAmount(batch.total_amount)}
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">
+                      Formátum
+                    </Typography>
+                    <Chip
+                      label={
+                        batch.batch_format_display?.replace('SEPA XML', 'XML') ||
+                        batch.batch_format ||
+                        'XML'
+                      }
+                      size="small"
+                      color="info"
+                    />
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">
+                      Generálás dátuma
+                    </Typography>
+                    <Typography variant="body1">
+                      {batch.xml_generated_at ? formatDateTime(batch.xml_generated_at) : 'N/A'}
+                    </Typography>
+                  </Box>
+                </Stack>
 
-        {/* Transfer Details */}
-        <Card>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Utalások részletei ({batch.transfers?.length || 0})
-            </Typography>
-            
-            {batch.transfers && batch.transfers.length > 0 ? (
-              <TableContainer component={Paper} variant="outlined">
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell><strong>Kedvezményezett</strong></TableCell>
-                      <TableCell><strong>Számla</strong></TableCell>
-                      <TableCell align="right"><strong>Összeg</strong></TableCell>
-                      <TableCell><strong>Teljesítés</strong></TableCell>
-                      <TableCell><strong>Közlemény</strong></TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {batch.transfers.map((transfer) => (
-                      <TableRow key={transfer.id} hover>
-                        <TableCell>
-                          <Stack direction="row" alignItems="center" spacing={1}>
-                            <PersonIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                            <Typography variant="body2">
-                              {transfer.beneficiary?.name || 'Ismeretlen kedvezményezett'}
-                            </Typography>
-                          </Stack>
-                        </TableCell>
-                        <TableCell>
-                          <Stack direction="row" alignItems="center" spacing={1}>
-                            <AccountBalanceIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                            <Typography variant="body2" fontFamily="monospace">
-                              {transfer.beneficiary?.account_number || 'N/A'}
-                            </Typography>
-                          </Stack>
-                        </TableCell>
-                        <TableCell align="right">
-                          <Typography variant="body2" fontWeight="medium">
-                            {formatAmount(transfer.amount)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Stack direction="row" alignItems="center" spacing={1}>
-                            <CalendarIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                            <Typography variant="body2">
-                              {formatDate(transfer.execution_date)}
-                            </Typography>
-                          </Stack>
-                        </TableCell>
-                        <TableCell>
-                          <Typography 
-                            variant="body2" 
-                            sx={{ 
-                              maxWidth: 200, 
-                              overflow: 'hidden', 
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap'
-                            }}
-                            title={transfer.remittance_info}
-                          >
-                            {transfer.remittance_info || '-'}
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            ) : (
-              <Box 
-                sx={{ 
-                  textAlign: 'center', 
-                  py: 4,
-                  color: 'text.secondary' 
-                }}
-              >
-                <Typography variant="body2">
-                  Nincsenek utalások ebben a kötegben
+                {batch.description && (
+                  <>
+                    <Divider sx={{ my: 2 }} />
+                    <Typography variant="body2" color="text.secondary">
+                      Leírás
+                    </Typography>
+                    <Typography variant="body1">{batch.description}</Typography>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Transfer Details */}
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Utalások részletei ({batch.transfers?.length || 0})
                 </Typography>
-              </Box>
-            )}
-          </CardContent>
-        </Card>
+
+                {batch.transfers && batch.transfers.length > 0 ? (
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>
+                            <strong>Kedvezményezett</strong>
+                          </TableCell>
+                          <TableCell>
+                            <strong>Számla</strong>
+                          </TableCell>
+                          <TableCell align="right">
+                            <strong>Összeg</strong>
+                          </TableCell>
+                          <TableCell>
+                            <strong>Teljesítés</strong>
+                          </TableCell>
+                          <TableCell>
+                            <strong>Közlemény</strong>
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {batch.transfers.map((transfer) => (
+                          <TableRow key={transfer.id} hover>
+                            <TableCell>
+                              <Stack direction="row" alignItems="center" spacing={1}>
+                                <PersonIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                                <Typography variant="body2">
+                                  {transfer.beneficiary?.name || 'Ismeretlen kedvezményezett'}
+                                </Typography>
+                              </Stack>
+                            </TableCell>
+                            <TableCell>
+                              <Stack direction="row" alignItems="center" spacing={1}>
+                                <AccountBalanceIcon
+                                  sx={{ fontSize: 16, color: 'text.secondary' }}
+                                />
+                                <Typography variant="body2" fontFamily="monospace">
+                                  {transfer.beneficiary?.account_number || 'N/A'}
+                                </Typography>
+                              </Stack>
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography variant="body2" fontWeight="medium">
+                                {formatAmount(transfer.amount)}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Stack direction="row" alignItems="center" spacing={1}>
+                                <CalendarIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                                <Typography variant="body2">
+                                  {formatDate(transfer.execution_date)}
+                                </Typography>
+                              </Stack>
+                            </TableCell>
+                            <TableCell>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  maxWidth: 200,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                                title={transfer.remittance_info}
+                              >
+                                {transfer.remittance_info || '-'}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                ) : (
+                  <Box
+                    sx={{
+                      textAlign: 'center',
+                      py: 4,
+                      color: 'text.secondary',
+                    }}
+                  >
+                    <Typography variant="body2">Nincsenek utalások ebben a kötegben</Typography>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
           </>
         ) : (
-          <Box 
-            sx={{ 
-              textAlign: 'center', 
+          <Box
+            sx={{
+              textAlign: 'center',
               py: 4,
-              color: 'text.secondary' 
+              color: 'text.secondary',
             }}
           >
-            <Typography variant="body2">
-              Hiba történt az adatok betöltése során
-            </Typography>
+            <Typography variant="body2">Hiba történt az adatok betöltése során</Typography>
           </Box>
         )}
       </DialogContent>

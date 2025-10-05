@@ -14,7 +14,7 @@ import {
   Typography,
   Skeleton,
   Box,
-  FormControlLabel
+  FormControlLabel,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -23,17 +23,17 @@ import {
   Close as CloseIcon,
   KeyboardArrowUp as ArrowUpIcon,
   KeyboardArrowDown as ArrowDownIcon,
-  Star as StarIcon
+  Star as StarIcon,
 } from '@mui/icons-material';
 import { Beneficiary } from '../../types/api';
-import { 
-  formatAccountNumberOnInput, 
-  validateAndFormatHungarianAccountNumber 
+import {
+  formatAccountNumberOnInput,
+  validateAndFormatHungarianAccountNumber,
 } from '../../utils/bankAccountValidation';
-import { 
+import {
   validateBeneficiaryName,
   validateRemittanceInfo,
-  normalizeWhitespace
+  normalizeWhitespace,
 } from '../../utils/stringValidation';
 
 interface BeneficiaryTableProps {
@@ -59,7 +59,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
 }) => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editData, setEditData] = useState<Partial<Beneficiary>>({});
-  const [fieldErrors, setFieldErrors] = useState<{[key: string]: string}>({});
+  const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
 
   const handleStartEdit = (beneficiary: Beneficiary) => {
     setEditingId(beneficiary.id);
@@ -86,20 +86,19 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
     }
   };
 
-
   const handleSaveEdit = async () => {
     if (editingId && editData) {
       // Clear previous errors
       setFieldErrors({});
-      
+
       // Validate that at least one identifier is provided
       if (!editData.account_number && !editData.vat_number && !editData.tax_number) {
         setFieldErrors({
-          account_number: 'Meg kell adni a számlaszámot, adóazonosító jelet vagy céges adószámot'
+          account_number: 'Meg kell adni a számlaszámot, adóazonosító jelet vagy céges adószámot',
         });
         return;
       }
-      
+
       // Format account number before saving
       const updatedData = { ...editData };
       if (editData.account_number) {
@@ -111,13 +110,14 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
           return;
         }
       }
-      
+
       // Validate VAT number if provided
       if (editData.vat_number) {
         const cleanVat = editData.vat_number.replace(/[\s-]/g, '');
         if (!/^\d{10}$/.test(cleanVat)) {
           setFieldErrors({
-            vat_number: 'Magyar személyi adóazonosító jel 10 számjegyből kell álljon (pl. 8440961790)'
+            vat_number:
+              'Magyar személyi adóazonosító jel 10 számjegyből kell álljon (pl. 8440961790)',
           });
           return;
         }
@@ -129,7 +129,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
         const cleanTax = editData.tax_number.replace(/[\s-]/g, '');
         if (!/^\d{8}$/.test(cleanTax)) {
           setFieldErrors({
-            tax_number: 'Magyar céges adószám 8 számjegyből kell álljon (pl. 12345678)'
+            tax_number: 'Magyar céges adószám 8 számjegyből kell álljon (pl. 12345678)',
           });
           return;
         }
@@ -147,7 +147,9 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
       if (editData.remittance_information) {
         const remittanceValidation = validateRemittanceInfo(editData.remittance_information);
         if (!remittanceValidation.isValid) {
-          setFieldErrors({ remittance_information: remittanceValidation.error || 'Érvénytelen közlemény' });
+          setFieldErrors({
+            remittance_information: remittanceValidation.error || 'Érvénytelen közlemény',
+          });
           return;
         }
       }
@@ -157,9 +159,11 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
         updatedData.name = normalizeWhitespace(updatedData.name);
       }
       if (updatedData.remittance_information) {
-        updatedData.remittance_information = normalizeWhitespace(updatedData.remittance_information);
+        updatedData.remittance_information = normalizeWhitespace(
+          updatedData.remittance_information
+        );
       }
-      
+
       try {
         await onUpdate(editingId, updatedData);
         setEditingId(null);
@@ -169,15 +173,15 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
         // Handle backend validation errors
         if (error.response?.status === 400 && error.response?.data) {
           const backendErrors = error.response.data;
-          const newFieldErrors: {[key: string]: string} = {};
-          
-          Object.keys(backendErrors).forEach(field => {
-            const errorMessage = Array.isArray(backendErrors[field]) 
-              ? backendErrors[field][0] 
+          const newFieldErrors: { [key: string]: string } = {};
+
+          Object.keys(backendErrors).forEach((field) => {
+            const errorMessage = Array.isArray(backendErrors[field])
+              ? backendErrors[field][0]
               : backendErrors[field];
             newFieldErrors[field] = errorMessage;
           });
-          
+
           setFieldErrors(newFieldErrors);
         }
       }
@@ -200,34 +204,71 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
       <TableContainer sx={{ flexGrow: 1, overflow: 'auto' }}>
         <Table size="small" stickyHeader sx={{ minWidth: 1200 }}>
           <TableHead>
-            <TableRow sx={{
-              '& .MuiTableCell-head': {
-                backgroundColor: 'background.paper',
-                borderBottom: '2px solid',
-                borderBottomColor: 'divider',
-              }
-            }}>
-              <TableCell sx={{ width: '20%', minWidth: 200, backgroundColor: 'background.paper' }}>Név</TableCell>
-              <TableCell sx={{ width: '15%', minWidth: 140, backgroundColor: 'background.paper' }}>Leírás</TableCell>
-              <TableCell sx={{ width: '16%', minWidth: 140, backgroundColor: 'background.paper' }}>Számlaszám</TableCell>
-              <TableCell sx={{ width: '10%', minWidth: 100, backgroundColor: 'background.paper' }}>Adóazonosító jel</TableCell>
-              <TableCell sx={{ width: '10%', minWidth: 100, backgroundColor: 'background.paper' }}>Céges adószám</TableCell>
-              <TableCell sx={{ width: '18%', minWidth: 160, backgroundColor: 'background.paper' }}>Közlemény</TableCell>
-              <TableCell sx={{ width: '10%', minWidth: 120, backgroundColor: 'background.paper' }}>Állapot</TableCell>
-              <TableCell align="right" sx={{ width: '5%', minWidth: 80, backgroundColor: 'background.paper' }}>Műveletek</TableCell>
+            <TableRow
+              sx={{
+                '& .MuiTableCell-head': {
+                  backgroundColor: 'background.paper',
+                  borderBottom: '2px solid',
+                  borderBottomColor: 'divider',
+                },
+              }}
+            >
+              <TableCell sx={{ width: '20%', minWidth: 200, backgroundColor: 'background.paper' }}>
+                Név
+              </TableCell>
+              <TableCell sx={{ width: '15%', minWidth: 140, backgroundColor: 'background.paper' }}>
+                Leírás
+              </TableCell>
+              <TableCell sx={{ width: '16%', minWidth: 140, backgroundColor: 'background.paper' }}>
+                Számlaszám
+              </TableCell>
+              <TableCell sx={{ width: '10%', minWidth: 100, backgroundColor: 'background.paper' }}>
+                Adóazonosító jel
+              </TableCell>
+              <TableCell sx={{ width: '10%', minWidth: 100, backgroundColor: 'background.paper' }}>
+                Céges adószám
+              </TableCell>
+              <TableCell sx={{ width: '18%', minWidth: 160, backgroundColor: 'background.paper' }}>
+                Közlemény
+              </TableCell>
+              <TableCell sx={{ width: '10%', minWidth: 120, backgroundColor: 'background.paper' }}>
+                Állapot
+              </TableCell>
+              <TableCell
+                align="right"
+                sx={{ width: '5%', minWidth: 80, backgroundColor: 'background.paper' }}
+              >
+                Műveletek
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {[...Array(5)].map((_, i) => (
               <TableRow key={i}>
-                <TableCell><Skeleton variant="text" width="80%" /></TableCell>
-                <TableCell><Skeleton variant="text" width="60%" /></TableCell>
-                <TableCell><Skeleton variant="text" width="90%" /></TableCell>
-                <TableCell><Skeleton variant="text" width="70%" /></TableCell>
-                <TableCell><Skeleton variant="text" width="70%" /></TableCell>
-                <TableCell><Skeleton variant="text" width="70%" /></TableCell>
-                <TableCell><Skeleton variant="text" width="60%" /></TableCell>
-                <TableCell><Skeleton variant="text" width="40%" /></TableCell>
+                <TableCell>
+                  <Skeleton variant="text" width="80%" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton variant="text" width="60%" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton variant="text" width="90%" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton variant="text" width="70%" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton variant="text" width="70%" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton variant="text" width="70%" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton variant="text" width="60%" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton variant="text" width="40%" />
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -250,21 +291,23 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
     <TableContainer sx={{ flexGrow: 1, overflow: 'auto' }}>
       <Table size="small" stickyHeader sx={{ minWidth: 1200 }}>
         <TableHead>
-          <TableRow sx={{
-            '& .MuiTableCell-head': {
-              backgroundColor: 'background.paper',
-              borderBottom: '2px solid',
-              borderBottomColor: 'divider',
-            }
-          }}>
-            <TableCell 
-              sx={{ 
+          <TableRow
+            sx={{
+              '& .MuiTableCell-head': {
+                backgroundColor: 'background.paper',
+                borderBottom: '2px solid',
+                borderBottomColor: 'divider',
+              },
+            }}
+          >
+            <TableCell
+              sx={{
                 cursor: 'pointer',
                 '&:hover': { backgroundColor: 'action.hover' },
                 fontWeight: 600,
                 backgroundColor: 'background.paper',
                 width: '20%',
-                minWidth: 200
+                minWidth: 200,
               }}
               onClick={() => handleSort('name')}
             >
@@ -272,21 +315,22 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 <Typography variant="body2" fontWeight="inherit">
                   Név
                 </Typography>
-                {sortField === 'name' && (
-                  sortDirection === 'asc' ? 
-                    <ArrowUpIcon fontSize="small" /> : 
+                {sortField === 'name' &&
+                  (sortDirection === 'asc' ? (
+                    <ArrowUpIcon fontSize="small" />
+                  ) : (
                     <ArrowDownIcon fontSize="small" />
-                )}
+                  ))}
               </Stack>
             </TableCell>
-            <TableCell 
-              sx={{ 
+            <TableCell
+              sx={{
                 cursor: 'pointer',
                 '&:hover': { backgroundColor: 'action.hover' },
                 fontWeight: 600,
                 backgroundColor: 'background.paper',
                 width: '15%',
-                minWidth: 140
+                minWidth: 140,
               }}
               onClick={() => handleSort('description')}
             >
@@ -294,21 +338,22 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 <Typography variant="body2" fontWeight="inherit">
                   Leírás
                 </Typography>
-                {sortField === 'description' && (
-                  sortDirection === 'asc' ? 
-                    <ArrowUpIcon fontSize="small" /> : 
+                {sortField === 'description' &&
+                  (sortDirection === 'asc' ? (
+                    <ArrowUpIcon fontSize="small" />
+                  ) : (
                     <ArrowDownIcon fontSize="small" />
-                )}
+                  ))}
               </Stack>
             </TableCell>
-            <TableCell 
-              sx={{ 
+            <TableCell
+              sx={{
                 cursor: 'pointer',
                 '&:hover': { backgroundColor: 'action.hover' },
                 fontWeight: 600,
                 backgroundColor: 'background.paper',
                 width: '18%',
-                minWidth: 160
+                minWidth: 160,
               }}
               onClick={() => handleSort('account_number')}
             >
@@ -316,21 +361,22 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 <Typography variant="body2" fontWeight="inherit">
                   Számlaszám
                 </Typography>
-                {sortField === 'account_number' && (
-                  sortDirection === 'asc' ? 
-                    <ArrowUpIcon fontSize="small" /> : 
+                {sortField === 'account_number' &&
+                  (sortDirection === 'asc' ? (
+                    <ArrowUpIcon fontSize="small" />
+                  ) : (
                     <ArrowDownIcon fontSize="small" />
-                )}
+                  ))}
               </Stack>
             </TableCell>
-            <TableCell 
-              sx={{ 
+            <TableCell
+              sx={{
                 cursor: 'pointer',
                 '&:hover': { backgroundColor: 'action.hover' },
                 fontWeight: 600,
                 backgroundColor: 'background.paper',
                 width: '12%',
-                minWidth: 120
+                minWidth: 120,
               }}
               onClick={() => handleSort('vat_number')}
             >
@@ -338,11 +384,12 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 <Typography variant="body2" fontWeight="inherit">
                   Adóazonosító jel
                 </Typography>
-                {sortField === 'vat_number' && (
-                  sortDirection === 'asc' ? 
-                    <ArrowUpIcon fontSize="small" /> : 
+                {sortField === 'vat_number' &&
+                  (sortDirection === 'asc' ? (
+                    <ArrowUpIcon fontSize="small" />
+                  ) : (
                     <ArrowDownIcon fontSize="small" />
-                )}
+                  ))}
               </Stack>
             </TableCell>
             <TableCell
@@ -352,7 +399,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 fontWeight: 600,
                 backgroundColor: 'background.paper',
                 width: '10%',
-                minWidth: 100
+                minWidth: 100,
               }}
               onClick={() => handleSort('tax_number')}
             >
@@ -360,11 +407,12 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 <Typography variant="body2" fontWeight="inherit">
                   Céges adószám
                 </Typography>
-                {sortField === 'tax_number' && (
-                  sortDirection === 'asc' ?
-                    <ArrowUpIcon fontSize="small" /> :
+                {sortField === 'tax_number' &&
+                  (sortDirection === 'asc' ? (
+                    <ArrowUpIcon fontSize="small" />
+                  ) : (
                     <ArrowDownIcon fontSize="small" />
-                )}
+                  ))}
               </Stack>
             </TableCell>
             <TableCell
@@ -374,7 +422,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 fontWeight: 600,
                 backgroundColor: 'background.paper',
                 width: '18%',
-                minWidth: 160
+                minWidth: 160,
               }}
               onClick={() => handleSort('remittance_information')}
             >
@@ -382,19 +430,35 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                 <Typography variant="body2" fontWeight="inherit">
                   Közlemény
                 </Typography>
-                {sortField === 'remittance_information' && (
-                  sortDirection === 'asc' ? 
-                    <ArrowUpIcon fontSize="small" /> : 
+                {sortField === 'remittance_information' &&
+                  (sortDirection === 'asc' ? (
+                    <ArrowUpIcon fontSize="small" />
+                  ) : (
                     <ArrowDownIcon fontSize="small" />
-                )}
+                  ))}
               </Stack>
             </TableCell>
-            <TableCell sx={{ fontWeight: 600, width: '10%', minWidth: 120, backgroundColor: 'background.paper' }}>
+            <TableCell
+              sx={{
+                fontWeight: 600,
+                width: '10%',
+                minWidth: 120,
+                backgroundColor: 'background.paper',
+              }}
+            >
               <Typography variant="body2" fontWeight="inherit">
                 Állapot
               </Typography>
             </TableCell>
-            <TableCell align="right" sx={{ fontWeight: 600, width: '5%', minWidth: 80, backgroundColor: 'background.paper' }}>
+            <TableCell
+              align="right"
+              sx={{
+                fontWeight: 600,
+                width: '5%',
+                minWidth: 80,
+                backgroundColor: 'background.paper',
+              }}
+            >
               <Typography variant="body2" fontWeight="inherit">
                 Műveletek
               </Typography>
@@ -413,8 +477,8 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                     fullWidth
                     error={!!fieldErrors.name}
                     helperText={fieldErrors.name}
-                    sx={{ 
-                      '& .MuiInputBase-input': { fontSize: '0.875rem', py: '6px' }
+                    sx={{
+                      '& .MuiInputBase-input': { fontSize: '0.875rem', py: '6px' },
                     }}
                   />
                 ) : (
@@ -436,8 +500,8 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                     onChange={(e) => setEditData({ ...editData, description: e.target.value })}
                     placeholder="Leírás..."
                     fullWidth
-                    sx={{ 
-                      '& .MuiInputBase-input': { fontSize: '0.875rem', py: '6px' }
+                    sx={{
+                      '& .MuiInputBase-input': { fontSize: '0.875rem', py: '6px' },
                     }}
                   />
                 ) : (
@@ -457,14 +521,14 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                     error={!!fieldErrors.account_number}
                     helperText={fieldErrors.account_number}
                     InputProps={{
-                      sx: { 
-                        fontFamily: 'monospace', 
+                      sx: {
+                        fontFamily: 'monospace',
                         letterSpacing: '0.5px',
-                        fontSize: '0.875rem'
-                      }
+                        fontSize: '0.875rem',
+                      },
                     }}
                     sx={{
-                      '& .MuiInputBase-input': { py: '6px' }
+                      '& .MuiInputBase-input': { py: '6px' },
                     }}
                   />
                 ) : (
@@ -484,14 +548,14 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                     error={!!fieldErrors.vat_number}
                     helperText={fieldErrors.vat_number}
                     InputProps={{
-                      sx: { 
-                        fontFamily: 'monospace', 
+                      sx: {
+                        fontFamily: 'monospace',
                         letterSpacing: '0.5px',
-                        fontSize: '0.875rem'
-                      }
+                        fontSize: '0.875rem',
+                      },
                     }}
                     sx={{
-                      '& .MuiInputBase-input': { py: '6px' }
+                      '& .MuiInputBase-input': { py: '6px' },
                     }}
                   />
                 ) : (
@@ -514,8 +578,8 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                       sx: {
                         fontFamily: 'monospace',
                         letterSpacing: '0.5px',
-                        fontSize: '0.875rem'
-                      }
+                        fontSize: '0.875rem',
+                      },
                     }}
                   />
                 ) : (
@@ -529,11 +593,13 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                   <TextField
                     size="small"
                     value={editData.remittance_information || ''}
-                    onChange={(e) => setEditData({ ...editData, remittance_information: e.target.value })}
+                    onChange={(e) =>
+                      setEditData({ ...editData, remittance_information: e.target.value })
+                    }
                     placeholder="Közlemény..."
                     fullWidth
-                    sx={{ 
-                      '& .MuiInputBase-input': { fontSize: '0.875rem', py: '6px' }
+                    sx={{
+                      '& .MuiInputBase-input': { fontSize: '0.875rem', py: '6px' },
                     }}
                   />
                 ) : (
@@ -550,10 +616,16 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                         <Checkbox
                           size="small"
                           checked={editData.is_active || false}
-                          onChange={(e) => setEditData({ ...editData, is_active: e.target.checked })}
+                          onChange={(e) =>
+                            setEditData({ ...editData, is_active: e.target.checked })
+                          }
                         />
                       }
-                      label={<Typography variant="caption" fontSize="0.75rem">Aktív</Typography>}
+                      label={
+                        <Typography variant="caption" fontSize="0.75rem">
+                          Aktív
+                        </Typography>
+                      }
                       sx={{ m: 0, '& .MuiFormControlLabel-label': { fontSize: '0.75rem' } }}
                     />
                     <FormControlLabel
@@ -561,10 +633,16 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                         <Checkbox
                           size="small"
                           checked={editData.is_frequent || false}
-                          onChange={(e) => setEditData({ ...editData, is_frequent: e.target.checked })}
+                          onChange={(e) =>
+                            setEditData({ ...editData, is_frequent: e.target.checked })
+                          }
                         />
                       }
-                      label={<Typography variant="caption" fontSize="0.75rem">Gyakori</Typography>}
+                      label={
+                        <Typography variant="caption" fontSize="0.75rem">
+                          Gyakori
+                        </Typography>
+                      }
                       sx={{ m: 0, '& .MuiFormControlLabel-label': { fontSize: '0.75rem' } }}
                     />
                   </Stack>
@@ -577,12 +655,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                       variant="outlined"
                     />
                     {beneficiary.is_frequent && (
-                      <Chip
-                        label="Gyakori"
-                        size="small"
-                        color="warning"
-                        variant="outlined"
-                      />
+                      <Chip label="Gyakori" size="small" color="warning" variant="outlined" />
                     )}
                   </Stack>
                 )}
@@ -590,18 +663,10 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
               <TableCell align="right">
                 {editingId === beneficiary.id ? (
                   <Stack direction="row" justifyContent="flex-end" spacing={1}>
-                    <IconButton
-                      size="small"
-                      onClick={handleSaveEdit}
-                      color="success"
-                    >
+                    <IconButton size="small" onClick={handleSaveEdit} color="success">
                       <CheckIcon fontSize="small" />
                     </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={handleCancelEdit}
-                      color="error"
-                    >
+                    <IconButton size="small" onClick={handleCancelEdit} color="error">
                       <CloseIcon fontSize="small" />
                     </IconButton>
                   </Stack>
@@ -614,11 +679,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
                     >
                       <EditIcon fontSize="small" />
                     </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => onDelete(beneficiary.id)}
-                      color="error"
-                    >
+                    <IconButton size="small" onClick={() => onDelete(beneficiary.id)} color="error">
                       <DeleteIcon fontSize="small" />
                     </IconButton>
                   </Stack>

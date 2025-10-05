@@ -1,16 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  Box,
-  Typography,
-  Alert,
-  AlertTitle,
-  Paper,
-  Stepper,
-  Step,
-  StepLabel
-} from '@mui/material';
+import { Box, Typography, Alert, AlertTitle, Paper, Stepper, Step, StepLabel } from '@mui/material';
 import { useToast } from '../../hooks/useToast';
 import { queryKeys } from '../../hooks/api';
 import { TransferTemplate } from '../../types/api';
@@ -54,7 +45,7 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete }) 
   const [processing, setProcessing] = useState(false);
   const [previewData, setPreviewData] = useState<PDFProcessingResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  
+
   const navigate = useNavigate();
   const { success } = useToast();
   const queryClient = useQueryClient();
@@ -75,13 +66,16 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete }) 
       return;
     }
 
-    console.log('Starting PDF processing with files:', selectedFiles.map(f => f.name));
+    console.log(
+      'Starting PDF processing with files:',
+      selectedFiles.map((f) => f.name)
+    );
     setProcessing(true);
     setErrorMessage(null);
 
     try {
       const formData = new FormData();
-      selectedFiles.forEach(file => {
+      selectedFiles.forEach((file) => {
         console.log('Adding file to FormData:', file.name, file.size, file.type);
         formData.append('pdf_files', file);
       });
@@ -100,10 +94,10 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete }) 
 
       console.log('Success result:', response.data);
       setPreviewData(response.data);
-      
+
       // Invalidate templates cache to refresh template lists
       queryClient.invalidateQueries({ queryKey: queryKeys.templates });
-      
+
       setCurrentStep(2);
       success('PDF fájlok sikeresen feldolgozva!');
     } catch (err: any) {
@@ -123,26 +117,28 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete }) 
 
   const handleConfirmTemplate = async () => {
     if (!previewData) return;
-    
+
     try {
       // Verify the template actually exists in the database
       const response = await apiClient.get(`/templates/${previewData.template.id}/`);
-      
+
       if (response.data) {
         setCurrentStep(3);
-        
+
         // Show different success message based on whether template was created or updated
         if (previewData.template_updated) {
           success(`Sablon frissítve: ${previewData.template.name}`);
         } else {
           success(`Sablon létrehozva: ${previewData.template.name}`);
         }
-        
+
         // Don't auto-navigate, let user decide when to proceed via buttons in TemplateStep
       }
     } catch (error: any) {
       console.error('Template verification failed:', error);
-      setErrorMessage(`Hiba: A sablon nem található az adatbázisban. ${error.response?.data?.detail || error.message}`);
+      setErrorMessage(
+        `Hiba: A sablon nem található az adatbázisban. ${error.response?.data?.detail || error.message}`
+      );
     }
   };
 
@@ -159,7 +155,7 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete }) 
   const steps = [
     { number: 1, title: 'PDF Feltöltés', description: 'Fájlok kiválasztása' },
     { number: 2, title: 'Adatok Áttekintése', description: 'Tranzakciók ellenőrzése' },
-    { number: 3, title: 'Sablon Kezelés', description: 'Létrehozás vagy frissítés' }
+    { number: 3, title: 'Sablon Kezelés', description: 'Létrehozás vagy frissítés' },
   ];
 
   return (
@@ -169,21 +165,37 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete }) 
         <Typography variant="h5" component="h1" fontWeight="bold" gutterBottom>
           PDF Importálás
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
-          Töltse fel a NAV adó és fizetési PDF fájljait automatikus sablon létrehozásához vagy meglévő sablon frissítéséhez
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ display: { xs: 'none', sm: 'block' } }}
+        >
+          Töltse fel a NAV adó és fizetési PDF fájljait automatikus sablon létrehozásához vagy
+          meglévő sablon frissítéséhez
         </Typography>
       </Box>
 
       {/* Progress Stepper */}
-      <Paper elevation={0} sx={{ bgcolor: 'grey.50', p: { xs: 2, sm: 3 }, mb: 3, border: 1, borderColor: 'grey.200' }}>
+      <Paper
+        elevation={0}
+        sx={{ bgcolor: 'grey.50', p: { xs: 2, sm: 3 }, mb: 3, border: 1, borderColor: 'grey.200' }}
+      >
         <Stepper activeStep={currentStep - 1} sx={{ width: '100%' }} orientation="horizontal">
           {steps.map((step) => (
             <Step key={step.number}>
               <StepLabel>
-                <Typography variant="body2" fontWeight={600} sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
+                <Typography
+                  variant="body2"
+                  fontWeight={600}
+                  sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
+                >
                   {step.title}
                 </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', md: 'block' } }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: { xs: 'none', md: 'block' } }}
+                >
                   {step.description}
                 </Typography>
               </StepLabel>

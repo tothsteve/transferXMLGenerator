@@ -11,17 +11,17 @@ import {
   Alert,
   Snackbar,
   FormControlLabel,
-  Switch
+  Switch,
 } from '@mui/material';
 import { Add as AddIcon, VisibilityOff as InactiveIcon } from '@mui/icons-material';
-import { 
-  useTemplates, 
-  useCreateTemplate, 
-  useUpdateTemplate, 
+import {
+  useTemplates,
+  useCreateTemplate,
+  useUpdateTemplate,
   useDeleteTemplate,
   useAddTemplateBeneficiary,
   useRemoveTemplateBeneficiary,
-  useUpdateTemplateBeneficiary
+  useUpdateTemplateBeneficiary,
 } from '../../hooks/api';
 import { TransferTemplate } from '../../types/api';
 import TemplateList from './TemplateList';
@@ -52,9 +52,9 @@ const TemplateBuilder: React.FC = () => {
   }>({
     open: false,
     message: '',
-    severity: 'success'
+    severity: 'success',
   });
-  
+
   const navigate = useNavigate();
 
   const { data: templatesData, isLoading, refetch } = useTemplates(showInactive);
@@ -67,33 +67,36 @@ const TemplateBuilder: React.FC = () => {
 
   const templates = templatesData?.results || [];
 
-  const showNotification = (message: string, severity: 'success' | 'error' | 'info' | 'warning' = 'success') => {
+  const showNotification = (
+    message: string,
+    severity: 'success' | 'error' | 'info' | 'warning' = 'success'
+  ) => {
     setNotification({ open: true, message, severity });
   };
 
   const hideNotification = () => {
-    setNotification(prev => ({ ...prev, open: false }));
+    setNotification((prev) => ({ ...prev, open: false }));
   };
 
   const handleCreateTemplate = async (data: TemplateFormData) => {
     try {
       console.log('Creating template with data:', data);
-      
+
       const templateData = {
         name: data.name,
         description: data.description,
         is_active: data.is_active,
       };
-      
+
       const result = await createMutation.mutateAsync(templateData);
       console.log('Template created successfully:', result);
-      
+
       const createdTemplate = result.data;
-      
+
       // Add beneficiaries to the template if any were selected
       if (data.beneficiaries && data.beneficiaries.length > 0) {
         console.log('Adding beneficiaries to template:', data.beneficiaries);
-        
+
         for (let i = 0; i < data.beneficiaries.length; i++) {
           const beneficiary = data.beneficiaries[i];
           if (!beneficiary) continue;
@@ -103,23 +106,30 @@ const TemplateBuilder: React.FC = () => {
               templateId: createdTemplate.id,
               data: {
                 beneficiary_id: beneficiary.beneficiary_id,
-                default_amount: beneficiary.default_amount ? parseFloat(beneficiary.default_amount) : undefined,
+                default_amount: beneficiary.default_amount
+                  ? parseFloat(beneficiary.default_amount)
+                  : undefined,
                 default_remittance: beneficiary.default_remittance_info || undefined,
                 order: i,
                 is_active: true,
-              }
+              },
             });
           } catch (beneficiaryError) {
-            console.error(`Failed to add beneficiary ${beneficiary.beneficiary_id}:`, beneficiaryError);
-            showNotification(`Figyelem: Nem sikerült hozzáadni minden kedvezményezettet a sablonhoz.`, 'warning');
+            console.error(
+              `Failed to add beneficiary ${beneficiary.beneficiary_id}:`,
+              beneficiaryError
+            );
+            showNotification(
+              `Figyelem: Nem sikerült hozzáadni minden kedvezményezettet a sablonhoz.`,
+              'warning'
+            );
           }
         }
       }
-      
+
       setShowForm(false);
       refetch();
       showNotification(`Sablon "${data.name}" sikeresen létrehozva!`, 'success');
-      
     } catch (error) {
       console.error('Failed to create template:', error);
       showNotification('Hiba történt a sablon létrehozása során.', 'error');
@@ -128,52 +138,50 @@ const TemplateBuilder: React.FC = () => {
 
   const handleUpdateTemplate = async (data: TemplateFormData) => {
     if (!editingTemplate) return;
-    
+
     try {
       const templateData = {
         name: data.name,
         description: data.description,
         is_active: data.is_active,
       };
-      
+
       await updateMutation.mutateAsync({
         id: editingTemplate.id,
         data: templateData,
       });
-      
+
       // Handle beneficiary associations update when editing templates
       const currentBeneficiaryIds = new Set(
-        editingTemplate.template_beneficiaries?.map(tb => tb.beneficiary.id) || []
+        editingTemplate.template_beneficiaries?.map((tb) => tb.beneficiary.id) || []
       );
-      const newBeneficiaryIds = new Set(
-        data.beneficiaries.map(b => b.beneficiary_id)
-      );
-      
+      const newBeneficiaryIds = new Set(data.beneficiaries.map((b) => b.beneficiary_id));
+
       // Check if beneficiaries have actually changed
-      const beneficiariesChanged = 
+      const beneficiariesChanged =
         currentBeneficiaryIds.size !== newBeneficiaryIds.size ||
-        !Array.from(currentBeneficiaryIds).every(id => newBeneficiaryIds.has(id));
-      
+        !Array.from(currentBeneficiaryIds).every((id) => newBeneficiaryIds.has(id));
+
       if (!beneficiariesChanged) {
         // Only template metadata changed (name, description, is_active), skip beneficiary sync
         console.log('Only template metadata changed, skipping beneficiary sync');
       } else {
         console.log('Beneficiaries changed, syncing beneficiary associations...');
-        
+
         // Remove beneficiaries that are no longer selected
         for (const currentBeneficiaryId of Array.from(currentBeneficiaryIds)) {
           if (!newBeneficiaryIds.has(currentBeneficiaryId)) {
             try {
               await removeBeneficiaryMutation.mutateAsync({
                 templateId: editingTemplate.id,
-                beneficiaryId: currentBeneficiaryId
+                beneficiaryId: currentBeneficiaryId,
               });
             } catch (error) {
               console.error(`Failed to remove beneficiary ${currentBeneficiaryId}:`, error);
             }
           }
         }
-        
+
         // Handle beneficiaries (add new ones and update existing ones)
         for (let i = 0; i < data.beneficiaries.length; i++) {
           const beneficiary = data.beneficiaries[i];
@@ -186,11 +194,13 @@ const TemplateBuilder: React.FC = () => {
                 templateId: editingTemplate.id,
                 data: {
                   beneficiary_id: beneficiary.beneficiary_id,
-                  default_amount: beneficiary.default_amount ? parseFloat(beneficiary.default_amount) : undefined,
+                  default_amount: beneficiary.default_amount
+                    ? parseFloat(beneficiary.default_amount)
+                    : undefined,
                   default_remittance: beneficiary.default_remittance_info || undefined,
                   order: i,
                   is_active: true,
-                }
+                },
               });
             } catch (error) {
               console.error(`Failed to add beneficiary ${beneficiary.beneficiary_id}:`, error);
@@ -202,11 +212,13 @@ const TemplateBuilder: React.FC = () => {
                 templateId: editingTemplate.id,
                 data: {
                   beneficiary_id: beneficiary.beneficiary_id,
-                  default_amount: beneficiary.default_amount ? parseFloat(beneficiary.default_amount) : undefined,
+                  default_amount: beneficiary.default_amount
+                    ? parseFloat(beneficiary.default_amount)
+                    : undefined,
                   default_remittance: beneficiary.default_remittance_info || undefined,
                   order: i,
                   is_active: true,
-                }
+                },
               });
             } catch (error) {
               console.error(`Failed to update beneficiary ${beneficiary.beneficiary_id}:`, error);
@@ -214,7 +226,7 @@ const TemplateBuilder: React.FC = () => {
           }
         }
       }
-      
+
       setShowForm(false);
       setEditingTemplate(null);
       refetch();
@@ -248,11 +260,11 @@ const TemplateBuilder: React.FC = () => {
 
   const handleLoadTemplate = (id: number) => {
     // Navigate to transfers page with template ID - let TransferWorkflow handle the loading
-    navigate('/transfers', { 
-      state: { 
+    navigate('/transfers', {
+      state: {
         templateId: id,
-        loadFromTemplate: true 
-      } 
+        loadFromTemplate: true,
+      },
     });
   };
 
@@ -266,13 +278,22 @@ const TemplateBuilder: React.FC = () => {
     setViewingTemplate(null);
   };
 
-  const isFormLoading = createMutation.isPending || updateMutation.isPending || addBeneficiaryMutation.isPending || removeBeneficiaryMutation.isPending;
+  const isFormLoading =
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    addBeneficiaryMutation.isPending ||
+    removeBeneficiaryMutation.isPending;
 
   return (
     <Box sx={{ p: 3 }}>
       {/* Header */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', pb: 3, mb: 4 }}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={3}>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          justifyContent="space-between"
+          alignItems={{ xs: 'flex-start', sm: 'center' }}
+          spacing={3}
+        >
           <Box>
             <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
               Sablonok
@@ -293,17 +314,11 @@ const TemplateBuilder: React.FC = () => {
               label={
                 <Stack direction="row" alignItems="center" spacing={1}>
                   <InactiveIcon sx={{ fontSize: 16 }} />
-                  <Typography variant="body2">
-                    Inaktív sablonok
-                  </Typography>
+                  <Typography variant="body2">Inaktív sablonok</Typography>
                 </Stack>
               }
             />
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setShowForm(true)}
-            >
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowForm(true)}>
               Új sablon
             </Button>
           </Stack>
@@ -311,16 +326,16 @@ const TemplateBuilder: React.FC = () => {
       </Box>
 
       {/* Stats */}
-      <Box 
-        sx={{ 
+      <Box
+        sx={{
           display: 'grid',
           gridTemplateColumns: {
             xs: '1fr',
             sm: 'repeat(2, 1fr)',
-            md: showInactive ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)'
+            md: showInactive ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)',
           },
           gap: 3,
-          mb: 4
+          mb: 4,
         }}
       >
         <Card elevation={1}>
@@ -343,7 +358,7 @@ const TemplateBuilder: React.FC = () => {
             <Stack direction="row" alignItems="center" spacing={2}>
               <Avatar sx={{ bgcolor: 'success.main', width: 40, height: 40 }}>
                 <Typography variant="body2" fontWeight="bold" color="white">
-                  {templates.filter(t => t.is_active).length}
+                  {templates.filter((t) => t.is_active).length}
                 </Typography>
               </Avatar>
               <Typography variant="body2" color="text.secondary">
@@ -359,7 +374,7 @@ const TemplateBuilder: React.FC = () => {
               <Stack direction="row" alignItems="center" spacing={2}>
                 <Avatar sx={{ bgcolor: 'warning.main', width: 40, height: 40 }}>
                   <Typography variant="body2" fontWeight="bold" color="white">
-                    {templates.filter(t => !t.is_active).length}
+                    {templates.filter((t) => !t.is_active).length}
                   </Typography>
                 </Avatar>
                 <Typography variant="body2" color="text.secondary">
@@ -375,7 +390,10 @@ const TemplateBuilder: React.FC = () => {
             <Stack direction="row" alignItems="center" spacing={2}>
               <Avatar sx={{ bgcolor: 'info.main', width: 40, height: 40 }}>
                 <Typography variant="body2" fontWeight="bold" color="white">
-                  {templates.reduce((sum, t) => sum + (showInactive || t.is_active ? t.beneficiary_count : 0), 0)}
+                  {templates.reduce(
+                    (sum, t) => sum + (showInactive || t.is_active ? t.beneficiary_count : 0),
+                    0
+                  )}
                 </Typography>
               </Avatar>
               <Typography variant="body2" color="text.secondary">
@@ -406,11 +424,7 @@ const TemplateBuilder: React.FC = () => {
       />
 
       {/* Template View Modal */}
-      <TemplateView
-        isOpen={showView}
-        onClose={handleViewClose}
-        template={viewingTemplate}
-      />
+      <TemplateView isOpen={showView} onClose={handleViewClose} template={viewingTemplate} />
 
       {/* Notification Snackbar */}
       <Snackbar

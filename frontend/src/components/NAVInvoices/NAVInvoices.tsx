@@ -64,11 +64,11 @@ import NAVInvoiceTable from './NAVInvoiceTable';
 interface Invoice {
   id: number;
   nav_invoice_number: string;
-  invoice_direction: string;  // 'INBOUND' | 'OUTBOUND' - using string for Zod v4 compatibility
+  invoice_direction: string; // 'INBOUND' | 'OUTBOUND' - using string for Zod v4 compatibility
   invoice_direction_display: string;
   partner_name: string;
   partner_tax_number: string;
-  
+
   // Dates
   issue_date: string;
   issue_date_formatted: string;
@@ -80,7 +80,7 @@ interface Invoice {
   payment_date_formatted: string | null;
   completion_date?: string | null;
   last_modified_date?: string | null;
-  
+
   // Financial
   currency_code: string;
   invoice_net_amount: number;
@@ -89,7 +89,7 @@ interface Invoice {
   invoice_vat_amount_formatted: string;
   invoice_gross_amount: number;
   invoice_gross_amount_formatted: string;
-  
+
   // Business
   invoice_operation: string | null;
   invoice_category?: string | null;
@@ -107,15 +107,15 @@ interface Invoice {
   auto_marked_paid: boolean;
   is_overdue: boolean;
   is_paid: boolean;
-  
+
   // System
   sync_status: string;
   created_at: string;
-  
+
   // NAV metadata (available in detail view)
   nav_source?: string | null;
   original_request_version?: string | null;
-  
+
   // Partners (available in detail view)
   supplier_name?: string | null;
   customer_name?: string | null;
@@ -123,7 +123,7 @@ interface Invoice {
   customer_tax_number?: string | null;
   supplier_bank_account_number?: string | null;
   customer_bank_account_number?: string | null;
-  
+
   // Line items (available in detail view)
   line_items?: InvoiceLineItem[];
 }
@@ -177,9 +177,11 @@ const NAVInvoices: React.FC = () => {
   const [sortField, setSortField] = useState<string>('issue_date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [inboundTransferFilter, setInboundTransferFilter] = useState(false);
-  
+
   // Date interval filters
-  const [dateFilterType, setDateFilterType] = useState<'issue_date' | 'fulfillment_date' | 'payment_due_date' | ''>('');
+  const [dateFilterType, setDateFilterType] = useState<
+    'issue_date' | 'fulfillment_date' | 'payment_due_date' | ''
+  >('');
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
 
@@ -187,15 +189,16 @@ const NAVInvoices: React.FC = () => {
   const getMonthRange = (date: Date) => {
     return {
       from: format(startOfMonth(date), 'yyyy-MM-dd'),
-      to: format(endOfMonth(date), 'yyyy-MM-dd')
+      to: format(endOfMonth(date), 'yyyy-MM-dd'),
     };
   };
 
   const getCurrentMonthRange = () => getMonthRange(new Date());
-  
+
   const getPreviousMonthRange = () => getMonthRange(subMonths(new Date(), 1));
 
-  const getNextMonthRange = () => getMonthRange(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1));
+  const getNextMonthRange = () =>
+    getMonthRange(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1));
 
   // Get current base date from dateFrom field or fallback to current date
   const getCurrentBaseDate = () => {
@@ -222,19 +225,22 @@ const NAVInvoices: React.FC = () => {
   // Navigate to previous/next month based on current selected date
   const navigateMonth = (direction: 'previous' | 'next') => {
     const baseDate = getCurrentBaseDate();
-    const targetDate = direction === 'previous' 
-      ? subMonths(baseDate, 1)
-      : new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
-    
+    const targetDate =
+      direction === 'previous'
+        ? subMonths(baseDate, 1)
+        : new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
+
     const range = getMonthRange(targetDate);
     setDateFrom(range.from);
     setDateTo(range.to);
   };
 
   // Handle date filter type change with automatic date range setting
-  const handleDateFilterTypeChange = (value: 'issue_date' | 'fulfillment_date' | 'payment_due_date' | '') => {
+  const handleDateFilterTypeChange = (
+    value: 'issue_date' | 'fulfillment_date' | 'payment_due_date' | ''
+  ) => {
     setDateFilterType(value);
-    
+
     if (value !== '') {
       // Set default date range to previous month
       const range = getPreviousMonthRange();
@@ -246,17 +252,19 @@ const NAVInvoices: React.FC = () => {
       setDateTo('');
     }
   };
-  
+
   // Selection states
   const [selectedInvoices, setSelectedInvoices] = useState<number[]>([]);
-  
+
   // Totals collapse state
   const [totalsCollapsed, setTotalsCollapsed] = useState(false);
-  
+
   // Payment date state for bulk update (format: YYYY-MM-DD)
-  const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0] || '');
+  const [paymentDate, setPaymentDate] = useState<string>(
+    new Date().toISOString().split('T')[0] || ''
+  );
   const [usePaymentDueDate, setUsePaymentDueDate] = useState<boolean>(true);
-  
+
   // Modal states
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [invoiceDetailsOpen, setInvoiceDetailsOpen] = useState(false);
@@ -267,10 +275,10 @@ const NAVInvoices: React.FC = () => {
   const [isSupplierTrusted, setIsSupplierTrusted] = useState<boolean>(false);
   const [checkingTrustedStatus, setCheckingTrustedStatus] = useState<boolean>(false);
   const [addingTrustedPartner, setAddingTrustedPartner] = useState<boolean>(false);
-  
+
   const { success: showSuccess, error: showError, addToast } = useToastContext();
   const navigate = useNavigate();
-  
+
   // Bulk payment status update hooks
   const bulkMarkUnpaidMutation = useBulkMarkUnpaid();
   const bulkMarkPreparedMutation = useBulkMarkPrepared();
@@ -280,12 +288,12 @@ const NAVInvoices: React.FC = () => {
   const loadInvoices = async () => {
     try {
       setLoading(true);
-      
+
       const params = {
         page: currentPage,
         page_size: pageSize,
         search: searchTerm || undefined,
-        direction: inboundTransferFilter ? 'INBOUND' : (directionFilter || undefined),
+        direction: inboundTransferFilter ? 'INBOUND' : directionFilter || undefined,
         payment_method: inboundTransferFilter ? 'TRANSFER' : undefined,
         payment_status: paymentStatusFilter || undefined,
         ordering: `${sortDirection === 'desc' ? '-' : ''}${sortField}`,
@@ -293,15 +301,17 @@ const NAVInvoices: React.FC = () => {
         // Date interval filters
         ...(dateFilterType === 'issue_date' && dateFrom && { issue_date_from: dateFrom }),
         ...(dateFilterType === 'issue_date' && dateTo && { issue_date_to: dateTo }),
-        ...(dateFilterType === 'fulfillment_date' && dateFrom && { fulfillment_date_from: dateFrom }),
+        ...(dateFilterType === 'fulfillment_date' &&
+          dateFrom && { fulfillment_date_from: dateFrom }),
         ...(dateFilterType === 'fulfillment_date' && dateTo && { fulfillment_date_to: dateTo }),
-        ...(dateFilterType === 'payment_due_date' && dateFrom && { payment_due_date_from: dateFrom }),
+        ...(dateFilterType === 'payment_due_date' &&
+          dateFrom && { payment_due_date_from: dateFrom }),
         ...(dateFilterType === 'payment_due_date' && dateTo && { payment_due_date_to: dateTo }),
       };
 
       const response = await navInvoicesApi.getAll(params);
       console.log('API Response:', response.data); // Debug log
-      
+
       // Handle both paginated and non-paginated responses
       if (Array.isArray(response.data)) {
         // Non-paginated response (direct array)
@@ -335,13 +345,13 @@ const NAVInvoices: React.FC = () => {
       setCheckingTrustedStatus(true);
       const response = await trustedPartnersApi.getAll({
         search: supplierTaxNumber,
-        is_active: true
+        is_active: true,
       });
 
       // Check if any trusted partner matches this tax number
-      const isTrusted = response.data?.results?.some(partner =>
-        partner.tax_number === supplierTaxNumber
-      ) || false;
+      const isTrusted =
+        response.data?.results?.some((partner) => partner.tax_number === supplierTaxNumber) ||
+        false;
 
       setIsSupplierTrusted(isTrusted);
     } catch (error) {
@@ -379,7 +389,20 @@ const NAVInvoices: React.FC = () => {
     loadInvoices();
     // Clear selections when filters or page change
     setSelectedInvoices([]);
-  }, [searchTerm, directionFilter, paymentStatusFilter, currentPage, pageSize, sortField, sortDirection, hideStornoInvoices, inboundTransferFilter, dateFilterType, dateFrom, dateTo]);
+  }, [
+    searchTerm,
+    directionFilter,
+    paymentStatusFilter,
+    currentPage,
+    pageSize,
+    sortField,
+    sortDirection,
+    hideStornoInvoices,
+    inboundTransferFilter,
+    dateFilterType,
+    dateFrom,
+    dateTo,
+  ]);
 
   const handleViewInvoice = async (invoice: Invoice) => {
     setInvoiceDetailsOpen(true);
@@ -407,7 +430,11 @@ const NAVInvoices: React.FC = () => {
 
   // Add supplier as trusted partner
   const handleAddTrustedPartner = async () => {
-    if (!selectedInvoice || !selectedInvoice.supplier_name || !selectedInvoice.supplier_tax_number) {
+    if (
+      !selectedInvoice ||
+      !selectedInvoice.supplier_name ||
+      !selectedInvoice.supplier_tax_number
+    ) {
       showError('Hiányzó szállító adatok a partner hozzáadásához');
       return;
     }
@@ -419,7 +446,7 @@ const NAVInvoices: React.FC = () => {
         partner_name: selectedInvoice.supplier_name,
         tax_number: selectedInvoice.supplier_tax_number,
         is_active: true,
-        auto_pay: true
+        auto_pay: true,
       };
 
       // Add trusted partner
@@ -432,32 +459,39 @@ const NAVInvoices: React.FC = () => {
         try {
           await bulkMarkPaidMutation.mutateAsync({
             invoice_ids: [selectedInvoice.id],
-            payment_date: new Date().toISOString().split('T')[0] // Today's date
+            payment_date: new Date().toISOString().split('T')[0], // Today's date
           });
 
           // Update the invoice in state to reflect the new payment status
-          setSelectedInvoice(prev => prev ? {
-            ...prev,
-            payment_status: {
-              status: 'PAID',
-              label: 'Kifizetve',
-              icon: 'CheckCircle',
-              class: 'success'
-            },
-            payment_status_date: new Date().toISOString().split('T')[0] || null,
-            payment_status_date_formatted: new Date().toLocaleDateString('hu-HU'),
-            is_paid: true
-          } : null);
+          setSelectedInvoice((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  payment_status: {
+                    status: 'PAID',
+                    label: 'Kifizetve',
+                    icon: 'CheckCircle',
+                    class: 'success',
+                  },
+                  payment_status_date: new Date().toISOString().split('T')[0] || null,
+                  payment_status_date_formatted: new Date().toLocaleDateString('hu-HU'),
+                  is_paid: true,
+                }
+              : null
+          );
 
-          showSuccess(`${selectedInvoice.supplier_name} hozzáadva a megbízható partnerekhez és a számla megjelölve kifizetettként`);
+          showSuccess(
+            `${selectedInvoice.supplier_name} hozzáadva a megbízható partnerekhez és a számla megjelölve kifizetettként`
+          );
         } catch (paymentError) {
           console.error('Error marking invoice as paid:', paymentError);
-          showSuccess(`${selectedInvoice.supplier_name} hozzáadva a megbízható partnerekhez (fizetési állapot frissítése sikertelen)`);
+          showSuccess(
+            `${selectedInvoice.supplier_name} hozzáadva a megbízható partnerekhez (fizetési állapot frissítése sikertelen)`
+          );
         }
       } else {
         showSuccess(`${selectedInvoice.supplier_name} hozzáadva a megbízható partnerekhez`);
       }
-
     } catch (error: any) {
       console.error('Error adding trusted partner:', error);
       if (error?.response?.data?.non_field_errors?.[0]) {
@@ -497,13 +531,19 @@ const NAVInvoices: React.FC = () => {
   // Calculate totals for selected or filtered invoices
   const calculateTotals = (): InvoiceTotals | null => {
     let invoicesToCalculate: Invoice[] = [];
-    
+
     // If there are selected invoices, calculate totals for selected only
     if (selectedInvoices.length > 0) {
-      invoicesToCalculate = invoices.filter(invoice => selectedInvoices.includes(invoice.id));
+      invoicesToCalculate = invoices.filter((invoice) => selectedInvoices.includes(invoice.id));
     } else {
       // If no selection but there are filters active, calculate totals for all visible invoices
-      const hasActiveFilters = searchTerm || directionFilter || paymentStatusFilter || !hideStornoInvoices || inboundTransferFilter || dateFilterType;
+      const hasActiveFilters =
+        searchTerm ||
+        directionFilter ||
+        paymentStatusFilter ||
+        !hideStornoInvoices ||
+        inboundTransferFilter ||
+        dateFilterType;
       if (hasActiveFilters) {
         invoicesToCalculate = invoices;
       }
@@ -513,7 +553,7 @@ const NAVInvoices: React.FC = () => {
     const totals = {
       inbound: { net: 0, vat: 0, gross: 0, count: 0 },
       outbound: { net: 0, vat: 0, gross: 0, count: 0 },
-      total: { net: 0, vat: 0, gross: 0, count: 0 }
+      total: { net: 0, vat: 0, gross: 0, count: 0 },
     };
 
     // Calculate sums by direction
@@ -573,15 +613,15 @@ const NAVInvoices: React.FC = () => {
   // Selection handlers
   const handleSelectInvoice = (invoiceId: number, selected: boolean) => {
     if (selected) {
-      setSelectedInvoices(prev => [...prev, invoiceId]);
+      setSelectedInvoices((prev) => [...prev, invoiceId]);
     } else {
-      setSelectedInvoices(prev => prev.filter(id => id !== invoiceId));
+      setSelectedInvoices((prev) => prev.filter((id) => id !== invoiceId));
     }
   };
 
   const handleSelectAll = (selected: boolean) => {
     if (selected) {
-      setSelectedInvoices(invoices.map(invoice => invoice.id));
+      setSelectedInvoices(invoices.map((invoice) => invoice.id));
     } else {
       setSelectedInvoices([]);
     }
@@ -600,7 +640,9 @@ const NAVInvoices: React.FC = () => {
       const originatorAccountId = defaultAccountResponse.data.id;
 
       if (!originatorAccountId) {
-        showError('Nincs beállítva alapértelmezett bankszámla. Kérjük, állítson be egyet a beállítások menüben.');
+        showError(
+          'Nincs beállítva alapértelmezett bankszámla. Kérjük, állítson be egyet a beállítások menüben.'
+        );
         return;
       }
 
@@ -637,8 +679,8 @@ const NAVInvoices: React.FC = () => {
           state: {
             source: 'nav_invoices_generated',
             transfers: transfers, // Pass the created transfers data
-            message: `${transfer_count} átutalás létrehozva NAV számlákból`
-          }
+            message: `${transfer_count} átutalás létrehozva NAV számlákból`,
+          },
         });
       } else {
         showError('Nem sikerült átutalást létrehozni a kiválasztott számlákból');
@@ -646,13 +688,12 @@ const NAVInvoices: React.FC = () => {
 
       // Clear selections
       setSelectedInvoices([]);
-
     } catch (error: any) {
       console.error('Error generating transfers:', error);
       console.log('Error details:', {
         status: error?.response?.status,
         data: error?.response?.data,
-        message: error?.message
+        message: error?.message,
       });
 
       if (error?.response?.status === 401) {
@@ -667,7 +708,9 @@ const NAVInvoices: React.FC = () => {
       } else if (error?.response?.data?.detail) {
         showError(`API hiba: ${error.response.data.detail}`);
       } else {
-        showError(`Hiba történt az átutalások generálásakor: ${error?.message || 'Ismeretlen hiba'}`);
+        showError(
+          `Hiba történt az átutalások generálásakor: ${error?.message || 'Ismeretlen hiba'}`
+        );
       }
     }
   };
@@ -675,7 +718,7 @@ const NAVInvoices: React.FC = () => {
   // Bulk payment status update handlers
   const handleBulkMarkUnpaid = async () => {
     if (selectedInvoices.length === 0) return;
-    
+
     try {
       await bulkMarkUnpaidMutation.mutateAsync(selectedInvoices);
       showSuccess(`${selectedInvoices.length} számla megjelölve "Fizetésre vár" státuszként`);
@@ -688,7 +731,7 @@ const NAVInvoices: React.FC = () => {
 
   const handleBulkMarkPrepared = async () => {
     if (selectedInvoices.length === 0) return;
-    
+
     try {
       await bulkMarkPreparedMutation.mutateAsync(selectedInvoices);
       showSuccess(`${selectedInvoices.length} számla megjelölve "Előkészítve" státuszként`);
@@ -701,28 +744,30 @@ const NAVInvoices: React.FC = () => {
 
   const handleBulkMarkPaid = async () => {
     if (selectedInvoices.length === 0) return;
-    
+
     try {
       let requestData;
-      
+
       if (usePaymentDueDate) {
         // Option 2: Use individual payment_due_date for each invoice
-        const selectedInvoiceObjects = invoices.filter(invoice => selectedInvoices.includes(invoice.id));
+        const selectedInvoiceObjects = invoices.filter((invoice) =>
+          selectedInvoices.includes(invoice.id)
+        );
         const today = new Date().toISOString().split('T')[0] as string;
         requestData = {
-          invoices: selectedInvoiceObjects.map(invoice => ({
+          invoices: selectedInvoiceObjects.map((invoice) => ({
             invoice_id: invoice.id,
-            payment_date: invoice.payment_due_date || today
-          }))
+            payment_date: invoice.payment_due_date || today,
+          })),
         };
       } else {
         // Option 1: Use single custom date for all invoices
         requestData = {
           invoice_ids: selectedInvoices,
-          payment_date: paymentDate || undefined
+          payment_date: paymentDate || undefined,
         };
       }
-      
+
       await bulkMarkPaidMutation.mutateAsync(requestData);
       showSuccess(`${selectedInvoices.length} számla megjelölve "Kifizetve" státuszként`);
       setSelectedInvoices([]);
@@ -747,10 +792,22 @@ const NAVInvoices: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: { xs: 0.5, sm: 0.5, md: 1 }, height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box
+      sx={{
+        p: { xs: 0.5, sm: 0.5, md: 1 },
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
       {/* Header - Same pattern as BeneficiaryManager */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', pb: 1, mb: 1 }}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={2}>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          justifyContent="space-between"
+          alignItems={{ xs: 'flex-start', sm: 'center' }}
+          spacing={2}
+        >
           <Box>
             <Typography variant="h5" component="h1" fontWeight="bold" sx={{ mb: 0.5 }}>
               NAV Számlák
@@ -892,7 +949,12 @@ const NAVInvoices: React.FC = () => {
               />
             </MenuItem>
             <Divider />
-            <MenuItem onClick={() => { clearFilters(); handleFilterClose(); }}>
+            <MenuItem
+              onClick={() => {
+                clearFilters();
+                handleFilterClose();
+              }}
+            >
               Szűrők törlése
             </MenuItem>
           </Menu>
@@ -901,7 +963,7 @@ const NAVInvoices: React.FC = () => {
         {/* Quick Filter Buttons */}
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 0.5 }}>
           <Button
-            variant={inboundTransferFilter ? "contained" : "outlined"}
+            variant={inboundTransferFilter ? 'contained' : 'outlined'}
             color="primary"
             size="small"
             onClick={() => {
@@ -924,16 +986,28 @@ const NAVInvoices: React.FC = () => {
               <Select
                 value={dateFilterType}
                 label="Dátum típus"
-                onChange={(e) => handleDateFilterTypeChange(e.target.value as 'issue_date' | 'fulfillment_date' | 'payment_due_date' | '')}
+                onChange={(e) =>
+                  handleDateFilterTypeChange(
+                    e.target.value as 'issue_date' | 'fulfillment_date' | 'payment_due_date' | ''
+                  )
+                }
                 sx={{ fontSize: '0.8rem' }}
               >
-                <MenuItem value="" sx={{ fontSize: '0.8rem' }}>Nincs</MenuItem>
-                <MenuItem value="issue_date" sx={{ fontSize: '0.8rem' }}>Kiállítás</MenuItem>
-                <MenuItem value="fulfillment_date" sx={{ fontSize: '0.8rem' }}>Teljesítés</MenuItem>
-                <MenuItem value="payment_due_date" sx={{ fontSize: '0.8rem' }}>Fizetési határidő</MenuItem>
+                <MenuItem value="" sx={{ fontSize: '0.8rem' }}>
+                  Nincs
+                </MenuItem>
+                <MenuItem value="issue_date" sx={{ fontSize: '0.8rem' }}>
+                  Kiállítás
+                </MenuItem>
+                <MenuItem value="fulfillment_date" sx={{ fontSize: '0.8rem' }}>
+                  Teljesítés
+                </MenuItem>
+                <MenuItem value="payment_due_date" sx={{ fontSize: '0.8rem' }}>
+                  Fizetési határidő
+                </MenuItem>
               </Select>
             </FormControl>
-            
+
             {dateFilterType && (
               <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={hu}>
                 <Stack direction="row" spacing={0.5} alignItems="center">
@@ -947,7 +1021,7 @@ const NAVInvoices: React.FC = () => {
                     sx={{
                       minWidth: 120,
                       '& .MuiInputLabel-root': { fontSize: '0.8rem' },
-                      '& .MuiInputBase-input': { fontSize: '0.8rem' }
+                      '& .MuiInputBase-input': { fontSize: '0.8rem' },
                     }}
                   />
                   <TextField
@@ -960,7 +1034,7 @@ const NAVInvoices: React.FC = () => {
                     sx={{
                       minWidth: 120,
                       '& .MuiInputLabel-root': { fontSize: '0.8rem' },
-                      '& .MuiInputBase-input': { fontSize: '0.8rem' }
+                      '& .MuiInputBase-input': { fontSize: '0.8rem' },
                     }}
                   />
 
@@ -975,7 +1049,7 @@ const NAVInvoices: React.FC = () => {
                         borderRadius: 1,
                         p: 0.25,
                         '&:hover': { bgcolor: 'primary.50' },
-                        '& .MuiSvgIcon-root': { fontSize: 16 }
+                        '& .MuiSvgIcon-root': { fontSize: 16 },
                       }}
                     >
                       <ChevronLeftIcon />
@@ -991,7 +1065,7 @@ const NAVInvoices: React.FC = () => {
                         minWidth: '80px',
                         py: 0.25,
                         px: 0.75,
-                        minHeight: '28px'
+                        minHeight: '28px',
                       }}
                     >
                       Aktuális hónap
@@ -1006,7 +1080,7 @@ const NAVInvoices: React.FC = () => {
                         borderRadius: 1,
                         p: 0.25,
                         '&:hover': { bgcolor: 'primary.50' },
-                        '& .MuiSvgIcon-root': { fontSize: 16 }
+                        '& .MuiSvgIcon-root': { fontSize: 16 },
                       }}
                     >
                       <ChevronRightIcon />
@@ -1019,7 +1093,12 @@ const NAVInvoices: React.FC = () => {
         </Stack>
 
         {/* Active filters display - Same pattern as BeneficiaryManager */}
-        {(searchTerm || directionFilter || paymentStatusFilter || !hideStornoInvoices || inboundTransferFilter || dateFilterType) && (
+        {(searchTerm ||
+          directionFilter ||
+          paymentStatusFilter ||
+          !hideStornoInvoices ||
+          inboundTransferFilter ||
+          dateFilterType) && (
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ mt: 2 }}>
             <Typography variant="body2" color="text.secondary">
               Aktív szűrők:
@@ -1042,21 +1121,20 @@ const NAVInvoices: React.FC = () => {
             )}
             {paymentStatusFilter && (
               <Chip
-                label={paymentStatusFilter === 'UNPAID' ? 'Fizetésre vár' : 
-                       paymentStatusFilter === 'PREPARED' ? 'Előkészítve' : 
-                       'Kifizetve'}
+                label={
+                  paymentStatusFilter === 'UNPAID'
+                    ? 'Fizetésre vár'
+                    : paymentStatusFilter === 'PREPARED'
+                      ? 'Előkészítve'
+                      : 'Kifizetve'
+                }
                 size="small"
                 color="info"
                 variant="outlined"
               />
             )}
             {inboundTransferFilter && (
-              <Chip
-                label="Bejövő átutalások"
-                size="small"
-                color="primary"
-                variant="outlined"
-              />
+              <Chip label="Bejövő átutalások" size="small" color="primary" variant="outlined" />
             )}
             {!hideStornoInvoices && (
               <Chip
@@ -1069,14 +1147,16 @@ const NAVInvoices: React.FC = () => {
             {dateFilterType && (dateFrom || dateTo) && (
               <Chip
                 label={`${
-                  dateFilterType === 'issue_date' ? 'Kiállítás' : 
-                  dateFilterType === 'fulfillment_date' ? 'Teljesítés' : 
-                  'Fizetési határidő'
+                  dateFilterType === 'issue_date'
+                    ? 'Kiállítás'
+                    : dateFilterType === 'fulfillment_date'
+                      ? 'Teljesítés'
+                      : 'Fizetési határidő'
                 }: ${
-                  dateFrom && dateTo 
-                    ? `${dateFrom} - ${dateTo}` 
-                    : dateFrom 
-                      ? `${dateFrom}-tól` 
+                  dateFrom && dateTo
+                    ? `${dateFrom} - ${dateTo}`
+                    : dateFrom
+                      ? `${dateFrom}-tól`
                       : `${dateTo}-ig`
                 }`}
                 size="small"
@@ -1118,17 +1198,25 @@ const NAVInvoices: React.FC = () => {
             mb: 0.5,
             bgcolor: 'primary.50',
             border: '1px solid',
-            borderColor: 'primary.200'
+            borderColor: 'primary.200',
           }}
         >
           <Stack spacing={0.5}>
             {/* Header with collapse button */}
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ minHeight: '24px' }}>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', fontWeight: 'medium' }}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              sx={{ minHeight: '24px' }}
+            >
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ fontSize: '0.7rem', fontWeight: 'medium' }}
+              >
                 {selectedInvoices.length > 0
                   ? `${selectedInvoices.length} kiválasztott számla összesen:`
-                  : `${totals.total.count} szűrt számla összesen:`
-                }
+                  : `${totals.total.count} szűrt számla összesen:`}
               </Typography>
               <IconButton
                 size="small"
@@ -1138,61 +1226,104 @@ const NAVInvoices: React.FC = () => {
                 {totalsCollapsed ? <ExpandMoreIcon /> : <ExpandLessIcon />}
               </IconButton>
             </Stack>
-            
+
             {/* Collapsible direction-specific totals - Compact Table Design */}
             <Collapse in={!totalsCollapsed}>
-              <Box sx={{
-                border: '1px solid',
-                borderColor: 'divider',
-                borderRadius: 1,
-                overflow: 'hidden',
-                mt: 0.5
-              }}>
+              <Box
+                sx={{
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  overflow: 'hidden',
+                  mt: 0.5,
+                }}
+              >
                 {/* Table Header */}
-                <Box sx={{
-                  display: 'grid',
-                  gridTemplateColumns: '100px 1fr 1fr 1fr',
-                  gap: 0.5,
-                  bgcolor: 'grey.50',
-                  p: 0.5,
-                  borderBottom: '1px solid',
-                  borderBottomColor: 'divider'
-                }}>
-                  <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.65rem' }}>
-                    Irány
-                  </Typography>
-                  <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.65rem', textAlign: 'center' }}>
-                    Nettó
-                  </Typography>
-                  <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.65rem', textAlign: 'center' }}>
-                    ÁFA
-                  </Typography>
-                  <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.65rem', textAlign: 'center' }}>
-                    Bruttó
-                  </Typography>
-                </Box>
-                
-                {/* Outbound Row */}
-                {totals.outbound.count > 0 && (
-                  <Box sx={{
+                <Box
+                  sx={{
                     display: 'grid',
                     gridTemplateColumns: '100px 1fr 1fr 1fr',
                     gap: 0.5,
+                    bgcolor: 'grey.50',
                     p: 0.5,
-                    borderBottom: totals.inbound.count > 0 ? '1px solid' : 'none',
+                    borderBottom: '1px solid',
                     borderBottomColor: 'divider',
-                    '&:hover': { bgcolor: 'action.hover' }
-                  }}>
-                    <Typography variant="caption" color="primary.main" sx={{ fontSize: '0.65rem', fontWeight: 'medium' }}>
+                  }}
+                >
+                  <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.65rem' }}>
+                    Irány
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{ fontWeight: 'bold', fontSize: '0.65rem', textAlign: 'center' }}
+                  >
+                    Nettó
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{ fontWeight: 'bold', fontSize: '0.65rem', textAlign: 'center' }}
+                  >
+                    ÁFA
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{ fontWeight: 'bold', fontSize: '0.65rem', textAlign: 'center' }}
+                  >
+                    Bruttó
+                  </Typography>
+                </Box>
+
+                {/* Outbound Row */}
+                {totals.outbound.count > 0 && (
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: '100px 1fr 1fr 1fr',
+                      gap: 0.5,
+                      p: 0.5,
+                      borderBottom: totals.inbound.count > 0 ? '1px solid' : 'none',
+                      borderBottomColor: 'divider',
+                      '&:hover': { bgcolor: 'action.hover' },
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      color="primary.main"
+                      sx={{ fontSize: '0.65rem', fontWeight: 'medium' }}
+                    >
                       Kimenő ({totals.outbound.count})
                     </Typography>
-                    <Typography variant="caption" sx={{ fontSize: '0.65rem', textAlign: 'center', color: 'success.main', fontWeight: 'medium' }}>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontSize: '0.65rem',
+                        textAlign: 'center',
+                        color: 'success.main',
+                        fontWeight: 'medium',
+                      }}
+                    >
                       {formatAmount(totals.outbound.net, 'HUF')}
                     </Typography>
-                    <Typography variant="caption" sx={{ fontSize: '0.65rem', textAlign: 'center', color: 'warning.main', fontWeight: 'medium' }}>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontSize: '0.65rem',
+                        textAlign: 'center',
+                        color: 'warning.main',
+                        fontWeight: 'medium',
+                      }}
+                    >
                       {formatAmount(totals.outbound.vat, 'HUF')}
                     </Typography>
-                    <Typography variant="caption" sx={{ fontSize: '0.65rem', textAlign: 'center', color: 'primary.main', fontWeight: 'bold' }}>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontSize: '0.65rem',
+                        textAlign: 'center',
+                        color: 'primary.main',
+                        fontWeight: 'bold',
+                      }}
+                    >
                       {formatAmount(totals.outbound.gross, 'HUF')}
                     </Typography>
                   </Box>
@@ -1200,23 +1331,53 @@ const NAVInvoices: React.FC = () => {
 
                 {/* Inbound Row */}
                 {totals.inbound.count > 0 && (
-                  <Box sx={{
-                    display: 'grid',
-                    gridTemplateColumns: '100px 1fr 1fr 1fr',
-                    gap: 0.5,
-                    p: 0.5,
-                    '&:hover': { bgcolor: 'action.hover' }
-                  }}>
-                    <Typography variant="caption" color="secondary.main" sx={{ fontSize: '0.65rem', fontWeight: 'medium' }}>
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: '100px 1fr 1fr 1fr',
+                      gap: 0.5,
+                      p: 0.5,
+                      '&:hover': { bgcolor: 'action.hover' },
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      color="secondary.main"
+                      sx={{ fontSize: '0.65rem', fontWeight: 'medium' }}
+                    >
                       Bejövő ({totals.inbound.count})
                     </Typography>
-                    <Typography variant="caption" sx={{ fontSize: '0.65rem', textAlign: 'center', color: 'success.main', fontWeight: 'medium' }}>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontSize: '0.65rem',
+                        textAlign: 'center',
+                        color: 'success.main',
+                        fontWeight: 'medium',
+                      }}
+                    >
                       {formatAmount(totals.inbound.net, 'HUF')}
                     </Typography>
-                    <Typography variant="caption" sx={{ fontSize: '0.65rem', textAlign: 'center', color: 'warning.main', fontWeight: 'medium' }}>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontSize: '0.65rem',
+                        textAlign: 'center',
+                        color: 'warning.main',
+                        fontWeight: 'medium',
+                      }}
+                    >
                       {formatAmount(totals.inbound.vat, 'HUF')}
                     </Typography>
-                    <Typography variant="caption" sx={{ fontSize: '0.65rem', textAlign: 'center', color: 'secondary.main', fontWeight: 'bold' }}>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontSize: '0.65rem',
+                        textAlign: 'center',
+                        color: 'secondary.main',
+                        fontWeight: 'bold',
+                      }}
+                    >
                       {formatAmount(totals.inbound.gross, 'HUF')}
                     </Typography>
                   </Box>
@@ -1230,7 +1391,16 @@ const NAVInvoices: React.FC = () => {
       {/* Action buttons for selected invoices */}
       {selectedInvoices.length > 0 && (
         <Paper elevation={1} sx={{ p: 1, mb: 0.5, backgroundColor: 'action.hover' }}>
-          <Typography variant="caption" sx={{ mb: 0.5, color: 'primary.main', fontWeight: 'medium', fontSize: '0.75rem', display: 'block' }}>
+          <Typography
+            variant="caption"
+            sx={{
+              mb: 0.5,
+              color: 'primary.main',
+              fontWeight: 'medium',
+              fontSize: '0.75rem',
+              display: 'block',
+            }}
+          >
             Tömeges műveletek ({selectedInvoices.length} számla)
           </Typography>
 
@@ -1283,7 +1453,7 @@ const NAVInvoices: React.FC = () => {
               sx={{
                 fontSize: '0.7rem',
                 mx: 0.5,
-                '& .MuiFormControlLabel-label': { fontSize: '0.7rem' }
+                '& .MuiFormControlLabel-label': { fontSize: '0.7rem' },
               }}
             />
 
@@ -1297,7 +1467,7 @@ const NAVInvoices: React.FC = () => {
                 sx={{
                   minWidth: '120px',
                   '& .MuiInputBase-input': { fontSize: '0.7rem', py: 0.5 },
-                  '& .MuiInputLabel-root': { fontSize: '0.7rem' }
+                  '& .MuiInputLabel-root': { fontSize: '0.7rem' },
                 }}
                 InputLabelProps={{ shrink: true }}
               />
@@ -1319,7 +1489,10 @@ const NAVInvoices: React.FC = () => {
       )}
 
       {/* Table - Same pattern as BeneficiaryManager */}
-      <Paper elevation={1} sx={{ flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <Paper
+        elevation={1}
+        sx={{ flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+      >
         <NAVInvoiceTable
           invoices={invoices}
           isLoading={loading}
@@ -1336,7 +1509,15 @@ const NAVInvoices: React.FC = () => {
 
       {/* Pagination with Page Size Selector */}
       {totalPages > 1 && (
-        <Box sx={{ mt: 1, p: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box
+          sx={{
+            mt: 1,
+            p: 1,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
           <Stack direction="row" spacing={2} alignItems="center">
             <Typography variant="body2" color="text.secondary">
               Oldal {currentPage} / {totalPages}
@@ -1373,14 +1554,16 @@ const NAVInvoices: React.FC = () => {
       )}
 
       {/* Invoice Details Dialog */}
-      <Dialog
-        open={invoiceDetailsOpen}
-        onClose={handleCloseInvoiceDetails}
-        maxWidth="lg"
-        fullWidth
-      >
+      <Dialog open={invoiceDetailsOpen} onClose={handleCloseInvoiceDetails} maxWidth="lg" fullWidth>
         <DialogTitle>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              width: '100%',
+            }}
+          >
             <Typography variant="h6" component="span">
               Számla részletei: {selectedInvoice?.nav_invoice_number || 'Betöltés...'}
             </Typography>
@@ -1392,10 +1575,22 @@ const NAVInvoices: React.FC = () => {
                   color={selectedInvoice.invoice_direction === 'INBOUND' ? 'secondary' : 'primary'}
                   size="small"
                   variant="outlined"
-                  icon={selectedInvoice.invoice_direction === 'INBOUND' ? <TrendingDownIcon /> : <TrendingUpIcon />}
+                  icon={
+                    selectedInvoice.invoice_direction === 'INBOUND' ? (
+                      <TrendingDownIcon />
+                    ) : (
+                      <TrendingUpIcon />
+                    )
+                  }
                 />
                 {selectedInvoice.invoice_operation === 'STORNO' && (
-                  <Chip label="Stornó" color="error" size="small" variant="filled" sx={{ height: 24, fontSize: '0.75rem' }} />
+                  <Chip
+                    label="Stornó"
+                    color="error"
+                    size="small"
+                    variant="filled"
+                    sx={{ height: 24, fontSize: '0.75rem' }}
+                  />
                 )}
               </Box>
             )}
@@ -1406,187 +1601,224 @@ const NAVInvoices: React.FC = () => {
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
               <CircularProgress />
             </Box>
-          ) : selectedInvoice && (
-            <Box>
-
-              {/* Compact Partners Section - Clean two-column like invoice */}
-              <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
-                {/* Supplier Column */}
-                {selectedInvoice.supplier_name && (
-                  <Box sx={{ flex: 1, borderRight: selectedInvoice.customer_name ? '1px solid #e0e0e0' : 'none', pr: selectedInvoice.customer_name ? 2 : 0 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
-                      Eladó: {selectedInvoice.supplier_name}
-                    </Typography>
-                    {selectedInvoice.supplier_tax_number && (
-                      <Typography variant="body2" sx={{ mb: 0.3, fontSize: '0.875rem' }}>
-                        Magyar adószám: {selectedInvoice.supplier_tax_number}
+          ) : (
+            selectedInvoice && (
+              <Box>
+                {/* Compact Partners Section - Clean two-column like invoice */}
+                <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+                  {/* Supplier Column */}
+                  {selectedInvoice.supplier_name && (
+                    <Box
+                      sx={{
+                        flex: 1,
+                        borderRight: selectedInvoice.customer_name ? '1px solid #e0e0e0' : 'none',
+                        pr: selectedInvoice.customer_name ? 2 : 0,
+                      }}
+                    >
+                      <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                        Eladó: {selectedInvoice.supplier_name}
                       </Typography>
-                    )}
-                    {selectedInvoice.supplier_bank_account_number && (
-                      <Typography variant="body2" sx={{ mb: 0.3, fontSize: '0.875rem' }}>
-                        Bankszámlaszám: {selectedInvoice.supplier_bank_account_number}
-                      </Typography>
-                    )}
+                      {selectedInvoice.supplier_tax_number && (
+                        <Typography variant="body2" sx={{ mb: 0.3, fontSize: '0.875rem' }}>
+                          Magyar adószám: {selectedInvoice.supplier_tax_number}
+                        </Typography>
+                      )}
+                      {selectedInvoice.supplier_bank_account_number && (
+                        <Typography variant="body2" sx={{ mb: 0.3, fontSize: '0.875rem' }}>
+                          Bankszámlaszám: {selectedInvoice.supplier_bank_account_number}
+                        </Typography>
+                      )}
 
-                    {/* Trusted Partner Status - Compact */}
-                    <Box sx={{ mt: 1 }}>
-                      {checkingTrustedStatus ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <CircularProgress size={14} />
-                          <Typography variant="caption" color="text.secondary">
-                            Ellenőrzés...
-                          </Typography>
-                        </Box>
-                      ) : isSupplierTrusted ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <VerifiedIcon color="success" fontSize="small" />
-                          <Typography variant="caption" color="success.main" sx={{ fontWeight: 'medium' }}>
-                            Megbízható partner
-                          </Typography>
-                        </Box>
-                      ) : selectedInvoice.supplier_tax_number && (
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          startIcon={<AddTrustedIcon />}
-                          onClick={handleAddTrustedPartner}
-                          disabled={addingTrustedPartner}
-                          sx={{ fontSize: '0.75rem', py: 0.5, px: 1 }}
-                        >
-                          {addingTrustedPartner ? 'Hozzáadás...' : 'Megbízható partner'}
-                        </Button>
+                      {/* Trusted Partner Status - Compact */}
+                      <Box sx={{ mt: 1 }}>
+                        {checkingTrustedStatus ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <CircularProgress size={14} />
+                            <Typography variant="caption" color="text.secondary">
+                              Ellenőrzés...
+                            </Typography>
+                          </Box>
+                        ) : isSupplierTrusted ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <VerifiedIcon color="success" fontSize="small" />
+                            <Typography
+                              variant="caption"
+                              color="success.main"
+                              sx={{ fontWeight: 'medium' }}
+                            >
+                              Megbízható partner
+                            </Typography>
+                          </Box>
+                        ) : (
+                          selectedInvoice.supplier_tax_number && (
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              startIcon={<AddTrustedIcon />}
+                              onClick={handleAddTrustedPartner}
+                              disabled={addingTrustedPartner}
+                              sx={{ fontSize: '0.75rem', py: 0.5, px: 1 }}
+                            >
+                              {addingTrustedPartner ? 'Hozzáadás...' : 'Megbízható partner'}
+                            </Button>
+                          )
+                        )}
+                      </Box>
+                    </Box>
+                  )}
+
+                  {/* Customer Column */}
+                  {selectedInvoice.customer_name && (
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                        Vevő: {selectedInvoice.customer_name}
+                      </Typography>
+                      {selectedInvoice.customer_tax_number && (
+                        <Typography variant="body2" sx={{ mb: 0.3, fontSize: '0.875rem' }}>
+                          Magyar adószám: {selectedInvoice.customer_tax_number}
+                        </Typography>
+                      )}
+                      {selectedInvoice.customer_bank_account_number && (
+                        <Typography variant="body2" sx={{ mb: 0.3, fontSize: '0.875rem' }}>
+                          Bankszámlaszám: {selectedInvoice.customer_bank_account_number}
+                        </Typography>
                       )}
                     </Box>
-                  </Box>
-                )}
-
-                {/* Customer Column */}
-                {selectedInvoice.customer_name && (
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
-                      Vevő: {selectedInvoice.customer_name}
-                    </Typography>
-                    {selectedInvoice.customer_tax_number && (
-                      <Typography variant="body2" sx={{ mb: 0.3, fontSize: '0.875rem' }}>
-                        Magyar adószám: {selectedInvoice.customer_tax_number}
-                      </Typography>
-                    )}
-                    {selectedInvoice.customer_bank_account_number && (
-                      <Typography variant="body2" sx={{ mb: 0.3, fontSize: '0.875rem' }}>
-                        Bankszámlaszám: {selectedInvoice.customer_bank_account_number}
-                      </Typography>
-                    )}
-                  </Box>
-                )}
-              </Stack>
-
-              {/* Compact Details Row - Essential dates only */}
-              <Box sx={{ borderTop: '1px solid #e0e0e0', pt: 1.5, mb: 2 }}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 1 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}>
-                    Teljesítés: {selectedInvoice.fulfillment_date_formatted || selectedInvoice.issue_date_formatted}
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}>
-                    Keltezés: {selectedInvoice.issue_date_formatted}
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}>
-                    Fizetési határidő: {selectedInvoice.payment_due_date_formatted || 'N/A'}
-                  </Typography>
-                  {selectedInvoice.original_invoice_number && (
-                    <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}>
-                      Eredeti szám: {selectedInvoice.original_invoice_number}
-                    </Typography>
                   )}
                 </Stack>
-              </Box>
 
-              {/* Compact Summary Section */}
-              <Box sx={{ backgroundColor: '#f9f9f9', p: 1.5, borderRadius: 1, mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
-                  Számla összesítő:
-                </Typography>
-
-                <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
-                  <Stack spacing={0.5} sx={{ flex: 1 }}>
-                    {selectedInvoice.invoice_net_amount && (
-                      <Stack direction="row" justifyContent="space-between">
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Számla nettó értéke</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                          {formatNumber(selectedInvoice.invoice_net_amount)} Ft
-                        </Typography>
-                      </Stack>
-                    )}
-                    {selectedInvoice.invoice_vat_amount && (
-                      <Stack direction="row" justifyContent="space-between">
-                        <Typography variant="body2">Áfa összege</Typography>
-                        <Typography variant="body2">
-                          {formatNumber(selectedInvoice.invoice_vat_amount)} Ft
-                        </Typography>
-                      </Stack>
-                    )}
-                    <Stack direction="row" justifyContent="space-between" sx={{ borderTop: '1px solid #ddd', pt: 0.5 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Számla bruttó végösszege</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                        {formatNumber(selectedInvoice.invoice_gross_amount)} Ft
+                {/* Compact Details Row - Essential dates only */}
+                <Box sx={{ borderTop: '1px solid #e0e0e0', pt: 1.5, mb: 2 }}>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 1 }}>
+                    <Typography
+                      variant="body2"
+                      sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}
+                    >
+                      Teljesítés:{' '}
+                      {selectedInvoice.fulfillment_date_formatted ||
+                        selectedInvoice.issue_date_formatted}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}
+                    >
+                      Keltezés: {selectedInvoice.issue_date_formatted}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}
+                    >
+                      Fizetési határidő: {selectedInvoice.payment_due_date_formatted || 'N/A'}
+                    </Typography>
+                    {selectedInvoice.original_invoice_number && (
+                      <Typography
+                        variant="body2"
+                        sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}
+                      >
+                        Eredeti szám: {selectedInvoice.original_invoice_number}
                       </Typography>
+                    )}
+                  </Stack>
+                </Box>
+
+                {/* Compact Summary Section */}
+                <Box sx={{ backgroundColor: '#f9f9f9', p: 1.5, borderRadius: 1, mb: 2 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                    Számla összesítő:
+                  </Typography>
+
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                    spacing={2}
+                  >
+                    <Stack spacing={0.5} sx={{ flex: 1 }}>
+                      {selectedInvoice.invoice_net_amount && (
+                        <Stack direction="row" justifyContent="space-between">
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            Számla nettó értéke
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            {formatNumber(selectedInvoice.invoice_net_amount)} Ft
+                          </Typography>
+                        </Stack>
+                      )}
+                      {selectedInvoice.invoice_vat_amount && (
+                        <Stack direction="row" justifyContent="space-between">
+                          <Typography variant="body2">Áfa összege</Typography>
+                          <Typography variant="body2">
+                            {formatNumber(selectedInvoice.invoice_vat_amount)} Ft
+                          </Typography>
+                        </Stack>
+                      )}
+                      <Stack
+                        direction="row"
+                        justifyContent="space-between"
+                        sx={{ borderTop: '1px solid #ddd', pt: 0.5 }}
+                      >
+                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                          Számla bruttó végösszege
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                          {formatNumber(selectedInvoice.invoice_gross_amount)} Ft
+                        </Typography>
+                      </Stack>
                     </Stack>
                   </Stack>
-                </Stack>
+                </Box>
 
-              </Box>
-
-              <Box>
-                <Typography variant="subtitle1" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
-                  Számla tételek
-                </Typography>
-                {invoiceLineItems.length > 0 ? (
-                  <TableContainer>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Sor</TableCell>
-                          <TableCell>Megnevezés</TableCell>
-                          <TableCell align="right">Mennyiség</TableCell>
-                          <TableCell align="right">Egységár</TableCell>
-                          <TableCell align="right">Nettó</TableCell>
-                          <TableCell align="right">ÁFA %</TableCell>
-                          <TableCell align="right">ÁFA összeg</TableCell>
-                          <TableCell align="right">Bruttó</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {invoiceLineItems.map((item) => (
-                          <TableRow key={item.id}>
-                            <TableCell>{item.line_number}</TableCell>
-                            <TableCell>{item.line_description}</TableCell>
-                            <TableCell align="right">
-                              {item.quantity ? `${item.quantity} ${item.unit_of_measure}` : '-'}
-                            </TableCell>
-                            <TableCell align="right">
-                              {formatNumber(item.unit_price)}
-                            </TableCell>
-                            <TableCell align="right">
-                              {formatNumber(item.line_net_amount)}
-                            </TableCell>
-                            <TableCell align="right">
-                              {item.vat_rate ? `${formatNumber(item.vat_rate)}%` : '-'}
-                            </TableCell>
-                            <TableCell align="right">
-                              {formatNumber(item.line_vat_amount)}
-                            </TableCell>
-                            <TableCell align="right">
-                              {formatNumber(item.line_gross_amount)}
-                            </TableCell>
+                <Box>
+                  <Typography variant="subtitle1" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
+                    Számla tételek
+                  </Typography>
+                  {invoiceLineItems.length > 0 ? (
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Sor</TableCell>
+                            <TableCell>Megnevezés</TableCell>
+                            <TableCell align="right">Mennyiség</TableCell>
+                            <TableCell align="right">Egységár</TableCell>
+                            <TableCell align="right">Nettó</TableCell>
+                            <TableCell align="right">ÁFA %</TableCell>
+                            <TableCell align="right">ÁFA összeg</TableCell>
+                            <TableCell align="right">Bruttó</TableCell>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                ) : (
-                  <Alert severity="info">Nincsenek részletes tételek</Alert>
-                )}
+                        </TableHead>
+                        <TableBody>
+                          {invoiceLineItems.map((item) => (
+                            <TableRow key={item.id}>
+                              <TableCell>{item.line_number}</TableCell>
+                              <TableCell>{item.line_description}</TableCell>
+                              <TableCell align="right">
+                                {item.quantity ? `${item.quantity} ${item.unit_of_measure}` : '-'}
+                              </TableCell>
+                              <TableCell align="right">{formatNumber(item.unit_price)}</TableCell>
+                              <TableCell align="right">
+                                {formatNumber(item.line_net_amount)}
+                              </TableCell>
+                              <TableCell align="right">
+                                {item.vat_rate ? `${formatNumber(item.vat_rate)}%` : '-'}
+                              </TableCell>
+                              <TableCell align="right">
+                                {formatNumber(item.line_vat_amount)}
+                              </TableCell>
+                              <TableCell align="right">
+                                {formatNumber(item.line_gross_amount)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  ) : (
+                    <Alert severity="info">Nincsenek részletes tételek</Alert>
+                  )}
+                </Box>
               </Box>
-            </Box>
+            )
           )}
         </DialogContent>
         <DialogActions>

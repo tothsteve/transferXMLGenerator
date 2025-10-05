@@ -11,18 +11,18 @@ import {
   Checkbox,
   Stack,
   IconButton,
-  Typography
+  Typography,
 } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
 import { Beneficiary } from '../../types/api';
-import { 
-  validateAndFormatHungarianAccountNumber, 
-  formatAccountNumberOnInput 
+import {
+  validateAndFormatHungarianAccountNumber,
+  formatAccountNumberOnInput,
 } from '../../utils/bankAccountValidation';
-import { 
+import {
   validateBeneficiaryName,
   validateRemittanceInfo,
-  normalizeWhitespace
+  normalizeWhitespace,
 } from '../../utils/stringValidation';
 
 interface BeneficiaryFormProps {
@@ -94,7 +94,7 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
     if (!data.account_number && !data.vat_number && !data.tax_number) {
       setError('account_number', {
         type: 'manual',
-        message: 'Meg kell adni a számlaszámot, adóazonosító jelet vagy céges adószámot'
+        message: 'Meg kell adni a számlaszámot, adóazonosító jelet vagy céges adószámot',
       });
       return;
     }
@@ -104,9 +104,9 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
     if (data.account_number) {
       const validation = validateAndFormatHungarianAccountNumber(data.account_number);
       if (!validation.isValid) {
-        setError('account_number', { 
-          type: 'manual', 
-          message: validation.error || 'Érvénytelen számlaszám' 
+        setError('account_number', {
+          type: 'manual',
+          message: validation.error || 'Érvénytelen számlaszám',
         });
         return;
       }
@@ -119,7 +119,7 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
       if (!/^\d{10}$/.test(cleanVat)) {
         setError('vat_number', {
           type: 'manual',
-          message: 'Magyar személyi adóazonosító jel 10 számjegyből kell álljon (pl. 8450782546)'
+          message: 'Magyar személyi adóazonosító jel 10 számjegyből kell álljon (pl. 8450782546)',
         });
         return;
       }
@@ -131,7 +131,7 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
       if (!/^\d{8}$/.test(cleanTax)) {
         setError('tax_number', {
           type: 'manual',
-          message: 'Magyar céges adószám 8 számjegyből kell álljon (pl. 12345678)'
+          message: 'Magyar céges adószám 8 számjegyből kell álljon (pl. 12345678)',
         });
         return;
       }
@@ -140,9 +140,9 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
     // Validate and normalize name
     const nameValidation = validateBeneficiaryName(data.name);
     if (!nameValidation.isValid) {
-      setError('name', { 
-        type: 'manual', 
-        message: nameValidation.error || 'Érvénytelen név' 
+      setError('name', {
+        type: 'manual',
+        message: nameValidation.error || 'Érvénytelen név',
       });
       return;
     }
@@ -151,9 +151,9 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
     if (data.remittance_information) {
       const remittanceValidation = validateRemittanceInfo(data.remittance_information);
       if (!remittanceValidation.isValid) {
-        setError('remittance_information', { 
-          type: 'manual', 
-          message: remittanceValidation.error || 'Érvénytelen közlemény' 
+        setError('remittance_information', {
+          type: 'manual',
+          message: remittanceValidation.error || 'Érvénytelen közlemény',
         });
         return;
       }
@@ -166,7 +166,9 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
       vat_number: data.vat_number ? data.vat_number.replace(/[\s-]/g, '') : undefined,
       tax_number: data.tax_number ? data.tax_number.replace(/[\s-]/g, '') : undefined,
       description: data.description || '',
-      remittance_information: data.remittance_information ? normalizeWhitespace(data.remittance_information) : ''
+      remittance_information: data.remittance_information
+        ? normalizeWhitespace(data.remittance_information)
+        : '',
     };
 
     try {
@@ -177,16 +179,21 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
       // Handle backend validation errors
       if (error.response?.status === 400 && error.response?.data) {
         const backendErrors = error.response.data;
-        
+
         // Set field-specific errors from backend
-        Object.keys(backendErrors).forEach(field => {
-          if (field === 'account_number' || field === 'name' || field === 'description' || field === 'remittance_information') {
-            const errorMessage = Array.isArray(backendErrors[field]) 
-              ? backendErrors[field][0] 
+        Object.keys(backendErrors).forEach((field) => {
+          if (
+            field === 'account_number' ||
+            field === 'name' ||
+            field === 'description' ||
+            field === 'remittance_information'
+          ) {
+            const errorMessage = Array.isArray(backendErrors[field])
+              ? backendErrors[field][0]
               : backendErrors[field];
             setError(field as keyof FormData, {
               type: 'manual',
-              message: errorMessage
+              message: errorMessage,
             });
           }
         });
@@ -204,12 +211,12 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
     // Format the input in real-time
     const formatted = formatAccountNumberOnInput(value);
     setAccountNumberValue(formatted);
-    
+
     // Clear any existing errors when user starts typing
     if (errors.account_number) {
       clearErrors('account_number');
     }
-    
+
     return formatted;
   };
 
@@ -232,26 +239,29 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
             <TextField
               label="Név *"
               fullWidth
-              {...register('name', { 
+              {...register('name', {
                 required: 'A név megadása kötelező',
                 validate: (value) => {
                   const validation = validateBeneficiaryName(value);
                   return validation.isValid || validation.error;
-                }
+                },
               })}
               error={!!errors.name}
-              helperText={errors.name?.message || 'Csak angol betűk, magyar ékezetes betűk, számok és megadott írásjelek használhatók'}
+              helperText={
+                errors.name?.message ||
+                'Csak angol betűk, magyar ékezetes betűk, számok és megadott írásjelek használhatók'
+              }
             />
 
             <Controller
               name="account_number"
               control={control}
-              rules={{ 
+              rules={{
                 validate: (value) => {
                   if (!value) return true; // Optional field now
                   const validation = validateAndFormatHungarianAccountNumber(value);
                   return validation.isValid || validation.error || 'Érvénytelen számlaszám';
-                }
+                },
               }}
               render={({ field }) => (
                 <TextField
@@ -266,11 +276,11 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
                   onBlur={field.onBlur}
                   error={!!errors.account_number}
                   helperText={
-                    errors.account_number?.message || 
+                    errors.account_number?.message ||
                     'Magyar számlaszám formátum: 16 vagy 24 számjegy, automatikus formázás'
                   }
                   InputProps={{
-                    sx: { fontFamily: 'monospace', letterSpacing: '0.5px' }
+                    sx: { fontFamily: 'monospace', letterSpacing: '0.5px' },
                   }}
                 />
               )}
@@ -288,15 +298,15 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
                     return 'Magyar személyi adóazonosító jel 10 számjegyből kell álljon (pl. 8440961790)';
                   }
                   return true;
-                }
+                },
               })}
               error={!!errors.vat_number}
               helperText={
-                errors.vat_number?.message || 
+                errors.vat_number?.message ||
                 'Magyar személyi adóazonosító jel 10 számjegyből áll (alkalmazottak azonosítására)'
               }
               InputProps={{
-                sx: { fontFamily: 'monospace', letterSpacing: '0.5px' }
+                sx: { fontFamily: 'monospace', letterSpacing: '0.5px' },
               }}
             />
 
@@ -312,7 +322,7 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
                     return 'Magyar céges adószám 8 számjegyből kell álljon (pl. 12345678)';
                   }
                   return true;
-                }
+                },
               })}
               error={!!errors.tax_number}
               helperText={
@@ -320,7 +330,7 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
                 'Magyar céges adószám első 8 számjegye (cégek és szervezetek azonosítására)'
               }
               InputProps={{
-                sx: { fontFamily: 'monospace', letterSpacing: '0.5px' }
+                sx: { fontFamily: 'monospace', letterSpacing: '0.5px' },
               }}
             />
 
@@ -342,10 +352,13 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
                   if (!value) return true;
                   const validation = validateRemittanceInfo(value);
                   return validation.isValid || validation.error;
-                }
+                },
               })}
               error={!!errors.remittance_information}
-              helperText={errors.remittance_information?.message || 'Maximum 140 karakter. Csak angol betűk, magyar ékezetes betűk, számok és megadott írásjelek használhatók'}
+              helperText={
+                errors.remittance_information?.message ||
+                'Maximum 140 karakter. Csak angol betűk, magyar ékezetes betűk, számok és megadott írásjelek használhatók'
+              }
             />
 
             <Stack spacing={1}>
@@ -374,15 +387,9 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
         </DialogContent>
 
         <DialogActions>
-          <Button onClick={handleClose}>
-            Mégse
-          </Button>
-          <Button 
-            type="submit" 
-            variant="contained" 
-            disabled={isLoading}
-          >
-            {isLoading ? 'Mentés...' : (beneficiary ? 'Frissítés' : 'Létrehozás')}
+          <Button onClick={handleClose}>Mégse</Button>
+          <Button type="submit" variant="contained" disabled={isLoading}>
+            {isLoading ? 'Mentés...' : beneficiary ? 'Frissítés' : 'Létrehozás'}
           </Button>
         </DialogActions>
       </form>

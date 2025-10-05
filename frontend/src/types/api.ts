@@ -1,9 +1,9 @@
 export interface Beneficiary {
   id: number;
   name: string;
-  account_number?: string | null;  // Optional for VAT/tax-only beneficiaries
-  vat_number?: string | null;      // Hungarian VAT number for employee identification
-  tax_number?: string | null;      // Hungarian company tax number for corporate identification
+  account_number?: string | null; // Optional for VAT/tax-only beneficiaries
+  vat_number?: string | null; // Hungarian VAT number for employee identification
+  tax_number?: string | null; // Hungarian company tax number for corporate identification
   description: string;
   remittance_information: string;
   is_frequent: boolean;
@@ -43,7 +43,7 @@ export interface TemplateBeneficiary {
 export interface Transfer {
   id?: number;
   beneficiary: number;
-  beneficiary_data?: Beneficiary;  // Optional expanded data
+  beneficiary_data?: Beneficiary; // Optional expanded data
   amount: string;
   currency: 'HUF' | 'EUR' | 'USD';
   execution_date: string;
@@ -56,7 +56,7 @@ export interface Transfer {
 // Transfer as returned from API (with expanded data)
 export interface TransferWithBeneficiary {
   id?: number;
-  beneficiary: Beneficiary;  // Full beneficiary object
+  beneficiary: Beneficiary; // Full beneficiary object
   amount: string;
   currency: 'HUF' | 'EUR' | 'USD';
   execution_date: string;
@@ -70,7 +70,7 @@ export interface TransferBatch {
   id: number;
   name: string;
   description?: string | null;
-  transfers: TransferWithBeneficiary[];  // Batches return transfers with expanded beneficiary data
+  transfers: TransferWithBeneficiary[]; // Batches return transfers with expanded beneficiary data
   total_amount: string;
   used_in_bank: boolean;
   bank_usage_date?: string | null;
@@ -129,7 +129,7 @@ export interface GenerateKHExportResponse {
   content: string;
   filename: string;
   encoding: string;
-  content_encoding?: string | null;  // Optional field for base64 encoding indicator
+  content_encoding?: string | null; // Optional field for base64 encoding indicator
   transfer_count: number;
   total_amount: string;
 }
@@ -157,7 +157,7 @@ export interface AvailablePartner {
 export interface NAVInvoice {
   id: number;
   nav_invoice_number: string;
-  invoice_direction: string;  // 'INBOUND' | 'OUTBOUND' - using string for Zod v4 compatibility
+  invoice_direction: string; // 'INBOUND' | 'OUTBOUND' - using string for Zod v4 compatibility
   invoice_direction_display: string;
   partner_name: string;
   partner_tax_number: string;

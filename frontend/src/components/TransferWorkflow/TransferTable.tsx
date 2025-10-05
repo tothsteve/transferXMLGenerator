@@ -17,7 +17,7 @@ import {
   Tooltip,
   Card,
   CardContent,
-  alpha
+  alpha,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -30,7 +30,7 @@ import {
   DragIndicator as DragIcon,
   Person as PersonIcon,
   Receipt as ReceiptIcon,
-  Payments as PaymentsIcon
+  Payments as PaymentsIcon,
 } from '@mui/icons-material';
 import {
   DndContext,
@@ -48,9 +48,7 @@ import {
   verticalListSortingStrategy,
   useSortable,
 } from '@dnd-kit/sortable';
-import {
-  CSS,
-} from '@dnd-kit/utilities';
+import { CSS } from '@dnd-kit/utilities';
 import { Transfer, Beneficiary } from '../../types/api';
 
 interface TransferData extends Omit<Transfer, 'id' | 'is_processed' | 'created_at'> {
@@ -66,7 +64,7 @@ interface TransferTableProps {
   onAddTransfer: () => void;
   onAddFromInvoice: () => void;
   onReorderTransfers: (transfers: TransferData[]) => void;
-  onGetSortedTransfers?: () => TransferData[];  // Optional callback to get sorted order
+  onGetSortedTransfers?: () => TransferData[]; // Optional callback to get sorted order
 }
 
 // Sortable Row Component
@@ -91,15 +89,8 @@ const SortableRow: React.FC<{
   onDelete,
   onUpdateEditData,
 }) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ 
-    id: transfer.id || transfer.tempId || `transfer-${index}`
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: transfer.id || transfer.tempId || `transfer-${index}`,
   });
 
   const style = {
@@ -109,13 +100,13 @@ const SortableRow: React.FC<{
   };
 
   return (
-    <TableRow 
-      ref={setNodeRef} 
-      style={style} 
+    <TableRow
+      ref={setNodeRef}
+      style={style}
       hover={!isDragging}
-      sx={{ 
+      sx={{
         cursor: isDragging ? 'grabbing' : 'default',
-        '&:hover .drag-handle': { opacity: 1 }
+        '&:hover .drag-handle': { opacity: 1 },
       }}
     >
       <TableCell sx={{ width: 48, p: 1 }}>
@@ -124,11 +115,11 @@ const SortableRow: React.FC<{
           {...listeners}
           size="small"
           className="drag-handle"
-          sx={{ 
+          sx={{
             opacity: 0.3,
             transition: 'opacity 0.2s',
             cursor: 'grab',
-            '&:active': { cursor: 'grabbing' }
+            '&:active': { cursor: 'grabbing' },
           }}
         >
           <DragIcon />
@@ -136,32 +127,38 @@ const SortableRow: React.FC<{
       </TableCell>
       <TableCell>
         <Stack direction="row" alignItems="center" spacing={2}>
-          <Avatar 
-            sx={{ 
-              width: 40, 
-              height: 40, 
+          <Avatar
+            sx={{
+              width: 40,
+              height: 40,
               bgcolor: 'primary.main',
-              background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)'
+              background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
             }}
           >
             <PersonIcon />
           </Avatar>
           <Box>
             <Typography variant="body2" fontWeight={600} sx={{ color: 'text.primary' }}>
-              {transfer.beneficiary_data?.name || (transfer as any).beneficiary_name || `Kedvezményezett #${typeof transfer.beneficiary === 'number' ? transfer.beneficiary : (transfer.beneficiary as any)?.id || 'N/A'}`}
+              {transfer.beneficiary_data?.name ||
+                (transfer as any).beneficiary_name ||
+                `Kedvezményezett #${typeof transfer.beneficiary === 'number' ? transfer.beneficiary : (transfer.beneficiary as any)?.id || 'N/A'}`}
               {transfer.beneficiary_data?.vat_number && (
-                <Typography component="span" variant="body2" sx={{ color: 'info.main', fontWeight: 400, ml: 1 }}>
+                <Typography
+                  component="span"
+                  variant="body2"
+                  sx={{ color: 'info.main', fontWeight: 400, ml: 1 }}
+                >
                   ({transfer.beneficiary_data.vat_number})
                 </Typography>
               )}
             </Typography>
-            <Typography 
-              variant="caption" 
-              sx={{ 
-                color: 'text.secondary', 
+            <Typography
+              variant="caption"
+              sx={{
+                color: 'text.secondary',
                 fontFamily: 'monospace',
                 fontSize: '0.75rem',
-                letterSpacing: '0.02em'
+                letterSpacing: '0.02em',
               }}
             >
               {transfer.beneficiary_data?.account_number || (transfer as any).account_number}
@@ -178,9 +175,11 @@ const SortableRow: React.FC<{
             onChange={(e) => onUpdateEditData({ ...editData, amount: e.target.value })}
             placeholder="0"
             sx={{ width: 140 }}
-            InputProps={{ 
+            InputProps={{
               inputProps: { step: 1 },
-              startAdornment: <PaymentsIcon sx={{ color: 'text.secondary', mr: 1, fontSize: 18 }} />
+              startAdornment: (
+                <PaymentsIcon sx={{ color: 'text.secondary', mr: 1, fontSize: 18 }} />
+              ),
             }}
           />
         ) : (
@@ -232,13 +231,13 @@ const SortableRow: React.FC<{
         ) : (
           <Stack direction="row" alignItems="center" spacing={1}>
             <ReceiptIcon sx={{ fontSize: 16, color: 'secondary.main' }} />
-            <Typography 
-              variant="body2" 
-              sx={{ 
-                maxWidth: 200, 
+            <Typography
+              variant="body2"
+              sx={{
+                maxWidth: 200,
                 color: 'text.primary',
                 fontWeight: transfer.remittance_info ? 500 : 400,
-                fontStyle: transfer.remittance_info ? 'normal' : 'italic'
+                fontStyle: transfer.remittance_info ? 'normal' : 'italic',
               }}
               noWrap
             >
@@ -264,20 +263,12 @@ const SortableRow: React.FC<{
         ) : (
           <Stack direction="row" justifyContent="flex-end" spacing={0.5}>
             <Tooltip title="Szerkesztés">
-              <IconButton
-                onClick={() => onStartEdit(index, transfer)}
-                size="small"
-                color="primary"
-              >
+              <IconButton onClick={() => onStartEdit(index, transfer)} size="small" color="primary">
                 <EditIcon fontSize="small" />
               </IconButton>
             </Tooltip>
             <Tooltip title="Törlés">
-              <IconButton
-                onClick={() => onDelete(index)}
-                size="small"
-                color="error"
-              >
+              <IconButton onClick={() => onDelete(index)} size="small" color="error">
                 <DeleteIcon fontSize="small" />
               </IconButton>
             </Tooltip>
@@ -317,11 +308,12 @@ const TransferTable: React.FC<TransferTableProps> = ({
 
     if (over && active.id !== over.id) {
       const oldIndex = transfers.findIndex(
-        (transfer) => 
-          (transfer.id || transfer.tempId || `transfer-${transfers.indexOf(transfer)}`) === active.id
+        (transfer) =>
+          (transfer.id || transfer.tempId || `transfer-${transfers.indexOf(transfer)}`) ===
+          active.id
       );
       const newIndex = transfers.findIndex(
-        (transfer) => 
+        (transfer) =>
           (transfer.id || transfer.tempId || `transfer-${transfers.indexOf(transfer)}`) === over.id
       );
 
@@ -414,10 +406,15 @@ const TransferTable: React.FC<TransferTableProps> = ({
   React.useEffect(() => {
     if (sortField && sortedTransfers.length > 0) {
       // Check if sorted order actually changed to prevent infinite loops
-      const hasChanged = sortedTransfers.length !== lastSortedRef.current.length ||
+      const hasChanged =
+        sortedTransfers.length !== lastSortedRef.current.length ||
         sortedTransfers.some((t, i) => {
           const prev = lastSortedRef.current[i];
-          return !prev || (t.id && prev.id && t.id !== prev.id) || (t.tempId && prev.tempId && t.tempId !== prev.tempId);
+          return (
+            !prev ||
+            (t.id && prev.id && t.id !== prev.id) ||
+            (t.tempId && prev.tempId && t.tempId !== prev.tempId)
+          );
         });
 
       if (hasChanged) {
@@ -449,16 +446,18 @@ const TransferTable: React.FC<TransferTableProps> = ({
     setEditData({});
   };
 
-  const totalAmount = transfers.reduce((sum, transfer) => 
-    sum + (parseFloat(transfer.amount) || 0), 0
+  const totalAmount = transfers.reduce(
+    (sum, transfer) => sum + (parseFloat(transfer.amount) || 0),
+    0
   );
 
   if (transfers.length === 0) {
     return (
-      <Card 
+      <Card
         elevation={2}
         sx={{
-          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%)',
+          background:
+            'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%)',
           backdropFilter: 'blur(20px)',
           border: '1px solid rgba(255, 255, 255, 0.3)',
           borderRadius: 3,
@@ -466,14 +465,15 @@ const TransferTable: React.FC<TransferTableProps> = ({
       >
         <CardContent>
           <Box sx={{ p: 6, textAlign: 'center' }}>
-            <Avatar 
-              sx={{ 
-                width: 80, 
-                height: 80, 
-                mx: 'auto', 
+            <Avatar
+              sx={{
+                width: 80,
+                height: 80,
+                mx: 'auto',
                 mb: 3,
-                background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%)',
-                border: '2px solid rgba(37, 99, 235, 0.1)'
+                background:
+                  'linear-gradient(135deg, rgba(37, 99, 235, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%)',
+                border: '2px solid rgba(37, 99, 235, 0.1)',
               }}
             >
               <CurrencyIcon sx={{ fontSize: 36, color: 'primary.main' }} />
@@ -481,7 +481,11 @@ const TransferTable: React.FC<TransferTableProps> = ({
             <Typography variant="h5" fontWeight={700} sx={{ mb: 2, color: 'text.primary' }}>
               Nincsenek átutalások
             </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 400, mx: 'auto' }}>
+            <Typography
+              variant="body1"
+              color="text.secondary"
+              sx={{ mb: 4, maxWidth: 400, mx: 'auto' }}
+            >
               Válasszon ki egy sablont vagy adjon hozzá manuálisan átutalásokat a kezdéshez.
             </Typography>
             <Stack direction="row" spacing={2}>
@@ -500,7 +504,7 @@ const TransferTable: React.FC<TransferTableProps> = ({
                     background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
                     transform: 'translateY(-2px)',
                     boxShadow: '0 6px 20px rgba(37, 99, 235, 0.4)',
-                  }
+                  },
                 }}
               >
                 Átutalás hozzáadása
@@ -520,7 +524,7 @@ const TransferTable: React.FC<TransferTableProps> = ({
                     borderColor: 'primary.dark',
                     bgcolor: 'primary.50',
                     transform: 'translateY(-2px)',
-                  }
+                  },
                 }}
               >
                 NAV számlából
@@ -533,35 +537,39 @@ const TransferTable: React.FC<TransferTableProps> = ({
   }
 
   return (
-    <Card 
+    <Card
       elevation={2}
       sx={{
-        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%)',
+        background:
+          'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%)',
         backdropFilter: 'blur(20px)',
         border: '1px solid rgba(255, 255, 255, 0.3)',
         borderRadius: 3,
-        overflow: 'hidden'
+        overflow: 'hidden',
       }}
     >
       {/* Header */}
-      <Box 
-        sx={{ 
-          px: 3, 
-          py: 3, 
-          background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.05) 0%, rgba(59, 130, 246, 0.02) 100%)',
+      <Box
+        sx={{
+          px: 3,
+          py: 3,
+          background:
+            'linear-gradient(135deg, rgba(37, 99, 235, 0.05) 0%, rgba(59, 130, 246, 0.02) 100%)',
           borderBottom: `1px solid ${alpha('#2563eb', 0.1)}`,
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center' 
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
         }}
       >
         <Stack direction="row" alignItems="center" spacing={2}>
-          <Avatar sx={{ 
-            bgcolor: 'primary.main',
-            background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
-            width: 32,
-            height: 32
-          }}>
+          <Avatar
+            sx={{
+              bgcolor: 'primary.main',
+              background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
+              width: 32,
+              height: 32,
+            }}
+          >
             <CurrencyIcon sx={{ fontSize: 18 }} />
           </Avatar>
           <Typography variant="h6" fontWeight={700} sx={{ color: 'text.primary' }}>
@@ -582,7 +590,7 @@ const TransferTable: React.FC<TransferTableProps> = ({
                 background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
                 transform: 'translateY(-1px)',
                 boxShadow: '0 6px 16px rgba(37, 99, 235, 0.4)',
-              }
+              },
             }}
           >
             Hozzáadás
@@ -600,7 +608,7 @@ const TransferTable: React.FC<TransferTableProps> = ({
                 borderColor: 'primary.dark',
                 bgcolor: 'primary.50',
                 transform: 'translateY(-1px)',
-              }
+              },
             }}
           >
             NAV számla
@@ -609,11 +617,7 @@ const TransferTable: React.FC<TransferTableProps> = ({
       </Box>
 
       {/* Table */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
-      >
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <TableContainer>
           <Table size="small">
             <TableHead>
@@ -659,16 +663,17 @@ const TransferTable: React.FC<TransferTableProps> = ({
               </TableRow>
             </TableHead>
             <SortableContext
-              items={sortedTransfers.map((transfer, index) =>
-                transfer.id || transfer.tempId || `transfer-${index}`
+              items={sortedTransfers.map(
+                (transfer, index) => transfer.id || transfer.tempId || `transfer-${index}`
               )}
               strategy={verticalListSortingStrategy}
             >
               <TableBody>
                 {sortedTransfers.map((transfer, index) => {
                   // Find the original index in the unsorted array for update/delete operations
-                  const originalIndex = transfers.findIndex(t =>
-                    (t.id && t.id === transfer.id) || (t.tempId && t.tempId === transfer.tempId)
+                  const originalIndex = transfers.findIndex(
+                    (t) =>
+                      (t.id && t.id === transfer.id) || (t.tempId && t.tempId === transfer.tempId)
                   );
 
                   return (
@@ -693,24 +698,27 @@ const TransferTable: React.FC<TransferTableProps> = ({
       </DndContext>
 
       {/* Footer with totals */}
-      <Box 
-        sx={{ 
-          px: 3, 
-          py: 3, 
-          background: 'linear-gradient(135deg, rgba(5, 150, 105, 0.03) 0%, rgba(16, 185, 129, 0.02) 100%)',
+      <Box
+        sx={{
+          px: 3,
+          py: 3,
+          background:
+            'linear-gradient(135deg, rgba(5, 150, 105, 0.03) 0%, rgba(16, 185, 129, 0.02) 100%)',
           borderTop: `1px solid ${alpha('#059669', 0.1)}`,
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center' 
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
         }}
       >
         <Stack direction="row" alignItems="center" spacing={2}>
-          <Avatar sx={{ 
-            bgcolor: 'success.main',
-            background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
-            width: 28,
-            height: 28
-          }}>
+          <Avatar
+            sx={{
+              bgcolor: 'success.main',
+              background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+              width: 28,
+              height: 28,
+            }}
+          >
             <Typography variant="caption" fontWeight={700} sx={{ color: 'white' }}>
               {transfers.length}
             </Typography>

@@ -34,7 +34,10 @@ export interface AuthState {
 
 type AuthAction =
   | { type: 'AUTH_START' }
-  | { type: 'AUTH_SUCCESS'; payload: { user: User; companies: Company[]; accessToken: string; refreshToken: string } }
+  | {
+      type: 'AUTH_SUCCESS';
+      payload: { user: User; companies: Company[]; accessToken: string; refreshToken: string };
+    }
   | { type: 'AUTH_ERROR'; payload: string }
   | { type: 'LOGOUT' }
   | { type: 'SET_COMPANY'; payload: Company }
@@ -61,10 +64,11 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         error: null,
       };
     case 'AUTH_SUCCESS':
-      const currentCompany = action.payload.companies.find(
-        c => c.id === action.payload.user.last_active_company
-      ) || action.payload.companies[0] || null;
-      
+      const currentCompany =
+        action.payload.companies.find((c) => c.id === action.payload.user.last_active_company) ||
+        action.payload.companies[0] ||
+        null;
+
       return {
         ...state,
         isAuthenticated: true,
@@ -154,12 +158,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Setup token manager interceptors
   useEffect(() => {
     console.log('🔧 Setting up TokenManager interceptors');
-    
+
     const handleTokenRefresh = (accessToken: string, refreshToken?: string) => {
       console.log('🔄 Token refresh triggered');
       dispatch({
         type: 'TOKEN_REFRESH',
-        payload: { accessToken, refreshToken }
+        payload: { accessToken, refreshToken },
       });
     };
 
@@ -188,7 +192,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           hasRefreshToken: !!refreshToken,
           hasUserData: !!userData,
           hasCompaniesData: !!companiesData,
-          hasCurrentCompany: !!currentCompanyData
+          hasCurrentCompany: !!currentCompanyData,
         });
 
         if (accessToken && refreshToken && userData && companiesData) {
@@ -201,7 +205,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
           dispatch({
             type: 'AUTH_SUCCESS',
-            payload: { user, companies, accessToken, refreshToken }
+            payload: { user, companies, accessToken, refreshToken },
           });
 
           if (currentCompany) {
@@ -233,7 +237,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
     // Note: We removed the automatic localStorage clearing to prevent race conditions
     // localStorage will only be cleared on explicit logout action
-  }, [state.isAuthenticated, state.user, state.accessToken, state.refreshToken, state.currentCompany, state.companies]);
+  }, [
+    state.isAuthenticated,
+    state.user,
+    state.accessToken,
+    state.refreshToken,
+    state.currentCompany,
+    state.companies,
+  ]);
 
   const login = async (username: string, password: string) => {
     dispatch({ type: 'AUTH_START' });
@@ -241,7 +252,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const response = await authApi.login(username, password);
       const data = response.data;
-      
+
       dispatch({
         type: 'AUTH_SUCCESS',
         payload: {
@@ -252,10 +263,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         },
       });
     } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || 
-                          error.response?.data?.non_field_errors?.[0] ||
-                          error.message || 
-                          'Login failed';
+      const errorMessage =
+        error.response?.data?.detail ||
+        error.response?.data?.non_field_errors?.[0] ||
+        error.message ||
+        'Login failed';
       dispatch({
         type: 'AUTH_ERROR',
         payload: errorMessage,
@@ -269,14 +281,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     try {
       await authApi.register(data);
-      
+
       // After successful registration, automatically login
       await login(data.username, data.password);
-      
     } catch (error: any) {
       const errorData = error.response?.data;
       let errorMessage = 'Registration failed';
-      
+
       if (errorData) {
         if (errorData.non_field_errors) {
           errorMessage = errorData.non_field_errors[0];
@@ -288,7 +299,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           errorMessage = `Company Tax ID: ${errorData.company_tax_id[0]}`;
         }
       }
-      
+
       dispatch({
         type: 'AUTH_ERROR',
         payload: errorMessage,
@@ -330,9 +341,5 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     clearError,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

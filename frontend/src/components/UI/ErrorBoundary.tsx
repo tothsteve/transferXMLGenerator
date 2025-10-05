@@ -40,20 +40,21 @@ class ErrorBoundary extends Component<Props, State> {
         >
           <Card sx={{ maxWidth: 500, width: '100%' }}>
             <CardContent sx={{ textAlign: 'center', p: 4 }}>
-              <WarningIcon 
-                sx={{ 
-                  fontSize: 60, 
-                  color: 'error.main', 
-                  mb: 2 
-                }} 
+              <WarningIcon
+                sx={{
+                  fontSize: 60,
+                  color: 'error.main',
+                  mb: 2,
+                }}
               />
-              
+
               <Typography variant="h5" component="h2" gutterBottom>
                 Alkalmazás hiba történt
               </Typography>
-              
+
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Váratlan hiba történt az alkalmazásban. Kérjük, frissítse az oldalt vagy próbálja újra később.
+                Váratlan hiba történt az alkalmazásban. Kérjük, frissítse az oldalt vagy próbálja
+                újra később.
               </Typography>
 
               {this.state.error && (

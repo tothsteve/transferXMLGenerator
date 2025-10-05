@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { 
-  AppBar, 
-  Toolbar, 
-  IconButton, 
-  Typography, 
-  Box, 
-  useTheme, 
+import {
+  AppBar,
+  Toolbar,
+  IconButton,
+  Typography,
+  Box,
+  useTheme,
   useMediaQuery,
   Avatar,
   Menu,
@@ -13,14 +13,9 @@ import {
   ListItemIcon,
   ListItemText,
   Divider,
-  Chip
+  Chip,
 } from '@mui/material';
-import { 
-  Menu as MenuIcon,
-  Logout,
-  Settings,
-  Business
-} from '@mui/icons-material';
+import { Menu as MenuIcon, Logout, Settings, Business } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -61,10 +56,10 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   };
 
   return (
-    <AppBar 
-      position="sticky" 
+    <AppBar
+      position="sticky"
       elevation={1}
-      sx={{ 
+      sx={{
         bgcolor: 'background.paper',
         borderBottom: 1,
         borderColor: 'divider',
@@ -83,12 +78,12 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           </IconButton>
         )}
 
-        <Typography 
-          variant="h6" 
-          sx={{ 
+        <Typography
+          variant="h6"
+          sx={{
             color: 'text.primary',
             fontWeight: 600,
-            mr: 2
+            mr: 2,
           }}
         >
           Transfer Generator
@@ -170,18 +165,18 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               </Typography>
             </Box>
           </MenuItem>
-          
+
           <Divider />
-          
+
           <MenuItem onClick={handleSettings}>
             <ListItemIcon>
               <Settings fontSize="small" />
             </ListItemIcon>
             <ListItemText>Beállítások</ListItemText>
           </MenuItem>
-          
+
           <Divider />
-          
+
           <MenuItem onClick={handleLogout}>
             <ListItemIcon>
               <Logout fontSize="small" />

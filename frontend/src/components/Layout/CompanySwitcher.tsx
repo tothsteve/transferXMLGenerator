@@ -102,7 +102,7 @@ const CompanySwitcher: React.FC = () => {
           Válasszon céget
         </Typography>
         <Divider />
-        
+
         {state.companies.map((company) => (
           <MenuItem
             key={company.id}

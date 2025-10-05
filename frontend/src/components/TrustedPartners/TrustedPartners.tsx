@@ -25,15 +25,7 @@ import {
   Tooltip,
   InputAdornment,
 } from '@mui/material';
-import {
-  Edit,
-  Delete,
-  Add,
-  Search,
-  CheckCircle,
-  Cancel,
-  PersonAdd,
-} from '@mui/icons-material';
+import { Edit, Delete, Add, Search, CheckCircle, Cancel, PersonAdd } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trustedPartnersApi } from '../../services/api';
 import { TrustedPartner, AvailablePartner } from '../../types/api';
@@ -49,14 +41,19 @@ const TrustedPartners: React.FC = () => {
   const queryClient = useQueryClient();
 
   // Fetch trusted partners
-  const { data: partnersResponse, isLoading, error } = useQuery({
+  const {
+    data: partnersResponse,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['trustedPartners', { page: page + 1, page_size: rowsPerPage, search: searchTerm }],
-    queryFn: () => trustedPartnersApi.getAll({ 
-      page: page + 1, 
-      page_size: rowsPerPage,
-      search: searchTerm || undefined,
-      ordering: '-created_at'
-    }),
+    queryFn: () =>
+      trustedPartnersApi.getAll({
+        page: page + 1,
+        page_size: rowsPerPage,
+        search: searchTerm || undefined,
+        ordering: '-created_at',
+      }),
   });
 
   // Delete mutation
@@ -70,7 +67,7 @@ const TrustedPartners: React.FC = () => {
 
   // Toggle active status mutation
   const toggleActiveMutation = useMutation({
-    mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) => 
+    mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) =>
       trustedPartnersApi.partialUpdate(id, { is_active }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
@@ -79,7 +76,7 @@ const TrustedPartners: React.FC = () => {
 
   // Toggle auto-pay mutation
   const toggleAutoPayMutation = useMutation({
-    mutationFn: ({ id, auto_pay }: { id: number; auto_pay: boolean }) => 
+    mutationFn: ({ id, auto_pay }: { id: number; auto_pay: boolean }) =>
       trustedPartnersApi.partialUpdate(id, { auto_pay }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
@@ -143,17 +140,14 @@ const TrustedPartners: React.FC = () => {
         <Typography variant="h5" fontWeight="600">
           Automatikusan Fizetett Partnerek
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => setIsAddDialogOpen(true)}
-        >
+        <Button variant="contained" startIcon={<Add />} onClick={() => setIsAddDialogOpen(true)}>
           Partner hozzáadása
         </Button>
       </Box>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Az automatikusan fizetettnek jelölt partnerektől érkező számlák automatikusan kifizetve jelöltek lesznek a NAV szinkronizáció során.
+        Az automatikusan fizetettnek jelölt partnerektől érkező számlák automatikusan kifizetve
+        jelöltek lesznek a NAV szinkronizáció során.
       </Typography>
 
       <Paper elevation={2} sx={{ width: '100%', overflow: 'hidden' }}>
@@ -250,7 +244,9 @@ const TrustedPartners: React.FC = () => {
                 <TableRow>
                   <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                     <Typography variant="body2" color="text.secondary">
-                      {searchTerm ? 'Nincs találat a keresésre.' : 'Még nincsenek megbízható partnerek hozzáadva.'}
+                      {searchTerm
+                        ? 'Nincs találat a keresésre.'
+                        : 'Még nincsenek megbízható partnerek hozzáadva.'}
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -283,10 +279,7 @@ const TrustedPartners: React.FC = () => {
       />
 
       {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteConfirmId !== null}
-        onClose={() => setDeleteConfirmId(null)}
-      >
+      <Dialog open={deleteConfirmId !== null} onClose={() => setDeleteConfirmId(null)}>
         <DialogTitle>Partner törlése</DialogTitle>
         <DialogContent>
           <Typography>
@@ -294,9 +287,7 @@ const TrustedPartners: React.FC = () => {
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteConfirmId(null)}>
-            Mégse
-          </Button>
+          <Button onClick={() => setDeleteConfirmId(null)}>Mégse</Button>
           <Button
             onClick={confirmDelete}
             color="error"

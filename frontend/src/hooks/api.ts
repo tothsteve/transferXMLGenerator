@@ -84,7 +84,7 @@ export function useFrequentBeneficiaries() {
 
 export function useCreateBeneficiary() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (data: Omit<Beneficiary, 'id'>) => beneficiariesApi.create(data),
     onSuccess: () => {
@@ -96,7 +96,7 @@ export function useCreateBeneficiary() {
 
 export function useUpdateBeneficiary() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<Beneficiary> }) =>
       beneficiariesApi.update(id, data),
@@ -109,7 +109,7 @@ export function useUpdateBeneficiary() {
 
 export function useDeleteBeneficiary() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (id: number) => beneficiariesApi.delete(id),
     onSuccess: () => {
@@ -155,10 +155,11 @@ export function useTemplate(id: number) {
 
 export function useCreateTemplate() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: (data: Omit<TransferTemplate, 'id' | 'beneficiary_count' | 'created_at' | 'updated_at'>) =>
-      templatesApi.create(data),
+    mutationFn: (
+      data: Omit<TransferTemplate, 'id' | 'beneficiary_count' | 'created_at' | 'updated_at'>
+    ) => templatesApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.templates });
     },
@@ -167,7 +168,7 @@ export function useCreateTemplate() {
 
 export function useUpdateTemplate() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<TransferTemplate> }) =>
       templatesApi.update(id, data),
@@ -180,7 +181,7 @@ export function useUpdateTemplate() {
 
 export function useDeleteTemplate() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (id: number) => templatesApi.delete(id),
     onSuccess: () => {
@@ -191,30 +192,36 @@ export function useDeleteTemplate() {
 
 export function useLoadTemplate() {
   return useMutation({
-    mutationFn: ({ templateId, data }: { 
-      templateId: number, 
-      data: { 
+    mutationFn: ({
+      templateId,
+      data,
+    }: {
+      templateId: number;
+      data: {
         template_id: number;
         originator_account_id: number;
         execution_date: string;
-      }
+      };
     }) => templatesApi.loadTransfers(templateId, data),
   });
 }
 
 export function useAddTemplateBeneficiary() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ templateId, data }: { 
-      templateId: number; 
+    mutationFn: ({
+      templateId,
+      data,
+    }: {
+      templateId: number;
       data: {
         beneficiary_id: number;
         default_amount?: number;
         default_remittance?: string;
         order?: number;
         is_active?: boolean;
-      }
+      };
     }) => templatesApi.addBeneficiary(templateId, data),
     onSuccess: (_, { templateId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.templates });
@@ -225,7 +232,7 @@ export function useAddTemplateBeneficiary() {
 
 export function useRemoveTemplateBeneficiary() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: ({ templateId, beneficiaryId }: { templateId: number; beneficiaryId: number }) =>
       templatesApi.removeBeneficiary(templateId, beneficiaryId),
@@ -238,17 +245,20 @@ export function useRemoveTemplateBeneficiary() {
 
 export function useUpdateTemplateBeneficiary() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ templateId, data }: { 
-      templateId: number; 
+    mutationFn: ({
+      templateId,
+      data,
+    }: {
+      templateId: number;
       data: {
         beneficiary_id: number;
         default_amount?: number;
         default_remittance?: string;
         order?: number;
         is_active?: boolean;
-      }
+      };
     }) => templatesApi.updateBeneficiary(templateId, data),
     onSuccess: (_, { templateId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.templates });
@@ -304,9 +314,7 @@ export function useBulkUpdateTransfers() {
   return useMutation({
     mutationFn: async (transfers: { id: number; data: Partial<Transfer> }[]) => {
       // Execute all updates in parallel
-      const updatePromises = transfers.map(({ id, data }) => 
-        transfersApi.partialUpdate(id, data)
-      );
+      const updatePromises = transfers.map(({ id, data }) => transfersApi.partialUpdate(id, data));
       return Promise.all(updatePromises);
     },
   });
@@ -320,7 +328,7 @@ export function useDeleteTransfer() {
 
 export function useGenerateXml() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (data: GenerateXmlRequest) => transfersApi.generateXml(data),
     onSuccess: () => {
@@ -332,7 +340,7 @@ export function useGenerateXml() {
 
 export function useGenerateKHExport() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (data: GenerateXmlRequest) => transfersApi.generateKHExport(data),
     onSuccess: () => {
@@ -392,7 +400,7 @@ export function useBatch(id: number | undefined, enabled = true) {
 
 export function useMarkBatchUsedInBank() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (batchId: number) => batchesApi.markUsedInBank(batchId),
     onSuccess: () => {
@@ -403,7 +411,7 @@ export function useMarkBatchUsedInBank() {
 
 export function useMarkBatchUnusedInBank() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (batchId: number) => batchesApi.markUnusedInBank(batchId),
     onSuccess: () => {
@@ -423,7 +431,7 @@ export function useDownloadBatchXml() {
 
 export function useDeleteBatch() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (batchId: number) => batchesApi.delete(batchId),
     onSuccess: () => {
@@ -472,9 +480,9 @@ export function useBulkMarkPrepared() {
 export function useBulkMarkPaid() {
   return useMutation({
     mutationFn: (data: {
-      invoice_ids?: number[],
-      payment_date?: string,
-      invoices?: { invoice_id: number, payment_date: string }[]
+      invoice_ids?: number[];
+      payment_date?: string;
+      invoices?: { invoice_id: number; payment_date: string }[];
     }) => navInvoicesApi.bulkMarkPaid(data),
   });
 }
@@ -482,7 +490,7 @@ export function useBulkMarkPaid() {
 // Upload Hooks
 export function useUploadExcel() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (file: File) => uploadApi.uploadExcel(file),
     onSuccess: () => {
