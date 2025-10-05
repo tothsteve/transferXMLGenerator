@@ -105,7 +105,10 @@ export const UploadStep: React.FC<UploadStepProps> = ({
 
       {/* Drag & Drop Zone */}
       <Paper
-        {...getRootProps()}
+        {...(() => {
+          const { className, style, ...rootProps } = getRootProps();
+          return rootProps;
+        })()}
         elevation={0}
         sx={{
           border: 2,

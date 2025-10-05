@@ -11,7 +11,7 @@ export const useToast = () => {
         id,
         type,
         title,
-        message,
+        ...(message && { message }),
         duration: duration || (type === 'error' ? 10000 : 5000),
       };
 

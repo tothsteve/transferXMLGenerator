@@ -105,7 +105,7 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
       trustedPartnersApi.getAvailablePartners({
         page: availablePartnersPage + 1,
         page_size: availablePartnersRowsPerPage,
-        search: availablePartnersSearch || undefined,
+        ...(availablePartnersSearch && { search: availablePartnersSearch }),
       }),
     enabled: open && tabValue === 1, // Only fetch when dialog is open and on "From Invoices" tab
   });

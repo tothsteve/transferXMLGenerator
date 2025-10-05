@@ -460,7 +460,9 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
               <TableCell align="center">
                 <PaymentStatusBadge
                   paymentStatus={invoice.payment_status}
-                  paymentStatusDate={invoice.payment_status_date_formatted || undefined}
+                  {...(invoice.payment_status_date_formatted && {
+                    paymentStatusDate: invoice.payment_status_date_formatted,
+                  })}
                   size="small"
                   compact={true}
                   isOverdue={invoice.is_overdue}

@@ -292,10 +292,12 @@ const NAVInvoices: React.FC = () => {
       const params = {
         page: currentPage,
         page_size: pageSize,
-        search: searchTerm || undefined,
-        direction: inboundTransferFilter ? 'INBOUND' : directionFilter || undefined,
-        payment_method: inboundTransferFilter ? 'TRANSFER' : undefined,
-        payment_status: paymentStatusFilter || undefined,
+        ...(searchTerm && { search: searchTerm }),
+        ...(inboundTransferFilter
+          ? { direction: 'INBOUND' as const }
+          : directionFilter && { direction: directionFilter }),
+        ...(inboundTransferFilter && { payment_method: 'TRANSFER' as const }),
+        ...(paymentStatusFilter && { payment_status: paymentStatusFilter }),
         ordering: `${sortDirection === 'desc' ? '-' : ''}${sortField}`,
         hide_storno_invoices: hideStornoInvoices,
         // Date interval filters
@@ -460,7 +462,7 @@ const NAVInvoices: React.FC = () => {
           await bulkMarkPaidMutation.mutateAsync({
             invoice_ids: [selectedInvoice.id],
             payment_date: new Date().toISOString().split('T')[0], // Today's date
-          });
+          } as { invoice_ids: number[]; payment_date: string });
 
           // Update the invoice in state to reflect the new payment status
           setSelectedInvoice((prev) =>
@@ -656,7 +658,7 @@ const NAVInvoices: React.FC = () => {
       showSuccess('Átutalások generálása folyamatban...');
 
       const response = await navInvoicesApi.generateTransfers(requestData);
-      const { transfers, transfer_count, errors, warnings, message } = response.data;
+      const { transfers, transfer_count, errors, warnings, message: _message } = response.data;
 
       // Show detailed feedback about the generation process
       if (errors.length > 0) {
@@ -764,7 +766,7 @@ const NAVInvoices: React.FC = () => {
         // Option 1: Use single custom date for all invoices
         requestData = {
           invoice_ids: selectedInvoices,
-          payment_date: paymentDate || undefined,
+          ...(paymentDate && { payment_date: paymentDate }),
         };
       }
 

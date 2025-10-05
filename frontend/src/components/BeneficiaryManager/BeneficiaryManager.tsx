@@ -44,9 +44,9 @@ const BeneficiaryManager: React.FC = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const queryParams = {
-    search: searchTerm || undefined,
-    is_active: showActive,
-    is_frequent: showFrequent,
+    ...(searchTerm && { search: searchTerm }),
+    ...(showActive !== undefined && { is_active: showActive }),
+    ...(showFrequent !== undefined && { is_frequent: showFrequent }),
     page: currentPage,
     page_size: 20, // Force pagination with 20 items per page
     // Send all sorting to backend for proper cross-page sorting

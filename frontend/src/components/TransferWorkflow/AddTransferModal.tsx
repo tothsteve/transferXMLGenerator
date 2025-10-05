@@ -65,9 +65,9 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({ isOpen, onClose, on
   } = useForm<FormData>({
     defaultValues: {
       amount: '',
-      execution_date: new Date().toISOString().split('T')[0],
+      execution_date: new Date().toISOString().split('T')[0] as string,
       remittance_info: '',
-      currency: 'HUF',
+      currency: 'HUF' as const,
     },
   });
 
@@ -163,7 +163,7 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({ isOpen, onClose, on
                   {availableBeneficiaries.map((beneficiary) => (
                     <ListItem key={beneficiary.id} disablePadding>
                       <ListItemButton
-                        onClick={() => handleBeneficiarySelect(beneficiary)}
+                        onClick={() => handleBeneficiarySelect(beneficiary as Beneficiary)}
                         sx={{
                           border: 1,
                           borderColor: 'divider',
@@ -220,7 +220,7 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({ isOpen, onClose, on
           </Stack>
         ) : (
           /* Transfer Form */
-          <form onSubmit={handleSubmit(handleFormSubmit)}>
+          <form onSubmit={handleSubmit(handleFormSubmit as any)}>
             <Stack spacing={3}>
               {/* Selected Beneficiary */}
               <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
@@ -314,7 +314,7 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({ isOpen, onClose, on
           <Button onClick={handleClose}>Mégse</Button>
           <Button
             variant="contained"
-            onClick={handleSubmit(handleFormSubmit)}
+            onClick={handleSubmit(handleFormSubmit as any)}
             disabled={!selectedBeneficiary}
           >
             Hozzáadás

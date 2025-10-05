@@ -102,7 +102,7 @@ export const validateAndSanitizeExportString = (
   return {
     value: sanitizedValue,
     isValid: validation.isValid,
-    error: validation.error,
+    ...(validation.error && { error: validation.error }),
     wasModified,
   };
 };

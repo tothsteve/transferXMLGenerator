@@ -14,7 +14,7 @@ import {
   Transfer,
   BulkCreateTransferRequest,
   GenerateXmlRequest,
-  NAVInvoice,
+  // NAVInvoice,
 } from '../types/api';
 import {
   BeneficiarySchema,

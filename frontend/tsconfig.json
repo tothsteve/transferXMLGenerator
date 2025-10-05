@@ -22,8 +22,10 @@
 
     // Additional strictness for code quality
     "noImplicitReturns": true,
-    "noUncheckedIndexedAccess": true
-    // Note: noUnusedLocals and noUnusedParameters deferred to Week 2 (21 unused variables to clean up)
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": true
   },
   "include": [
     "src"

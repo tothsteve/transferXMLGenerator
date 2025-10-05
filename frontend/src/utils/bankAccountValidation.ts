@@ -198,8 +198,8 @@ export const isValidHungarianAccountNumber = (accountNumber: string): boolean =>
  * @returns The calculated checksum digit (0-9)
  */
 export const calculateHungarianBBANChecksum = (
-  bankCode: string,
-  branchCode: string,
+  _bankCode: string,
+  _branchCode: string,
   accountNumber: string
 ): number => {
   if (accountNumber.length !== 16) {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -20,7 +20,6 @@ import {
   Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
   PlayArrow as PlayIcon,
-  Receipt as ReceiptIcon,
 } from '@mui/icons-material';
 import {
   useTemplates,
@@ -54,9 +53,9 @@ import XMLPreview from './XMLPreview';
  * - `beneficiary_data`: Full beneficiary object for display purposes
  */
 interface TransferData extends Omit<Transfer, 'id' | 'is_processed' | 'created_at'> {
-  id?: number;
-  tempId?: string;
-  beneficiary_data?: Beneficiary;
+  id?: number | undefined;
+  tempId?: string | undefined;
+  beneficiary_data?: Beneficiary | undefined;
 }
 
 /**
@@ -89,7 +88,6 @@ interface TransferData extends Omit<Transfer, 'id' | 'is_processed' | 'created_a
  */
 const TransferWorkflow: React.FC = () => {
   const location = useLocation();
-  const navigate = useNavigate();
   const [selectedTemplate, setSelectedTemplate] = useState<TransferTemplate | null>(null);
   const [transfers, setTransfers] = useState<TransferData[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -102,10 +100,10 @@ const TransferWorkflow: React.FC = () => {
 
   const { data: templatesData } = useTemplates();
   const { data: defaultAccount } = useDefaultBankAccount();
-  const { data: beneficiariesData, isLoading: beneficiariesLoading } = useBeneficiaries({
+  const { data: beneficiariesData, isLoading: _beneficiariesLoading } = useBeneficiaries({
     page: 1,
   });
-  const { data: transfersData, refetch: refetchTransfers } = useTransfers({
+  const { data: transfersData, refetch: _refetchTransfers } = useTransfers({
     is_processed: false,
     ordering: '-created_at',
     page_size: 100,
@@ -315,7 +313,7 @@ const TransferWorkflow: React.FC = () => {
       const template = templates.find((t) => t.id === state.templateId);
       if (template) {
         console.log('Auto-loading template from TemplateBuilder:', template);
-        setSelectedTemplate(template);
+        setSelectedTemplate(template as TransferTemplate);
         handleLoadTemplate(state.templateId);
       }
 
@@ -355,7 +353,7 @@ const TransferWorkflow: React.FC = () => {
 
       if (template) {
         console.log('Auto-loading template from URL parameter:', template);
-        setSelectedTemplate(template);
+        setSelectedTemplate(template as TransferTemplate);
         handleLoadTemplate(templateId);
 
         // Remove the template parameter from URL to clean it up
@@ -376,9 +374,9 @@ const TransferWorkflow: React.FC = () => {
         await updateTransferMutation.mutateAsync({
           id: transfer.id,
           data: {
-            amount: updatedData.amount ? parseFloat(updatedData.amount).toFixed(2) : undefined,
-            execution_date: updatedData.execution_date,
-            remittance_info: updatedData.remittance_info,
+            ...(updatedData.amount && { amount: parseFloat(updatedData.amount).toFixed(2) }),
+            ...(updatedData.execution_date && { execution_date: updatedData.execution_date }),
+            ...(updatedData.remittance_info && { remittance_info: updatedData.remittance_info }),
           },
         });
 
@@ -670,7 +668,7 @@ const TransferWorkflow: React.FC = () => {
       if (transfersToCreate.length > 0) {
         console.log('Creating transfers:', transfersToCreate);
 
-        const transfersPayload = transfersToCreate.map((t, index) => ({
+        const transfersPayload = transfersToCreate.map((t, _index) => ({
           originator_account_id: defaultAccount!.id,
           beneficiary_id: t.beneficiary,
           amount: parseFloat(t.amount).toFixed(2),
@@ -980,7 +978,7 @@ const TransferWorkflow: React.FC = () => {
       {/* Template Selector */}
       <Box sx={{ mb: 4 }}>
         <TemplateSelector
-          templates={templates}
+          templates={templates as TransferTemplate[]}
           selectedTemplate={selectedTemplate}
           onSelectTemplate={setSelectedTemplate}
           onLoadTemplate={handleLoadTemplate}

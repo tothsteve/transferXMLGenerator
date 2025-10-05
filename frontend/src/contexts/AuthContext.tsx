@@ -163,7 +163,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('🔄 Token refresh triggered');
       dispatch({
         type: 'TOKEN_REFRESH',
-        payload: { accessToken, refreshToken },
+        payload: { accessToken, ...(refreshToken && { refreshToken }) },
       });
     };
 

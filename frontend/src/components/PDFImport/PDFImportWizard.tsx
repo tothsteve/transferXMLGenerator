@@ -38,7 +38,7 @@ export interface PDFProcessingResult {
   total_amount: number;
 }
 
-export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete }) => {
+export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete: _onComplete }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [templateName, setTemplateName] = useState('');

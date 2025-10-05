@@ -1,9 +1,9 @@
 export interface Beneficiary {
   id: number;
   name: string;
-  account_number?: string | null; // Optional for VAT/tax-only beneficiaries
-  vat_number?: string | null; // Hungarian VAT number for employee identification
-  tax_number?: string | null; // Hungarian company tax number for corporate identification
+  account_number?: string | null | undefined; // Optional for VAT/tax-only beneficiaries
+  vat_number?: string | null | undefined; // Hungarian VAT number for employee identification
+  tax_number?: string | null | undefined; // Hungarian company tax number for corporate identification
   description: string;
   remittance_information: string;
   is_frequent: boolean;
@@ -21,19 +21,19 @@ export interface BankAccount {
 export interface TransferTemplate {
   id: number;
   name: string;
-  description?: string | null;
+  description?: string | null | undefined;
   is_active: boolean;
   beneficiary_count: number;
   created_at: string;
   updated_at: string;
-  template_beneficiaries?: TemplateBeneficiary[];
+  template_beneficiaries?: TemplateBeneficiary[] | undefined;
 }
 
 export interface TemplateBeneficiary {
   id: number;
-  template?: number;
+  template?: number | undefined;
   beneficiary: Beneficiary;
-  default_amount?: string | number | null;
+  default_amount?: string | number | null | undefined;
   default_remittance: string;
   order: number;
   is_active: boolean;
@@ -41,46 +41,46 @@ export interface TemplateBeneficiary {
 
 // Transfer for create/update operations (uses IDs)
 export interface Transfer {
-  id?: number;
+  id?: number | undefined;
   beneficiary: number;
-  beneficiary_data?: Beneficiary; // Optional expanded data
+  beneficiary_data?: Beneficiary | undefined; // Optional expanded data
   amount: string;
   currency: 'HUF' | 'EUR' | 'USD';
   execution_date: string;
   remittance_info: string;
-  nav_invoice?: number | null; // Optional link to NAV invoice
+  nav_invoice?: number | null | undefined; // Optional link to NAV invoice
   is_processed: boolean;
-  created_at?: string;
+  created_at?: string | undefined;
 }
 
 // Transfer as returned from API (with expanded data)
 export interface TransferWithBeneficiary {
-  id?: number;
+  id?: number | undefined;
   beneficiary: Beneficiary; // Full beneficiary object
   amount: string;
   currency: 'HUF' | 'EUR' | 'USD';
   execution_date: string;
   remittance_info: string;
-  nav_invoice?: number | null;
+  nav_invoice?: number | null | undefined;
   is_processed: boolean;
-  created_at?: string;
+  created_at?: string | undefined;
 }
 
 export interface TransferBatch {
   id: number;
   name: string;
-  description?: string | null;
+  description?: string | null | undefined;
   transfers: TransferWithBeneficiary[]; // Batches return transfers with expanded beneficiary data
   total_amount: string;
   used_in_bank: boolean;
-  bank_usage_date?: string | null;
+  bank_usage_date?: string | null | undefined;
   order: number;
   transfer_count: number;
   xml_filename: string;
-  xml_generated_at?: string | null;
+  xml_generated_at?: string | null | undefined;
   created_at: string;
-  batch_format?: string | null;
-  batch_format_display?: string | null;
+  batch_format?: string | null | undefined;
+  batch_format_display?: string | null | undefined;
 }
 
 export interface ApiResponse<T> {

@@ -50,7 +50,7 @@ interface BeneficiaryTableProps {
 const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
   beneficiaries,
   isLoading,
-  onEdit,
+  onEdit: _onEdit,
   onDelete,
   onUpdate,
   onSort,
@@ -65,9 +65,9 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
     setEditingId(beneficiary.id);
     setEditData({
       name: beneficiary.name,
-      account_number: beneficiary.account_number,
-      vat_number: beneficiary.vat_number,
-      tax_number: beneficiary.tax_number,
+      ...(beneficiary.account_number !== undefined && { account_number: beneficiary.account_number }),
+      ...(beneficiary.vat_number !== undefined && { vat_number: beneficiary.vat_number }),
+      ...(beneficiary.tax_number !== undefined && { tax_number: beneficiary.tax_number }),
       description: beneficiary.description,
       remittance_information: beneficiary.remittance_information,
       is_frequent: beneficiary.is_frequent,

@@ -162,9 +162,9 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
     const submitData: Omit<Beneficiary, 'id'> = {
       ...data,
       name: normalizeWhitespace(data.name),
-      account_number: formattedAccountNumber,
-      vat_number: data.vat_number ? data.vat_number.replace(/[\s-]/g, '') : undefined,
-      tax_number: data.tax_number ? data.tax_number.replace(/[\s-]/g, '') : undefined,
+      ...(formattedAccountNumber && { account_number: formattedAccountNumber }),
+      ...(data.vat_number && { vat_number: data.vat_number.replace(/[\s-]/g, '') }),
+      ...(data.tax_number && { tax_number: data.tax_number.replace(/[\s-]/g, '') }),
       description: data.description || '',
       remittance_information: data.remittance_information
         ? normalizeWhitespace(data.remittance_information)

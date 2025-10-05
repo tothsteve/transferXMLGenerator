@@ -215,7 +215,7 @@ const Dashboard: React.FC = () => {
           value={totalBeneficiaries}
           icon={PeopleIcon}
           color="primary"
-          trend={activeBeneficiaries > 0 ? `${activeBeneficiaries} aktív` : undefined}
+          {...(activeBeneficiaries > 0 && { trend: `${activeBeneficiaries} aktív` })}
           isLoading={isLoading}
         />
         <StatCard

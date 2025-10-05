@@ -14,7 +14,7 @@ import {
   TablePagination,
   IconButton,
   Switch,
-  FormControlLabel,
+  // FormControlLabel,
   Chip,
   Dialog,
   DialogTitle,
@@ -25,17 +25,16 @@ import {
   Tooltip,
   InputAdornment,
 } from '@mui/material';
-import { Edit, Delete, Add, Search, CheckCircle, Cancel, PersonAdd } from '@mui/icons-material';
+import { Delete, Add, Search } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trustedPartnersApi } from '../../services/api';
-import { TrustedPartner, AvailablePartner } from '../../types/api';
+import { TrustedPartner } from '../../types/api';
 import AddPartnerDialog from './AddPartnerDialog';
 
 const TrustedPartners: React.FC = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
-  const [editingPartner, setEditingPartner] = useState<TrustedPartner | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const queryClient = useQueryClient();
@@ -51,7 +50,7 @@ const TrustedPartners: React.FC = () => {
       trustedPartnersApi.getAll({
         page: page + 1,
         page_size: rowsPerPage,
-        search: searchTerm || undefined,
+        ...(searchTerm && { search: searchTerm }),
         ordering: '-created_at',
       }),
   });

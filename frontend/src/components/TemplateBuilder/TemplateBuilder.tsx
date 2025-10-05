@@ -106,10 +106,12 @@ const TemplateBuilder: React.FC = () => {
               templateId: createdTemplate.id,
               data: {
                 beneficiary_id: beneficiary.beneficiary_id,
-                default_amount: beneficiary.default_amount
-                  ? parseFloat(beneficiary.default_amount)
-                  : undefined,
-                default_remittance: beneficiary.default_remittance_info || undefined,
+                ...(beneficiary.default_amount && {
+                  default_amount: parseFloat(beneficiary.default_amount),
+                }),
+                ...(beneficiary.default_remittance_info && {
+                  default_remittance: beneficiary.default_remittance_info,
+                }),
                 order: i,
                 is_active: true,
               },
@@ -194,10 +196,12 @@ const TemplateBuilder: React.FC = () => {
                 templateId: editingTemplate.id,
                 data: {
                   beneficiary_id: beneficiary.beneficiary_id,
-                  default_amount: beneficiary.default_amount
-                    ? parseFloat(beneficiary.default_amount)
-                    : undefined,
-                  default_remittance: beneficiary.default_remittance_info || undefined,
+                  ...(beneficiary.default_amount && {
+                    default_amount: parseFloat(beneficiary.default_amount),
+                  }),
+                  ...(beneficiary.default_remittance_info && {
+                    default_remittance: beneficiary.default_remittance_info,
+                  }),
                   order: i,
                   is_active: true,
                 },
@@ -212,10 +216,12 @@ const TemplateBuilder: React.FC = () => {
                 templateId: editingTemplate.id,
                 data: {
                   beneficiary_id: beneficiary.beneficiary_id,
-                  default_amount: beneficiary.default_amount
-                    ? parseFloat(beneficiary.default_amount)
-                    : undefined,
-                  default_remittance: beneficiary.default_remittance_info || undefined,
+                  ...(beneficiary.default_amount && {
+                    default_amount: parseFloat(beneficiary.default_amount),
+                  }),
+                  ...(beneficiary.default_remittance_info && {
+                    default_remittance: beneficiary.default_remittance_info,
+                  }),
                   order: i,
                   is_active: true,
                 },

@@ -52,9 +52,9 @@ import { CSS } from '@dnd-kit/utilities';
 import { Transfer, Beneficiary } from '../../types/api';
 
 interface TransferData extends Omit<Transfer, 'id' | 'is_processed' | 'created_at'> {
-  id?: number;
-  beneficiary_data?: Beneficiary;
-  tempId?: string;
+  id?: number | undefined;
+  beneficiary_data?: Beneficiary | undefined;
+  tempId?: string | undefined;
 }
 
 interface TransferTableProps {
