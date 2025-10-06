@@ -33,12 +33,19 @@ class BankTransfersConfig(AppConfig):
             scheduler = BackgroundScheduler()
             
             def sync_nav_invoices():
+                from django.db import close_old_connections
                 try:
+                    # Close any stale database connections before starting
+                    close_old_connections()
+
                     logger.info("🔄 Starting NAV sync via scheduler...")
                     call_command('sync_nav_invoices', '--days=7')
                     logger.info("✅ NAV sync completed successfully")
                 except Exception as e:
                     logger.error(f"❌ NAV sync failed: {str(e)}")
+                finally:
+                    # Always close connections after job completes
+                    close_old_connections()
             
             # Schedule every 6 hours for production
             scheduler.add_job(
@@ -70,12 +77,19 @@ class BankTransfersConfig(AppConfig):
             scheduler = BackgroundScheduler()
 
             def sync_mnb_rates():
+                from django.db import close_old_connections
                 try:
+                    # Close any stale database connections before starting
+                    close_old_connections()
+
                     logger.info("💱 Starting MNB exchange rate sync...")
                     call_command('sync_mnb_rates', '--current')
                     logger.info("✅ MNB sync completed successfully")
                 except Exception as e:
                     logger.error(f"❌ MNB sync failed: {str(e)}")
+                finally:
+                    # Always close connections after job completes
+                    close_old_connections()
 
             # Schedule every 6 hours (same as NAV)
             scheduler.add_job(

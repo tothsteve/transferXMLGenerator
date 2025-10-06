@@ -57,6 +57,8 @@ class ExchangeRateSyncService:
 
         logger.info(f"Starting current rate sync for {','.join(currencies)}")
 
+        sync_log = None  # Initialize to avoid UnboundLocalError in exception handlers
+
         try:
             # Fetch current rates using dedicated SOAP method
             # Returns tuple: (date_str, rates_dict) - use MNB's actual date!
@@ -98,10 +100,12 @@ class ExchangeRateSyncService:
             error_msg = f"MNB API error: {str(e)}"
             logger.error(error_msg)
 
-            sync_log.sync_status = 'FAILED'
-            sync_log.error_message = error_msg
-            sync_log.sync_end_time = timezone.now()
-            sync_log.save()
+            # Only update sync_log if it was created before the error
+            if sync_log:
+                sync_log.sync_status = 'FAILED'
+                sync_log.error_message = error_msg
+                sync_log.sync_end_time = timezone.now()
+                sync_log.save()
 
             raise
 
@@ -109,10 +113,12 @@ class ExchangeRateSyncService:
             error_msg = f"Unexpected error during current rate sync: {str(e)}"
             logger.error(error_msg, exc_info=True)
 
-            sync_log.sync_status = 'FAILED'
-            sync_log.error_message = error_msg
-            sync_log.sync_end_time = timezone.now()
-            sync_log.save()
+            # Only update sync_log if it was created before the error
+            if sync_log:
+                sync_log.sync_status = 'FAILED'
+                sync_log.error_message = error_msg
+                sync_log.sync_end_time = timezone.now()
+                sync_log.save()
 
             raise
 
