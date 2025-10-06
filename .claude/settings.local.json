@@ -23,7 +23,9 @@
       "Bash(npx tsc:*)",
       "Bash(TransferWorkflow.original.tsx)",
       "Bash(npx husky init:*)",
-      "Bash(npm run build:fast:*)"
+      "Bash(npm run build:fast:*)",
+      "Bash(npm run lint:*)",
+      "Bash(awk:*)"
     ],
     "deny": []
   }

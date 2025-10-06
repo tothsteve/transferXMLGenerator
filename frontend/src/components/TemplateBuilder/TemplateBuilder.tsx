@@ -80,7 +80,6 @@ const TemplateBuilder: React.FC = () => {
 
   const handleCreateTemplate = async (data: TemplateFormData) => {
     try {
-      console.log('Creating template with data:', data);
 
       const templateData = {
         name: data.name,
@@ -89,13 +88,11 @@ const TemplateBuilder: React.FC = () => {
       };
 
       const result = await createMutation.mutateAsync(templateData);
-      console.log('Template created successfully:', result);
 
       const createdTemplate = result.data;
 
       // Add beneficiaries to the template if any were selected
       if (data.beneficiaries && data.beneficiaries.length > 0) {
-        console.log('Adding beneficiaries to template:', data.beneficiaries);
 
         for (let i = 0; i < data.beneficiaries.length; i++) {
           const beneficiary = data.beneficiaries[i];
@@ -166,9 +163,7 @@ const TemplateBuilder: React.FC = () => {
 
       if (!beneficiariesChanged) {
         // Only template metadata changed (name, description, is_active), skip beneficiary sync
-        console.log('Only template metadata changed, skipping beneficiary sync');
       } else {
-        console.log('Beneficiaries changed, syncing beneficiary associations...');
 
         // Remove beneficiaries that are no longer selected
         for (const currentBeneficiaryId of Array.from(currentBeneficiaryIds)) {

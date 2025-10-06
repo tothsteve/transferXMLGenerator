@@ -37,18 +37,14 @@ class TokenManager {
     onLogout: () => void,
     axiosInstance: any = axios
   ) {
-    console.log('🔧 Setting up interceptors on axios instance');
 
     // Request interceptor to add auth header
     axiosInstance.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
         const token = localStorage.getItem('accessToken');
-        console.log('🔑 TokenManager interceptor - token exists:', !!token);
-        console.log('🔑 Request URL:', config.url);
 
         if (token && config.headers) {
           config.headers.Authorization = `Bearer ${token}`;
-          console.log('✅ Added Authorization header');
 
           // Add company header if available
           const currentCompany = localStorage.getItem('currentCompany');
@@ -56,15 +52,12 @@ class TokenManager {
             try {
               const company = JSON.parse(currentCompany);
               config.headers['X-Company-ID'] = company.id.toString();
-              console.log('✅ Added X-Company-ID header:', company.id);
             } catch (error) {
               console.error('Error parsing current company:', error);
             }
           } else {
-            console.log('⚠️ No currentCompany in localStorage');
           }
         } else {
-          console.log('❌ No token or headers available');
         }
         return config;
       },

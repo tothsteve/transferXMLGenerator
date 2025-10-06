@@ -58,7 +58,6 @@ export function useBeneficiaries(params?: {
         // Validate API response with Zod schema
         const schema = ApiResponseSchema(BeneficiarySchema);
         const parsed = schema.parse(data.data);
-        console.log('✅ Beneficiaries data parsed successfully:', parsed);
         return parsed;
       } catch (error) {
         console.error('❌ Zod validation error in useBeneficiaries:', error);
@@ -132,7 +131,6 @@ export function useTemplates(showInactive?: boolean) {
       try {
         const schema = ApiResponseSchema(TransferTemplateSchema);
         const parsed = schema.parse(data.data);
-        console.log('✅ Templates data parsed successfully:', parsed);
         return parsed;
       } catch (error) {
         console.error('❌ Zod validation error in useTemplates:', error);
@@ -377,7 +375,6 @@ export function useBatches() {
       try {
         const schema = ApiResponseSchema(TransferBatchSchema);
         const parsed = schema.parse(data.data);
-        console.log('✅ Batches data parsed successfully:', parsed);
         return parsed;
       } catch (error) {
         console.error('❌ Zod validation error in useBatches:', error);
