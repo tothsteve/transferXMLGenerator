@@ -121,21 +121,22 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
   const isAllSelected = Boolean(totalCount > 0 && selectedCount === totalCount);
   const isIndeterminate = Boolean(selectedCount > 0 && selectedCount < totalCount);
 
-  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>): void => {
     if (onSelectAll) {
       onSelectAll(event.target.checked);
     }
   };
 
   const handleSelectInvoice =
-    (invoiceId: number) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    (invoiceId: number) =>
+    (event: React.ChangeEvent<HTMLInputElement>): void => {
       event.stopPropagation(); // Prevent row click when checking checkbox
       if (onSelectInvoice) {
         onSelectInvoice(invoiceId, event.target.checked);
       }
     };
 
-  const handleSort = (field: string) => {
+  const handleSort = (field: string): void => {
     if (sortField === field) {
       // Toggle direction
       const newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
@@ -147,7 +148,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
     }
   };
 
-  const getDirectionChip = (direction: string, display: string) => (
+  const getDirectionChip = (direction: string, display: string): React.ReactElement => (
     <Chip
       label={display}
       color={direction === 'OUTBOUND' ? 'primary' : 'secondary'}
@@ -157,7 +158,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
     />
   );
 
-  const getSortIcon = (field: string) => {
+  const getSortIcon = (field: string): React.ReactElement | null => {
     if (sortField !== field) return null;
     return sortDirection === 'asc' ? (
       <ArrowUpIcon fontSize="small" />
@@ -170,7 +171,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
     field: string,
     label: string,
     align: 'left' | 'right' | 'center' = 'left'
-  ) => (
+  ): React.ReactElement => (
     <TableCell
       align={align}
       sx={{
@@ -196,7 +197,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
     </TableCell>
   );
 
-  const getStornoIndicator = (operation: string | null) => {
+  const getStornoIndicator = (operation: string | null): React.ReactElement | null => {
     // Show "Igen" for STORNO invoices, empty for others
     if (operation === 'STORNO') {
       return <Chip label="Igen" color="error" size="small" variant="filled" />;
@@ -204,7 +205,10 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
     return null;
   };
 
-  const getPaymentMethodIcon = (paymentMethod: string | null, invoiceCategory?: string | null) => {
+  const getPaymentMethodIcon = (
+    paymentMethod: string | null,
+    invoiceCategory?: string | null
+  ): React.ReactElement | string => {
     // Show Receipt icon for SIMPLIFIED invoices when payment_method is null
     if (!paymentMethod && invoiceCategory?.toUpperCase() === 'SIMPLIFIED') {
       return (

@@ -31,25 +31,25 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const menuOpen = Boolean(anchorEl);
 
-  const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
+  const handleMenuClick = (event: React.MouseEvent<HTMLElement>): void => {
     setAnchorEl(event.currentTarget);
   };
 
-  const handleMenuClose = () => {
+  const handleMenuClose = (): void => {
     setAnchorEl(null);
   };
 
-  const handleLogout = () => {
+  const handleLogout = (): void => {
     logout();
     handleMenuClose();
   };
 
-  const handleSettings = () => {
+  const handleSettings = (): void => {
     navigate('/settings');
     handleMenuClose();
   };
 
-  const getUserInitials = () => {
+  const getUserInitials = (): string => {
     if (!state.user) return 'U';
     const { first_name, last_name } = state.user;
     return `${first_name?.charAt(0) || ''}${last_name?.charAt(0) || ''}`.toUpperCase() || 'U';

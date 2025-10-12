@@ -26,7 +26,7 @@ interface XMLPreviewProps {
 }
 
 const XMLPreview: React.FC<XMLPreviewProps> = ({ xmlContent, filename, onClose, onDownload }) => {
-  const handleCopyToClipboard = async () => {
+  const handleCopyToClipboard = async (): Promise<void> => {
     try {
       await navigator.clipboard.writeText(xmlContent);
       // Success feedback could be handled by a snackbar or toast system
@@ -35,7 +35,14 @@ const XMLPreview: React.FC<XMLPreviewProps> = ({ xmlContent, filename, onClose, 
     }
   };
 
-  const formatXML = (xml: string) => {
+  const formatXML = (
+    xml: string
+  ): Array<{
+    content: string;
+    indent: number;
+    lineNumber: number;
+    formattedContent: string;
+  }> => {
     // Improved XML formatting with proper indentation
     if (!xml) return [];
 

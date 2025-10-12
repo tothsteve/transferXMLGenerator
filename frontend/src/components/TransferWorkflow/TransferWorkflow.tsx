@@ -36,12 +36,13 @@ import {
   useTransfers,
 } from '../../hooks/api';
 import { navInvoicesApi, bankAccountsApi } from '../../services/api';
-import { Transfer, TransferTemplate, LoadTemplateResponse, Beneficiary } from '../../types/api';
+import { Transfer, TransferWithBeneficiary, TransferTemplate, LoadTemplateResponse, Beneficiary } from '../../types/api';
 import TemplateSelector from './TemplateSelector';
 import TransferTable from './TransferTable';
 import AddTransferModal from './AddTransferModal';
 import InvoiceSelectionModal from './InvoiceSelectionModal';
 import XMLPreview from './XMLPreview';
+import { hasResponseData, getErrorMessage } from '../../utils/errorTypeGuards';
 
 /**
  * Extended transfer interface for working with transfers in the workflow.
@@ -154,7 +155,7 @@ const TransferWorkflow: React.FC = () => {
 
       // Convert API response transfers to TransferData format
       const convertedTransfers: TransferData[] = state.transfers.map(
-        (transfer: any, index: number) => ({
+        (transfer: TransferWithBeneficiary, index: number) => ({
           id: transfer.id,
           tempId: `generated_${index}`,
           beneficiary: transfer.beneficiary.id,
@@ -177,17 +178,17 @@ const TransferWorkflow: React.FC = () => {
       // Legacy preloaded transfers format (for backward compatibility)
       console.log('Loading preloaded transfers from NAV invoices:', state.preloadedTransfers);
 
-      // Convert preloaded data to TransferData format
+      // Convert preloaded data to TransferData format (legacy format with different structure)
       const convertedTransfers: TransferData[] = state.preloadedTransfers.map(
-        (transfer: any, index: number) => ({
+        (transfer: Record<string, any>, index: number) => ({
           tempId: `nav_${index}`,
-          beneficiary: transfer.beneficiary_id, // null initially
+          beneficiary: transfer.beneficiary_id || transfer.beneficiary, // null initially
           beneficiary_data: transfer.beneficiary_id
             ? undefined
             : {
                 id: 0,
-                name: transfer.beneficiary_name,
-                account_number: transfer.account_number,
+                name: transfer.beneficiary_name || '',
+                account_number: transfer.account_number || '',
                 description: `From NAV: ${transfer.remittance_info}`,
                 remittance_information: transfer.remittance_info,
                 is_frequent: false,
@@ -198,8 +199,6 @@ const TransferWorkflow: React.FC = () => {
           execution_date: transfer.execution_date,
           remittance_info: transfer.remittance_info,
           nav_invoice: transfer.nav_invoice, // Link to NAV invoice for payment tracking
-          order: transfer.order,
-          is_processed: false,
         })
       );
 
@@ -208,18 +207,27 @@ const TransferWorkflow: React.FC = () => {
       // Only load existing transfers if we have a specific source (not fresh navigation)
       console.log('Loading existing transfers:', existingTransfers);
 
-      const convertedTransfers: TransferData[] = existingTransfers.map((transfer: any) => ({
-        id: transfer.id,
-        beneficiary: transfer.beneficiary.id,
-        beneficiary_data: transfer.beneficiary,
-        amount: transfer.amount,
-        currency: transfer.currency,
-        execution_date: transfer.execution_date,
-        remittance_info: transfer.remittance_info,
-        nav_invoice: transfer.nav_invoice,
-        order: transfer.order,
-        is_processed: transfer.is_processed,
-      }));
+      const convertedTransfers: TransferData[] = existingTransfers.map((transfer) => {
+        const beneficiaryId = typeof transfer.beneficiary === 'number'
+          ? transfer.beneficiary
+          : (transfer.beneficiary as Beneficiary).id;
+        const beneficiaryData = typeof transfer.beneficiary === 'number'
+          ? transfer.beneficiary_data
+          : (transfer.beneficiary as Beneficiary);
+
+        return {
+          id: transfer.id,
+          beneficiary: beneficiaryId,
+          beneficiary_data: beneficiaryData,
+          amount: transfer.amount,
+          currency: transfer.currency,
+          execution_date: transfer.execution_date,
+          remittance_info: transfer.remittance_info,
+          nav_invoice: transfer.nav_invoice,
+          order: transfer.order,
+          is_processed: transfer.is_processed,
+        };
+      });
 
       setTransfers(convertedTransfers);
     }
@@ -235,7 +243,7 @@ const TransferWorkflow: React.FC = () => {
     }
   }, [location.state]);
 
-  const handleLoadTemplate = useCallback(async (templateId: number) => {
+  const handleLoadTemplate = useCallback(async (templateId: number): Promise<void> => {
     if (!defaultAccount) {
       console.error('No default account available for template loading');
       return;
@@ -254,11 +262,11 @@ const TransferWorkflow: React.FC = () => {
         },
       });
 
-      console.log('Template loading response:', result.data);
-      console.log('Loaded transfers:', result.data.transfers);
+      console.log('Template loading response:', result);
+      console.log('Loaded transfers:', result.transfers);
 
       // Enrich transfers with beneficiary data
-      const enrichedTransfers = result.data.transfers.map((transfer: any, index: number) => {
+      const enrichedTransfers = result.transfers.map((transfer: Omit<Transfer, 'id' | 'is_processed' | 'created_at'>, index: number) => {
         const beneficiaryData = beneficiaries.find((b) => b.id === transfer.beneficiary);
         console.log(
           `Transfer ${index}: beneficiary ID ${transfer.beneficiary}, found data:`,
@@ -286,7 +294,7 @@ const TransferWorkflow: React.FC = () => {
       loadedFromTemplate?: boolean;
       templateId?: number;
       loadFromTemplate?: boolean;
-      preloadedTransfers?: any[];
+      preloadedTransfers?: TransferData[];
       source?: string;
     } | null;
 
@@ -364,7 +372,7 @@ const TransferWorkflow: React.FC = () => {
     }
   }, [location.search, location.pathname, templates, defaultAccount, selectedTemplate, handleLoadTemplate]);
 
-  const handleUpdateTransfer = async (index: number, updatedData: Partial<TransferData>) => {
+  const handleUpdateTransfer = async (index: number, updatedData: Partial<TransferData>): Promise<void> => {
     const transfer = transfers[index];
     if (!transfer) return;
 
@@ -397,7 +405,7 @@ const TransferWorkflow: React.FC = () => {
     setValidationErrors([]);
   };
 
-  const handleDeleteTransfer = async (index: number) => {
+  const handleDeleteTransfer = async (index: number): Promise<void> => {
     const transfer = transfers[index];
     if (!transfer) return;
 
@@ -417,7 +425,7 @@ const TransferWorkflow: React.FC = () => {
     setTransfers((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleAddTransfer = (transferData: TransferData) => {
+  const handleAddTransfer = (transferData: TransferData): void => {
     setTransfers((prev) => [
       ...prev,
       {
@@ -428,7 +436,7 @@ const TransferWorkflow: React.FC = () => {
     setValidationErrors([]);
   };
 
-  const handleInvoiceSelect = async (invoiceIds: number[]) => {
+  const handleInvoiceSelect = async (invoiceIds: number[]): Promise<void> => {
     try {
       // Get default bank account for originator
       const defaultAccountResponse = await bankAccountsApi.getDefault();
@@ -445,7 +453,7 @@ const TransferWorkflow: React.FC = () => {
 
       // Convert API response transfers to TransferData format
       const convertedTransfers: TransferData[] = newTransfers.map(
-        (transfer: any, index: number) => ({
+        (transfer: TransferWithBeneficiary, index: number) => ({
           id: transfer.id,
           tempId: `nav_generated_${Date.now()}_${index}`,
           beneficiary: transfer.beneficiary.id,
@@ -465,16 +473,17 @@ const TransferWorkflow: React.FC = () => {
       setValidationErrors([]);
 
       console.log(`${transfer_count} átutalás létrehozva NAV számlákból és hozzáadva a listához`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to generate transfers from invoices:', error);
-      setValidationErrors([
-        error.response?.data?.detail || 'Hiba történt az átutalás generálása során.',
-      ]);
+
+      const errorMessage = getErrorMessage(error, 'Hiba történt az átutalás generálása során.');
+
+      setValidationErrors([errorMessage]);
       throw error; // Re-throw to let the modal handle it
     }
   };
 
-  const handleReorderTransfers = (reorderedTransfers: TransferData[]) => {
+  const handleReorderTransfers = (reorderedTransfers: TransferData[]): void => {
     setTransfers(reorderedTransfers);
   };
 
@@ -506,11 +515,12 @@ const TransferWorkflow: React.FC = () => {
   };
 
   // Helper function to resolve beneficiaries for NAV transfers
-  const resolveBeneficiariesForTransfers = async (transfersToProcess: TransferData[]) => {
+  const resolveBeneficiariesForTransfers = async (transfersToProcess: TransferData[]): Promise<{ resolvedTransfers: TransferData[]; failedTransfers: { transfer: TransferData; reason: string }[] }> => {
     console.log(
       `[resolveBeneficiariesForTransfers] Starting with ${transfersToProcess.length} transfers`
     );
     const resolvedTransfers = [...transfersToProcess];
+    const failedTransfers: { transfer: TransferData; reason: string }[] = [];
     const createdBeneficiaries = new Map<string, number>(); // account_number -> beneficiary_id
 
     // First, collect all unique beneficiaries that need to be resolved
@@ -577,8 +587,8 @@ const TransferWorkflow: React.FC = () => {
             remittance_information: '',
           });
 
-          createdBeneficiaries.set(accountKey, newBeneficiary.data.id);
-          console.log(`Created new beneficiary for ${beneficiaryInfo.name}:`, newBeneficiary.data);
+          createdBeneficiaries.set(accountKey, newBeneficiary.id);
+          console.log(`Created new beneficiary for ${beneficiaryInfo.name}:`, newBeneficiary);
         } catch (error) {
           console.error(`Failed to create beneficiary for ${beneficiaryInfo.name}:`, error);
           throw new Error(`Nem sikerült létrehozni a kedvezményezettet: ${beneficiaryInfo.name}`);
@@ -630,7 +640,7 @@ const TransferWorkflow: React.FC = () => {
       `[resolveBeneficiariesForTransfers] Returning ${resolvedTransfers.length} resolved transfers`
     );
     console.log('[resolveBeneficiariesForTransfers] Final resolved transfers:', resolvedTransfers);
-    return resolvedTransfers;
+    return { resolvedTransfers, failedTransfers };
   };
 
   const handleSaveTransfers = async (): Promise<false | number[]> => {
@@ -648,14 +658,14 @@ const TransferWorkflow: React.FC = () => {
     try {
       // First, resolve beneficiaries for any NAV transfers
       console.log('Resolving beneficiaries for NAV transfers if needed...');
-      const resolvedTransfers = await resolveBeneficiariesForTransfers(transfers);
+      const { resolvedTransfers, failedTransfers: _failedTransfers } = await resolveBeneficiariesForTransfers(transfers);
 
       // Update the transfers state with resolved beneficiaries
       setTransfers(resolvedTransfers);
 
       // Separate transfers into create and update groups
-      const transfersToCreate = resolvedTransfers.filter((t) => !t.id);
-      const transfersToUpdate = resolvedTransfers.filter((t) => t.id);
+      const transfersToCreate = resolvedTransfers.filter((t: TransferData) => !t.id);
+      const transfersToUpdate = resolvedTransfers.filter((t: TransferData) => t.id);
 
       console.log('Transfers to create:', transfersToCreate.length);
       console.log('Transfers to update:', transfersToUpdate.length);
@@ -664,11 +674,11 @@ const TransferWorkflow: React.FC = () => {
       const allTransferIds: number[] = [];
 
       // Step 1: Create new transfers
-      let createdTransfers: any[] = [];
+      let createdTransfers: Transfer[] = [];
       if (transfersToCreate.length > 0) {
         console.log('Creating transfers:', transfersToCreate);
 
-        const transfersPayload = transfersToCreate.map((t, _index) => ({
+        const transfersPayload = transfersToCreate.map((t: TransferData, _index: number) => ({
           originator_account_id: defaultAccount!.id,
           beneficiary_id: t.beneficiary,
           amount: parseFloat(t.amount).toFixed(2),
@@ -688,10 +698,11 @@ const TransferWorkflow: React.FC = () => {
         console.log('Bulk create response:', bulkResult);
 
         // Handle the response structure - check if it's wrapped or direct array
-        const responseData: any = bulkResult.data;
-        createdTransfers = Array.isArray(responseData)
-          ? responseData
-          : responseData?.transfers || responseData?.results || [];
+        createdTransfers = Array.isArray(bulkResult)
+          ? (bulkResult as Transfer[])
+          : ((bulkResult as { transfers?: Transfer[]; results?: Transfer[] })?.transfers ||
+             (bulkResult as { transfers?: Transfer[]; results?: Transfer[] })?.results ||
+             []);
 
         console.log('Created transfers:', createdTransfers);
 
@@ -707,7 +718,7 @@ const TransferWorkflow: React.FC = () => {
       if (transfersToUpdate.length > 0) {
         console.log('Updating transfers:', transfersToUpdate);
 
-        const updatePayloads = transfersToUpdate.map((t) => ({
+        const updatePayloads = transfersToUpdate.map((t: TransferData) => ({
           id: t.id!,
           data: {
             beneficiary: t.beneficiary,
@@ -725,7 +736,7 @@ const TransferWorkflow: React.FC = () => {
         console.log('Bulk updates completed');
 
         // Add existing transfer IDs (they already exist)
-        transfersToUpdate.forEach((t) => {
+        transfersToUpdate.forEach((t: TransferData) => {
           if (t.id) {
             allTransferIds.push(t.id);
           }
@@ -734,7 +745,7 @@ const TransferWorkflow: React.FC = () => {
 
       // Step 3: Update state with newly created transfers (for UI consistency)
       if (createdTransfers.length > 0) {
-        const newTransfers = createdTransfers.map((createdTransfer: any, index: number) => ({
+        const newTransfers = createdTransfers.map((createdTransfer: Transfer, index: number) => ({
           ...transfersToCreate[index],
           id: createdTransfer.id,
         }));
@@ -760,36 +771,37 @@ const TransferWorkflow: React.FC = () => {
       console.log('All transfers saved successfully');
       console.log('Transfer IDs for XML generation:', allTransferIds);
       return allTransferIds;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to save transfers:', error);
-      console.error('Error response:', error.response?.data);
 
       // Handle validation errors from backend
       let errorMessages: string[] = [];
 
-      if (error.response?.data?.transfers) {
-        // Backend returned field-specific errors for each transfer
-        const transferErrors = error.response.data.transfers;
-        transferErrors.forEach((transferError: any, index: number) => {
-          if (transferError) {
-            Object.keys(transferError).forEach((field) => {
-              const fieldErrors = transferError[field];
-              if (Array.isArray(fieldErrors)) {
-                fieldErrors.forEach((err) => {
-                  errorMessages.push(`${index + 1}. átutalás - ${field}: ${err}`);
-                });
-              }
-            });
-          }
-        });
-      }
+      if (hasResponseData(error)) {
+        console.error('Error response:', error.response.data);
 
-      if (errorMessages.length === 0) {
-        const errorMessage =
-          error.response?.data?.detail ||
-          error.response?.data?.message ||
-          'Hiba történt az átutalások mentése során.';
-        errorMessages = [errorMessage];
+        if (error.response.data.transfers && Array.isArray(error.response.data.transfers)) {
+          // Backend returned field-specific errors for each transfer
+          const transferErrors = error.response.data.transfers;
+          transferErrors.forEach((transferError: Record<string, unknown>, index: number) => {
+            if (transferError && typeof transferError === 'object') {
+              Object.keys(transferError).forEach((field) => {
+                const fieldErrors = transferError[field];
+                if (Array.isArray(fieldErrors)) {
+                  fieldErrors.forEach((err) => {
+                    errorMessages.push(`${index + 1}. átutalás - ${field}: ${err}`);
+                  });
+                }
+              });
+            }
+          });
+        }
+
+        if (errorMessages.length === 0) {
+          errorMessages = [getErrorMessage(error, 'Hiba történt az átutalások mentése során.')];
+        }
+      } else {
+        errorMessages = [getErrorMessage(error, 'Hiba történt az átutalások mentése során.')];
       }
 
       setValidationErrors(errorMessages);
@@ -797,7 +809,7 @@ const TransferWorkflow: React.FC = () => {
     }
   };
 
-  const handleGenerateXML = async () => {
+  const handleGenerateXML = async (): Promise<void> => {
     // First, ensure all transfers are saved and get their IDs
     const transferIds = await handleSaveTransfers();
     if (!transferIds) return;
@@ -823,25 +835,26 @@ const TransferWorkflow: React.FC = () => {
       });
 
       console.log('XML generation response:', xmlResult);
-      console.log('XML content:', xmlResult.data);
+      console.log('XML content:', xmlResult);
 
       setXmlPreview({
-        content: xmlResult.data.xml,
+        content: xmlResult.xml,
         filename: `transfers_${new Date().toISOString().split('T')[0]}.xml`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to generate XML:', error);
-      console.error('Error response:', error.response?.data);
 
-      const errorMessage =
-        error.response?.data?.detail ||
-        error.response?.data?.message ||
-        'Hiba történt a generálás során.';
+      const errorMessage = getErrorMessage(error, 'Hiba történt a generálás során.');
+
+      if (hasResponseData(error)) {
+        console.error('Error response:', error.response.data);
+      }
+
       setValidationErrors([errorMessage]);
     }
   };
 
-  const handleDownloadXML = () => {
+  const handleDownloadXML = (): void => {
     if (!xmlPreview) return;
 
     const blob = new Blob([xmlPreview.content], { type: 'application/xml' });
@@ -853,7 +866,7 @@ const TransferWorkflow: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const handleGenerateKHExport = async () => {
+  const handleGenerateKHExport = async (): Promise<void> => {
     // First, ensure all transfers are saved and get their IDs
     const transferIds = await handleSaveTransfers();
     if (!transferIds) return;
@@ -890,9 +903,9 @@ const TransferWorkflow: React.FC = () => {
 
       // Automatically download the file with proper ISO-8859-2 encoding
       let blob;
-      if (khResult.data.content_encoding === 'base64') {
+      if (khResult.content_encoding === 'base64') {
         // Decode base64 content to get ISO-8859-2 encoded bytes
-        const binaryString = atob(khResult.data.content);
+        const binaryString = atob(khResult.content);
         const bytes = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
           bytes[i] = binaryString.charCodeAt(i);
@@ -900,25 +913,24 @@ const TransferWorkflow: React.FC = () => {
         blob = new Blob([bytes], { type: 'text/csv' });
       } else {
         // Fallback for non-base64 content
-        blob = new Blob([khResult.data.content], { type: 'text/csv; charset=utf-8' });
+        blob = new Blob([khResult.content], { type: 'text/csv; charset=utf-8' });
       }
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = khResult.data.filename;
+      link.download = khResult.filename;
       link.click();
       URL.revokeObjectURL(url);
 
       setValidationErrors([]);
       console.log(
-        `KH Bank export sikeresen generálva: ${khResult.data.transfer_count} átutalás, ${parseFloat(khResult.data.total_amount).toLocaleString('hu-HU')} HUF`
+        `KH Bank export sikeresen generálva: ${khResult.transfer_count} átutalás, ${parseFloat(khResult.total_amount).toLocaleString('hu-HU')} HUF`
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('KH export generation failed:', error);
-      const errorMessage =
-        error.response?.data?.error ||
-        error.response?.data?.detail ||
-        'Hiba történt a KH export generálása során.';
+
+      const errorMessage = getErrorMessage(error, 'Hiba történt a KH export generálása során.');
+
       setValidationErrors([errorMessage]);
     }
   };

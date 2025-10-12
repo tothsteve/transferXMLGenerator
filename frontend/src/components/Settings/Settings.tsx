@@ -23,7 +23,7 @@ interface TabPanelProps {
   value: number;
 }
 
-function TabPanel(props: TabPanelProps) {
+function TabPanel(props: TabPanelProps): React.ReactElement {
   const { children, value, index, ...other } = props;
   return (
     <div
@@ -108,7 +108,7 @@ const Settings: React.FC = () => {
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(''), 3000);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Error saving bank account:', error);
       setSuccessMessage('Hiba történt a mentés során. Kérlek próbáld újra!');
 
@@ -144,14 +144,15 @@ const Settings: React.FC = () => {
   }, [defaultAccount?.data, isEditing]);
 
   const handleInputChange =
-    (field: string) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    (field: string) =>
+    (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void => {
       setFormData((prev) => ({
         ...prev,
         [field]: event.target.value,
       }));
     };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
     console.log('📝 handleSubmit called, isEditing:', isEditing);
 
@@ -165,7 +166,7 @@ const Settings: React.FC = () => {
     saveBankAccountMutation.mutate(formData);
   };
 
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number): void => {
     setTabValue(newValue);
   };
 

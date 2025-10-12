@@ -64,7 +64,7 @@ export const UploadStep: React.FC<UploadStepProps> = ({
     maxSize: 50 * 1024 * 1024, // 50MB max file size
   });
 
-  const formatFileSize = (bytes: number) => {
+  const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
@@ -106,7 +106,7 @@ export const UploadStep: React.FC<UploadStepProps> = ({
       {/* Drag & Drop Zone */}
       <Paper
         {...(() => {
-          const { className, style, ...rootProps } = getRootProps();
+          const { className: _className, style: _style, ...rootProps } = getRootProps();
           return rootProps;
         })()}
         elevation={0}

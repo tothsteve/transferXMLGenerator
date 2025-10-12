@@ -3,6 +3,7 @@ import {
   useQuery,
   useQueryClient,
   UseQueryResult,
+  UseMutationResult,
 } from '@tanstack/react-query';
 import {
   beneficiariesApi,
@@ -19,7 +20,14 @@ import {
   Transfer,
   BulkCreateTransferRequest,
   GenerateXmlRequest,
+  GenerateXmlResponse,
+  GenerateKHExportResponse,
+  LoadTemplateResponse,
+  ExcelImportResponse,
   ApiResponse,
+  BankAccount,
+  TransferBatch,
+  NAVInvoice,
 } from '../types/api';
 import {
   BeneficiarySchema,
@@ -75,7 +83,7 @@ export function useBeneficiaries(params?: {
   });
 }
 
-export function useFrequentBeneficiaries() {
+export function useFrequentBeneficiaries(): UseQueryResult<ApiResponse<Beneficiary>, Error> {
   return useQuery({
     queryKey: queryKeys.beneficiariesFrequent,
     queryFn: () => beneficiariesApi.getFrequent(),
@@ -86,11 +94,14 @@ export function useFrequentBeneficiaries() {
   });
 }
 
-export function useCreateBeneficiary() {
+export function useCreateBeneficiary(): UseMutationResult<Beneficiary, Error, Omit<Beneficiary, 'id'>> {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: Omit<Beneficiary, 'id'>) => beneficiariesApi.create(data),
+    mutationFn: async (data: Omit<Beneficiary, 'id'>) => {
+      const response = await beneficiariesApi.create(data);
+      return response.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.beneficiaries });
       queryClient.invalidateQueries({ queryKey: queryKeys.beneficiariesFrequent });
@@ -98,12 +109,14 @@ export function useCreateBeneficiary() {
   });
 }
 
-export function useUpdateBeneficiary() {
+export function useUpdateBeneficiary(): UseMutationResult<Beneficiary, Error, { id: number; data: Partial<Beneficiary> }> {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Beneficiary> }) =>
-      beneficiariesApi.update(id, data),
+    mutationFn: async ({ id, data }: { id: number; data: Partial<Beneficiary> }) => {
+      const response = await beneficiariesApi.update(id, data);
+      return response.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.beneficiaries });
       queryClient.invalidateQueries({ queryKey: queryKeys.beneficiariesFrequent });
@@ -111,11 +124,13 @@ export function useUpdateBeneficiary() {
   });
 }
 
-export function useDeleteBeneficiary() {
+export function useDeleteBeneficiary(): UseMutationResult<void, Error, number> {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: number) => beneficiariesApi.delete(id),
+    mutationFn: async (id: number) => {
+      await beneficiariesApi.delete(id);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.beneficiaries });
       queryClient.invalidateQueries({ queryKey: queryKeys.beneficiariesFrequent });
@@ -129,7 +144,7 @@ export function useDeleteBeneficiary() {
  * React Query hooks for managing transfer template data with Zod validation
  */
 
-export function useTemplates(showInactive?: boolean) {
+export function useTemplates(showInactive?: boolean): UseQueryResult<ApiResponse<TransferTemplate>, Error> {
   return useQuery({
     queryKey: [...queryKeys.templates, showInactive],
     queryFn: () => templatesApi.getAll(showInactive ? { show_inactive: true } : undefined),
@@ -147,7 +162,7 @@ export function useTemplates(showInactive?: boolean) {
   });
 }
 
-export function useTemplate(id: number) {
+export function useTemplate(id: number): UseQueryResult<TransferTemplate, Error> {
   return useQuery({
     queryKey: queryKeys.template(id),
     queryFn: () => templatesApi.getById(id),
@@ -156,25 +171,38 @@ export function useTemplate(id: number) {
   });
 }
 
-export function useCreateTemplate() {
+export function useCreateTemplate(): UseMutationResult<
+  TransferTemplate,
+  Error,
+  Omit<TransferTemplate, 'id' | 'beneficiary_count' | 'created_at' | 'updated_at'>
+> {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (
+    mutationFn: async (
       data: Omit<TransferTemplate, 'id' | 'beneficiary_count' | 'created_at' | 'updated_at'>
-    ) => templatesApi.create(data),
+    ) => {
+      const response = await templatesApi.create(data);
+      return response.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.templates });
     },
   });
 }
 
-export function useUpdateTemplate() {
+export function useUpdateTemplate(): UseMutationResult<
+  TransferTemplate,
+  Error,
+  { id: number; data: Partial<TransferTemplate> }
+> {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<TransferTemplate> }) =>
-      templatesApi.update(id, data),
+    mutationFn: async ({ id, data }: { id: number; data: Partial<TransferTemplate> }) => {
+      const response = await templatesApi.update(id, data);
+      return response.data;
+    },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.templates });
       queryClient.invalidateQueries({ queryKey: queryKeys.template(id) });
@@ -182,20 +210,33 @@ export function useUpdateTemplate() {
   });
 }
 
-export function useDeleteTemplate() {
+export function useDeleteTemplate(): UseMutationResult<void, Error, number> {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: number) => templatesApi.delete(id),
+    mutationFn: async (id: number) => {
+      await templatesApi.delete(id);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.templates });
     },
   });
 }
 
-export function useLoadTemplate() {
+export function useLoadTemplate(): UseMutationResult<
+  LoadTemplateResponse,
+  Error,
+  {
+    templateId: number;
+    data: {
+      template_id: number;
+      originator_account_id: number;
+      execution_date: string;
+    };
+  }
+> {
   return useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       templateId,
       data,
     }: {
@@ -205,11 +246,27 @@ export function useLoadTemplate() {
         originator_account_id: number;
         execution_date: string;
       };
-    }) => templatesApi.loadTransfers(templateId, data),
+    }) => {
+      const response = await templatesApi.loadTransfers(templateId, data);
+      return response.data;
+    },
   });
 }
 
-export function useAddTemplateBeneficiary() {
+export function useAddTemplateBeneficiary(): UseMutationResult<
+  unknown,
+  Error,
+  {
+    templateId: number;
+    data: {
+      beneficiary_id: number;
+      default_amount?: number;
+      default_remittance?: string;
+      order?: number;
+      is_active?: boolean;
+    };
+  }
+> {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -233,12 +290,17 @@ export function useAddTemplateBeneficiary() {
   });
 }
 
-export function useRemoveTemplateBeneficiary() {
+export function useRemoveTemplateBeneficiary(): UseMutationResult<
+  void,
+  Error,
+  { templateId: number; beneficiaryId: number }
+> {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ templateId, beneficiaryId }: { templateId: number; beneficiaryId: number }) =>
-      templatesApi.removeBeneficiary(templateId, beneficiaryId),
+    mutationFn: async ({ templateId, beneficiaryId }: { templateId: number; beneficiaryId: number }) => {
+      await templatesApi.removeBeneficiary(templateId, beneficiaryId);
+    },
     onSuccess: (_, { templateId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.templates });
       queryClient.invalidateQueries({ queryKey: queryKeys.template(templateId) });
@@ -246,7 +308,20 @@ export function useRemoveTemplateBeneficiary() {
   });
 }
 
-export function useUpdateTemplateBeneficiary() {
+export function useUpdateTemplateBeneficiary(): UseMutationResult<
+  unknown,
+  Error,
+  {
+    templateId: number;
+    data: {
+      beneficiary_id: number;
+      default_amount?: number;
+      default_remittance?: string;
+      order?: number;
+      is_active?: boolean;
+    };
+  }
+> {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -284,7 +359,7 @@ export function useTransfers(params?: {
   execution_date_from?: string;
   execution_date_to?: string;
   ordering?: string;
-}) {
+}): UseQueryResult<ApiResponse<Transfer>, Error> {
   return useQuery({
     queryKey: [...queryKeys.transfers, params],
     queryFn: () => transfersApi.getAll(params),
@@ -295,7 +370,7 @@ export function useTransfers(params?: {
   });
 }
 
-export function useBulkCreateTransfers() {
+export function useBulkCreateTransfers(): UseMutationResult<unknown, Error, BulkCreateTransferRequest> {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -306,34 +381,44 @@ export function useBulkCreateTransfers() {
   });
 }
 
-export function useUpdateTransfer() {
+export function useUpdateTransfer(): UseMutationResult<Transfer, Error, { id: number; data: Partial<Transfer> }> {
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Transfer> }) =>
-      transfersApi.partialUpdate(id, data),
+    mutationFn: async ({ id, data }: { id: number; data: Partial<Transfer> }) => {
+      const response = await transfersApi.partialUpdate(id, data);
+      return response.data;
+    },
   });
 }
 
-export function useBulkUpdateTransfers() {
+export function useBulkUpdateTransfers(): UseMutationResult<Transfer[], Error, { id: number; data: Partial<Transfer> }[]> {
   return useMutation({
     mutationFn: async (transfers: { id: number; data: Partial<Transfer> }[]) => {
       // Execute all updates in parallel
-      const updatePromises = transfers.map(({ id, data }) => transfersApi.partialUpdate(id, data));
+      const updatePromises = transfers.map(async ({ id, data }) => {
+        const response = await transfersApi.partialUpdate(id, data);
+        return response.data;
+      });
       return Promise.all(updatePromises);
     },
   });
 }
 
-export function useDeleteTransfer() {
+export function useDeleteTransfer(): UseMutationResult<void, Error, number> {
   return useMutation({
-    mutationFn: (id: number) => transfersApi.delete(id),
+    mutationFn: async (id: number) => {
+      await transfersApi.delete(id);
+    },
   });
 }
 
-export function useGenerateXml() {
+export function useGenerateXml(): UseMutationResult<GenerateXmlResponse, Error, GenerateXmlRequest> {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: GenerateXmlRequest) => transfersApi.generateXml(data),
+    mutationFn: async (data: GenerateXmlRequest) => {
+      const response = await transfersApi.generateXml(data);
+      return response.data;
+    },
     onSuccess: () => {
       // Invalidate batches query to update the dashboard counter
       queryClient.invalidateQueries({ queryKey: queryKeys.batches });
@@ -341,11 +426,14 @@ export function useGenerateXml() {
   });
 }
 
-export function useGenerateKHExport() {
+export function useGenerateKHExport(): UseMutationResult<GenerateKHExportResponse, Error, GenerateXmlRequest> {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: GenerateXmlRequest) => transfersApi.generateKHExport(data),
+    mutationFn: async (data: GenerateXmlRequest) => {
+      const response = await transfersApi.generateKHExport(data);
+      return response.data;
+    },
     onSuccess: () => {
       // Invalidate batches query to update the dashboard counter
       queryClient.invalidateQueries({ queryKey: queryKeys.batches });
@@ -359,7 +447,7 @@ export function useGenerateKHExport() {
  * React Query hooks for managing bank account data with Zod validation
  */
 
-export function useDefaultBankAccount() {
+export function useDefaultBankAccount(): UseQueryResult<BankAccount, Error> {
   return useQuery({
     queryKey: queryKeys.bankAccountDefault,
     queryFn: () => bankAccountsApi.getDefault(),
@@ -373,7 +461,7 @@ export function useDefaultBankAccount() {
  * React Query hooks for managing batch data with Zod validation
  */
 
-export function useBatches() {
+export function useBatches(): UseQueryResult<ApiResponse<TransferBatch>, Error> {
   return useQuery({
     queryKey: queryKeys.batches,
     queryFn: () => batchesApi.getAll(),
@@ -391,7 +479,7 @@ export function useBatches() {
   });
 }
 
-export function useBatch(id: number | undefined, enabled = true) {
+export function useBatch(id: number | undefined, enabled = true): UseQueryResult<TransferBatch, Error> {
   return useQuery({
     queryKey: ['batch', id],
     queryFn: () => batchesApi.getById(id!),
@@ -400,7 +488,7 @@ export function useBatch(id: number | undefined, enabled = true) {
   });
 }
 
-export function useMarkBatchUsedInBank() {
+export function useMarkBatchUsedInBank(): UseMutationResult<unknown, Error, number> {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -411,7 +499,7 @@ export function useMarkBatchUsedInBank() {
   });
 }
 
-export function useMarkBatchUnusedInBank() {
+export function useMarkBatchUnusedInBank(): UseMutationResult<unknown, Error, number> {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -422,7 +510,7 @@ export function useMarkBatchUnusedInBank() {
   });
 }
 
-export function useDownloadBatchXml() {
+export function useDownloadBatchXml(): UseMutationResult<unknown, Error, number> {
   return useMutation({
     mutationFn: async (batchId: number) => {
       const response = await batchesApi.downloadXml(batchId);
@@ -431,11 +519,13 @@ export function useDownloadBatchXml() {
   });
 }
 
-export function useDeleteBatch() {
+export function useDeleteBatch(): UseMutationResult<void, Error, number> {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (batchId: number) => batchesApi.delete(batchId),
+    mutationFn: async (batchId: number) => {
+      await batchesApi.delete(batchId);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.batches });
     },
@@ -456,7 +546,7 @@ export function useNAVInvoices(params?: {
   page_size?: number;
   ordering?: string;
   hide_storno_invoices?: boolean;
-}) {
+}): UseQueryResult<ApiResponse<NAVInvoice>, Error> {
   return useQuery({
     queryKey: [...queryKeys.navInvoices, params],
     queryFn: () => navInvoicesApi.getAll(params),
@@ -467,19 +557,27 @@ export function useNAVInvoices(params?: {
   });
 }
 
-export function useBulkMarkUnpaid() {
+export function useBulkMarkUnpaid(): UseMutationResult<unknown, Error, number[]> {
   return useMutation({
     mutationFn: (invoice_ids: number[]) => navInvoicesApi.bulkMarkUnpaid(invoice_ids),
   });
 }
 
-export function useBulkMarkPrepared() {
+export function useBulkMarkPrepared(): UseMutationResult<unknown, Error, number[]> {
   return useMutation({
     mutationFn: (invoice_ids: number[]) => navInvoicesApi.bulkMarkPrepared(invoice_ids),
   });
 }
 
-export function useBulkMarkPaid() {
+export function useBulkMarkPaid(): UseMutationResult<
+  unknown,
+  Error,
+  {
+    invoice_ids?: number[];
+    payment_date?: string;
+    invoices?: { invoice_id: number; payment_date: string }[];
+  }
+> {
   return useMutation({
     mutationFn: (data: {
       invoice_ids?: number[];
@@ -490,11 +588,14 @@ export function useBulkMarkPaid() {
 }
 
 // Upload Hooks
-export function useUploadExcel() {
+export function useUploadExcel(): UseMutationResult<ExcelImportResponse, Error, File> {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (file: File) => uploadApi.uploadExcel(file),
+    mutationFn: async (file: File) => {
+      const response = await uploadApi.uploadExcel(file);
+      return response.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.beneficiaries });
       queryClient.invalidateQueries({ queryKey: queryKeys.beneficiariesFrequent });

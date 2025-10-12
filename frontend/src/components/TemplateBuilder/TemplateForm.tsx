@@ -276,7 +276,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
     }
   }, [template, reset]);
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = (event: DragEndEvent): void => {
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
@@ -299,7 +299,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
     }
   };
 
-  const handleFormSubmit = (data: Omit<TemplateFormData, 'beneficiaries'>) => {
+  const handleFormSubmit = (data: Omit<TemplateFormData, 'beneficiaries'>): void => {
     const formData: TemplateFormData = {
       ...data,
       beneficiaries: selectedBeneficiaries.map((b) => ({
@@ -311,7 +311,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
     onSubmit(formData);
   };
 
-  const handleClose = () => {
+  const handleClose = (): void => {
     reset();
     setSelectedBeneficiaries([]);
     setSearchTerm('');
@@ -319,7 +319,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
     onClose();
   };
 
-  const addBeneficiary = (beneficiary: Beneficiary) => {
+  const addBeneficiary = (beneficiary: Beneficiary): void => {
     if (!selectedBeneficiaryIds.has(beneficiary.id)) {
       setSelectedBeneficiaries((prev) => [
         ...prev,
@@ -338,7 +338,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
     setSearchTerm('');
   };
 
-  const removeBeneficiary = (beneficiaryId: number) => {
+  const removeBeneficiary = (beneficiaryId: number): void => {
     setSelectedBeneficiaries(
       (prev) =>
         prev

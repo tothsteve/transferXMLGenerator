@@ -30,7 +30,7 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
 }) => {
   const activeTemplates = templates.filter((t) => t.is_active);
 
-  const handleSelectChange = (event: SelectChangeEvent<number>) => {
+  const handleSelectChange = (event: SelectChangeEvent<number>): void => {
     const templateId = event.target.value as number;
     const template = activeTemplates.find((t) => t.id === templateId);
     if (template) {

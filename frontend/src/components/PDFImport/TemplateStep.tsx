@@ -23,7 +23,7 @@ interface TemplateStepProps {
 }
 
 export const TemplateStep: React.FC<TemplateStepProps> = ({ previewData, onCreateTransfers }) => {
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('hu-HU', {
       style: 'currency',
       currency: 'HUF',

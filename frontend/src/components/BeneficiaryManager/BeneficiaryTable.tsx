@@ -78,7 +78,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
   const [editData, setEditData] = useState<Partial<Beneficiary>>({});
   const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
 
-  const handleStartEdit = (beneficiary: Beneficiary) => {
+  const handleStartEdit = (beneficiary: Beneficiary): void => {
     setEditingId(beneficiary.id);
     setEditData({
       name: beneficiary.name,
@@ -92,7 +92,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
     });
   };
 
-  const handleSort = (field: string) => {
+  const handleSort = (field: string): void => {
     if (sortField === field) {
       // Toggle direction
       const newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
@@ -103,7 +103,7 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
     }
   };
 
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = async (): Promise<void> => {
     if (editingId && editData) {
       // Clear previous errors
       setFieldErrors({});
@@ -206,12 +206,12 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
     }
   };
 
-  const handleAccountNumberChange = (value: string) => {
+  const handleAccountNumberChange = (value: string): void => {
     const formatted = formatAccountNumberOnInput(value);
     setEditData({ ...editData, account_number: formatted });
   };
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = (): void => {
     setEditingId(null);
     setEditData({});
     setFieldErrors({});

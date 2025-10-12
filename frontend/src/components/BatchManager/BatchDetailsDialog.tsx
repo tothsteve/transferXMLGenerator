@@ -44,7 +44,7 @@ const BatchDetailsDialog: React.FC<BatchDetailsDialogProps> = ({
   batch,
   isLoading = false,
 }) => {
-  const formatAmount = (amount: string) => {
+  const formatAmount = (amount: string): string => {
     const num = parseFloat(amount);
     return new Intl.NumberFormat('hu-HU', {
       style: 'currency',
@@ -54,11 +54,11 @@ const BatchDetailsDialog: React.FC<BatchDetailsDialogProps> = ({
     }).format(num);
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString('hu-HU');
   };
 
-  const formatDateTime = (dateString: string) => {
+  const formatDateTime = (dateString: string): string => {
     return new Date(dateString).toLocaleString('hu-HU', {
       year: 'numeric',
       month: '2-digit',

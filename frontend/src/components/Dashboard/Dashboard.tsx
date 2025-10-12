@@ -21,7 +21,7 @@ import { useNavigate } from 'react-router-dom';
 import { useBeneficiaries, useTemplates, useBatches } from '../../hooks/api';
 
 // Animated counter hook
-const useAnimatedCounter = (end: number, duration: number = 1000, start: number = 0) => {
+const useAnimatedCounter = (end: number, duration: number = 1000, start: number = 0): number => {
   const [count, setCount] = useState(start);
 
   useEffect(() => {

@@ -62,7 +62,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
   const navigate = useNavigate();
   const location = useLocation();
 
-  const handleTransferClick = (e: React.MouseEvent) => {
+  const handleTransferClick = (e: React.MouseEvent): void => {
     e.preventDefault();
 
     // If already on transfers page, force a reset by navigating with reset flag
@@ -116,7 +116,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
       {/* Navigation */}
       <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
         <List sx={{ p: 1 }}>
-          {navigation.map((item) => (
+          {navigation.map((item: NavigationItem) => (
             <ListItem key={item.name} disablePadding sx={{ mb: 0.5 }}>
               <ListItemButton
                 component={item.href === '/transfers' ? 'div' : NavLink}
@@ -156,9 +156,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
                     fontSize: '0.875rem',
                   }}
                 />
-                {(item as any).badge && (
+                {item.badge && (
                   <Chip
-                    label={(item as any).badge}
+                    label={item.badge}
                     size="small"
                     color="primary"
                     variant="filled"

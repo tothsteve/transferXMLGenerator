@@ -31,7 +31,7 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
   compact = false,
   isOverdue = false,
 }) => {
-  const getIcon = (iconName: string) => {
+  const getIcon = (iconName: string): React.ReactElement => {
     const iconProps = { fontSize: size === 'small' ? 'small' : ('medium' as any) };
 
     // Show warning icon for overdue unpaid invoices
@@ -55,7 +55,7 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
     }
   };
 
-  const getColor = (status: string) => {
+  const getColor = (status: string): 'warning' | 'error' | 'info' | 'success' | 'secondary' | 'default' => {
     // Override color for overdue unpaid invoices
     if (isOverdue && status === 'UNPAID') {
       return 'error'; // Keep red but will be styled differently
@@ -79,7 +79,7 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
     }
   };
 
-  const getTooltip = (status: string) => {
+  const getTooltip = (status: string): string => {
     const baseLabel = paymentStatus.label;
     const dateText = paymentStatusDate ? ` (${paymentStatusDate})` : '';
 
@@ -104,7 +104,7 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
   };
 
   // Create display label with date if available and status needs it
-  const getDisplayLabel = () => {
+  const getDisplayLabel = (): string => {
     // Override label for overdue unpaid invoices
     if (isOverdue && paymentStatus.status === 'UNPAID') {
       return 'LEJÁRT!';
@@ -122,7 +122,7 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
 
   if (compact) {
     // Compact mode: Just icon with colors and detailed tooltip
-    const getIconColor = (status: string) => {
+    const getIconColor = (status: string): string => {
       // Override color for overdue unpaid invoices
       if (isOverdue && status === 'UNPAID') {
         return '#d32f2f'; // Dark red for overdue

@@ -70,15 +70,15 @@ const TemplateBuilder: React.FC = () => {
   const showNotification = (
     message: string,
     severity: 'success' | 'error' | 'info' | 'warning' = 'success'
-  ) => {
+  ): void => {
     setNotification({ open: true, message, severity });
   };
 
-  const hideNotification = () => {
+  const hideNotification = (): void => {
     setNotification((prev) => ({ ...prev, open: false }));
   };
 
-  const handleCreateTemplate = async (data: TemplateFormData) => {
+  const handleCreateTemplate = async (data: TemplateFormData): Promise<void> => {
     try {
 
       const templateData = {
@@ -87,9 +87,7 @@ const TemplateBuilder: React.FC = () => {
         is_active: data.is_active,
       };
 
-      const result = await createMutation.mutateAsync(templateData);
-
-      const createdTemplate = result.data;
+      const createdTemplate = await createMutation.mutateAsync(templateData);
 
       // Add beneficiaries to the template if any were selected
       if (data.beneficiaries && data.beneficiaries.length > 0) {
@@ -135,7 +133,7 @@ const TemplateBuilder: React.FC = () => {
     }
   };
 
-  const handleUpdateTemplate = async (data: TemplateFormData) => {
+  const handleUpdateTemplate = async (data: TemplateFormData): Promise<void> => {
     if (!editingTemplate) return;
 
     try {
@@ -238,7 +236,7 @@ const TemplateBuilder: React.FC = () => {
     }
   };
 
-  const handleDeleteTemplate = async (id: number) => {
+  const handleDeleteTemplate = async (id: number): Promise<void> => {
     if (window.confirm('Biztosan törölni szeretné ezt a sablont?')) {
       try {
         await deleteMutation.mutateAsync(id);
@@ -249,17 +247,17 @@ const TemplateBuilder: React.FC = () => {
     }
   };
 
-  const handleEditTemplate = (template: TransferTemplate) => {
+  const handleEditTemplate = (template: TransferTemplate): void => {
     setEditingTemplate(template);
     setShowForm(true);
   };
 
-  const handleViewTemplate = (template: TransferTemplate) => {
+  const handleViewTemplate = (template: TransferTemplate): void => {
     setViewingTemplate(template);
     setShowView(true);
   };
 
-  const handleLoadTemplate = (id: number) => {
+  const handleLoadTemplate = (id: number): void => {
     // Navigate to transfers page with template ID - let TransferWorkflow handle the loading
     navigate('/transfers', {
       state: {
@@ -269,12 +267,12 @@ const TemplateBuilder: React.FC = () => {
     });
   };
 
-  const handleFormClose = () => {
+  const handleFormClose = (): void => {
     setShowForm(false);
     setEditingTemplate(null);
   };
 
-  const handleViewClose = () => {
+  const handleViewClose = (): void => {
     setShowView(false);
     setViewingTemplate(null);
   };

@@ -47,7 +47,7 @@ const queryClient = new QueryClient({
   },
 });
 
-function App() {
+function App(): React.ReactElement {
   return (
     <ErrorBoundary>
       <ThemeProvider theme={customTheme}>

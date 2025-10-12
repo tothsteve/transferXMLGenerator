@@ -29,7 +29,7 @@ const SimpleRegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =>
     company_tax_id: '',
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -40,7 +40,7 @@ const SimpleRegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =>
     }
   };
 
-  const validateForm = () => {
+  const validateForm = (): string | null => {
     if (!formData.username.trim()) return 'Felhasználónév kötelező';
     if (!formData.email.trim()) return 'E-mail cím kötelező';
     if (!formData.first_name.trim()) return 'Keresztnév kötelező';
@@ -53,7 +53,7 @@ const SimpleRegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =>
     return null;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
 
     const error = validateForm();

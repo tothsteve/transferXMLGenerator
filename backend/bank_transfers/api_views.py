@@ -1245,6 +1245,11 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
 
         for invoice in invoices:
             try:
+                if invoice.payment_due_date:
+                    execution_date = invoice.payment_due_date
+                else:
+                    execution_date = datetime.strptime(execution_date_str, '%Y-%m-%d').date()
+                
                 # Extract supplier tax number (normalize to 8 digits)
                 supplier_tax_number = invoice.supplier_tax_number
                 if not supplier_tax_number:

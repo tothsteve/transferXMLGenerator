@@ -25,7 +25,9 @@
       "Bash(npx husky init:*)",
       "Bash(npm run build:fast:*)",
       "Bash(npm run lint:*)",
-      "Bash(awk:*)"
+      "Bash(awk:*)",
+      "Bash(npx eslint:*)",
+      "Bash(cat:*)"
     ],
     "deny": []
   }

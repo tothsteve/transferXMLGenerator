@@ -152,8 +152,8 @@ export const NAVInvoiceSchema = z.object({
   payment_due_date_formatted: z.string().nullable(),
   payment_date: z.string().nullable(),
   payment_date_formatted: z.string().nullable(),
-  completion_date: z.string().nullable().optional(),
-  last_modified_date: z.string().nullable().optional(),
+  completion_date: z.string().nullable(),
+  last_modified_date: z.string().nullable(),
 
   // Financial
   currency_code: z.string(),
@@ -166,8 +166,8 @@ export const NAVInvoiceSchema = z.object({
 
   // Business
   invoice_operation: z.string().nullable(),
-  invoice_category: z.string().nullable().optional(),
-  invoice_appearance: z.string().nullable().optional(),
+  invoice_category: z.string().nullable(),
+  invoice_appearance: z.string().nullable(),
   payment_method: z.string().nullable(),
   original_invoice_number: z.string().nullable(),
   payment_status: PaymentStatusSchema,
@@ -181,17 +181,17 @@ export const NAVInvoiceSchema = z.object({
   sync_status: z.string(),
   created_at: z.string(),
 
-  // NAV metadata (optional - available in detail view)
-  nav_source: z.string().nullable().optional(),
-  original_request_version: z.string().nullable().optional(),
+  // NAV metadata (available in detail view)
+  nav_source: z.string().nullable(),
+  original_request_version: z.string().nullable(),
 
-  // Partners (optional - available in detail view)
-  supplier_name: z.string().nullish(),
-  customer_name: z.string().nullish(),
-  supplier_tax_number: z.string().nullish(),
-  customer_tax_number: z.string().nullish(),
-  supplier_bank_account_number: z.string().nullish(),
-  customer_bank_account_number: z.string().nullish(),
+  // Partners (available in detail view)
+  supplier_name: z.string().nullable(),
+  customer_name: z.string().nullable(),
+  supplier_tax_number: z.string().nullable(),
+  customer_tax_number: z.string().nullable(),
+  supplier_bank_account_number: z.string().nullable(),
+  customer_bank_account_number: z.string().nullable(),
 });
 
 export type NAVInvoiceSchemaType = z.infer<typeof NAVInvoiceSchema>;
@@ -219,7 +219,12 @@ export type TrustedPartnerSchemaType = z.infer<typeof TrustedPartnerSchema>;
 // Generic API Response Schema
 // ============================================================================
 
-export const ApiResponseSchema = <T extends z.ZodTypeAny>(dataSchema: T) =>
+export const ApiResponseSchema = <T extends z.ZodTypeAny>(dataSchema: T): z.ZodObject<{
+  count: z.ZodNumber;
+  next: z.ZodNullable<z.ZodString>;
+  previous: z.ZodNullable<z.ZodString>;
+  results: z.ZodArray<T>;
+}> =>
   z.object({
     count: z.number(),
     next: z.string().nullable(),

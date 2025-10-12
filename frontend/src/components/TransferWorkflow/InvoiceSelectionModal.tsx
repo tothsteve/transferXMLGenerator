@@ -85,7 +85,7 @@ const InvoiceSelectionModal: React.FC<InvoiceSelectionModalProps> = ({
   // Fetch invoices when modal opens
   React.useEffect(() => {
     if (isOpen) {
-      const fetchInvoices = async () => {
+      const fetchInvoices = async (): Promise<void> => {
         setIsFetching(true);
         try {
           const { navInvoicesApi } = await import('../../services/api');
@@ -109,20 +109,20 @@ const InvoiceSelectionModal: React.FC<InvoiceSelectionModalProps> = ({
 
   const availableInvoices = invoices;
 
-  const handleClose = () => {
+  const handleClose = (): void => {
     setSearchTerm('');
     setSelectedInvoices([]);
     setInvoices([]);
     onClose();
   };
 
-  const handleToggleInvoice = (invoiceId: number) => {
+  const handleToggleInvoice = (invoiceId: number): void => {
     setSelectedInvoices((prev) =>
       prev.includes(invoiceId) ? prev.filter((id) => id !== invoiceId) : [...prev, invoiceId]
     );
   };
 
-  const handleGenerateTransfers = async () => {
+  const handleGenerateTransfers = async (): Promise<void> => {
     if (selectedInvoices.length === 0) return;
 
     setLoading(true);

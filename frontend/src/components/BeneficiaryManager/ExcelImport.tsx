@@ -40,7 +40,7 @@ const ExcelImport: React.FC<ExcelImportProps> = ({ isOpen, onClose, onSuccess })
 
   const uploadMutation = useUploadExcel();
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>): void => {
     const file = event.target.files?.[0];
     if (file) {
       setSelectedFile(file);
@@ -48,14 +48,14 @@ const ExcelImport: React.FC<ExcelImportProps> = ({ isOpen, onClose, onSuccess })
     }
   };
 
-  const handleUpload = async () => {
+  const handleUpload = async (): Promise<void> => {
     if (!selectedFile) return;
 
     try {
       const result = await uploadMutation.mutateAsync(selectedFile);
-      setUploadResult(result.data);
+      setUploadResult(result);
 
-      if (result.data.errors?.length === 0 && onSuccess) {
+      if (result.errors?.length === 0 && onSuccess) {
         setTimeout(() => {
           onSuccess();
           handleClose();
@@ -66,14 +66,14 @@ const ExcelImport: React.FC<ExcelImportProps> = ({ isOpen, onClose, onSuccess })
     }
   };
 
-  const handleClose = () => {
+  const handleClose = (): void => {
     setSelectedFile(null);
     setUploadResult(null);
     uploadMutation.reset();
     onClose();
   };
 
-  const downloadTemplate = () => {
+  const downloadTemplate = (): void => {
     // Create a sample Excel template
     const csvContent = `Megjegyzés,Kedvezményezett neve,Számlaszám,Összeg,Teljesítés dátuma,Közlemény
 Példa,Teszt Kft.,12345678-12345678-12345678,100000,2025-01-15,Számla 2025-001

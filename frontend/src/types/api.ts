@@ -49,6 +49,7 @@ export interface Transfer {
   execution_date: string;
   remittance_info: string;
   nav_invoice?: number | null | undefined; // Optional link to NAV invoice
+  order?: number | undefined;
   is_processed: boolean;
   created_at?: string | undefined;
 }
@@ -62,6 +63,7 @@ export interface TransferWithBeneficiary {
   execution_date: string;
   remittance_info: string;
   nav_invoice?: number | null | undefined;
+  order?: number | undefined;
   is_processed: boolean;
   created_at?: string | undefined;
 }
@@ -171,8 +173,8 @@ export interface NAVInvoice {
   payment_due_date_formatted: string | null;
   payment_date: string | null;
   payment_date_formatted: string | null;
-  completion_date?: string | null;
-  last_modified_date?: string | null;
+  completion_date: string | null;
+  last_modified_date: string | null;
 
   // Financial
   currency_code: string;
@@ -185,8 +187,8 @@ export interface NAVInvoice {
 
   // Business
   invoice_operation: string | null;
-  invoice_category?: string | null;
-  invoice_appearance?: string | null;
+  invoice_category: string | null;
+  invoice_appearance: string | null;
   payment_method: string | null;
   original_invoice_number: string | null;
   payment_status: {
@@ -206,14 +208,14 @@ export interface NAVInvoice {
   created_at: string;
 
   // NAV metadata (available in detail view)
-  nav_source?: string | null;
-  original_request_version?: string | null;
+  nav_source: string | null;
+  original_request_version: string | null;
 
   // Partners (available in detail view)
-  supplier_name?: string | null;
-  customer_name?: string | null;
-  supplier_tax_number?: string | null;
-  customer_tax_number?: string | null;
-  supplier_bank_account_number?: string | null;
-  customer_bank_account_number?: string | null;
+  supplier_name: string | null;
+  customer_name: string | null;
+  supplier_tax_number: string | null;
+  customer_tax_number: string | null;
+  supplier_bank_account_number: string | null;
+  customer_bank_account_number: string | null;
 }

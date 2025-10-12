@@ -303,7 +303,7 @@ const TransferTable: React.FC<TransferTableProps> = ({
     })
   );
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = (event: DragEndEvent): void => {
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
@@ -324,7 +324,7 @@ const TransferTable: React.FC<TransferTableProps> = ({
     }
   };
 
-  const handleSort = (field: SortField) => {
+  const handleSort = (field: SortField): void => {
     const isAsc = sortField === field && sortOrder === 'asc';
     const newOrder = isAsc ? 'desc' : 'asc';
     setSortOrder(newOrder);
@@ -424,7 +424,7 @@ const TransferTable: React.FC<TransferTableProps> = ({
     }
   }, [sortedTransfers, sortField, onReorderTransfers]);
 
-  const handleStartEdit = (index: number, transfer: TransferData) => {
+  const handleStartEdit = (index: number, transfer: TransferData): void => {
     setEditingIndex(index);
     setEditData({
       amount: transfer.amount,
@@ -433,7 +433,7 @@ const TransferTable: React.FC<TransferTableProps> = ({
     });
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = (): void => {
     if (editingIndex !== null) {
       onUpdateTransfer(editingIndex, editData);
       setEditingIndex(null);
@@ -441,7 +441,7 @@ const TransferTable: React.FC<TransferTableProps> = ({
     }
   };
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = (): void => {
     setEditingIndex(null);
     setEditData({});
   };

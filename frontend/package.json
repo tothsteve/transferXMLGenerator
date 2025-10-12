@@ -48,6 +48,9 @@
       "react-app",
       "react-app/jest"
     ],
+    "parserOptions": {
+      "project": "./tsconfig.json"
+    },
     "plugins": [
       "sonarjs"
     ],
@@ -59,6 +62,28 @@
           "allowExpressions": true,
           "allowTypedFunctionExpressions": true,
           "allowHigherOrderFunctions": true
+        }
+      ],
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          "argsIgnorePattern": "^_",
+          "varsIgnorePattern": "^_",
+          "caughtErrorsIgnorePattern": "^_"
+        }
+      ],
+      "react-hooks/exhaustive-deps": "warn",
+      "@typescript-eslint/no-floating-promises": "warn",
+      "@typescript-eslint/strict-boolean-expressions": [
+        "warn",
+        {
+          "allowString": true,
+          "allowNumber": true,
+          "allowNullableObject": true,
+          "allowNullableBoolean": false,
+          "allowNullableString": false,
+          "allowNullableNumber": false,
+          "allowAny": false
         }
       ],
       "no-console": [

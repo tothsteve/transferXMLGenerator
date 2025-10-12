@@ -85,7 +85,7 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({ isOpen, onClose, on
     }
   }, [selectedBeneficiary, setValue]);
 
-  const handleFormSubmit = (data: FormData) => {
+  const handleFormSubmit = (data: FormData): void => {
     if (!selectedBeneficiary) return;
 
     onAdd({
@@ -100,7 +100,7 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({ isOpen, onClose, on
     handleClose();
   };
 
-  const handleClose = () => {
+  const handleClose = (): void => {
     reset();
     setSelectedBeneficiary(null);
     setSearchTerm('');
@@ -108,13 +108,13 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({ isOpen, onClose, on
     onClose();
   };
 
-  const handleBeneficiarySelect = (beneficiary: Beneficiary) => {
+  const handleBeneficiarySelect = (beneficiary: Beneficiary): void => {
     setSelectedBeneficiary(beneficiary);
     setShowBeneficiaryPicker(false);
     setSearchTerm('');
   };
 
-  const handleChangeBeneficiary = () => {
+  const handleChangeBeneficiary = (): void => {
     setSelectedBeneficiary(null);
     setShowBeneficiaryPicker(true);
   };
@@ -220,7 +220,7 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({ isOpen, onClose, on
           </Stack>
         ) : (
           /* Transfer Form */
-          <form onSubmit={handleSubmit(handleFormSubmit as any)}>
+          <form onSubmit={handleSubmit(handleFormSubmit)}>
             <Stack spacing={3}>
               {/* Selected Beneficiary */}
               <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>

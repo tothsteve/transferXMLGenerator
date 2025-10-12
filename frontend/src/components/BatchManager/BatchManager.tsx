@@ -56,7 +56,7 @@ const BatchManager: React.FC = () => {
 
   const batches = batchesData?.results || [];
 
-  const handleUsageToggle = async (batch: TransferBatch) => {
+  const handleUsageToggle = async (batch: TransferBatch): Promise<void> => {
     try {
       if (batch.used_in_bank) {
         await markUnusedMutation.mutateAsync(batch.id);
@@ -68,7 +68,7 @@ const BatchManager: React.FC = () => {
     }
   };
 
-  const handleDownload = async (batch: TransferBatch) => {
+  const handleDownload = async (batch: TransferBatch): Promise<void> => {
     try {
       setDownloadingBatchId(batch.id);
       const response = await downloadMutation.mutateAsync(batch.id);
@@ -79,7 +79,7 @@ const BatchManager: React.FC = () => {
       const fileExtension = isKHExport ? 'csv' : 'xml';
 
       // Create download link
-      const blob = new Blob([response.data], { type: mimeType });
+      const blob = new Blob([response as BlobPart], { type: mimeType });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -95,7 +95,7 @@ const BatchManager: React.FC = () => {
     }
   };
 
-  const handleDelete = async (batch: TransferBatch) => {
+  const handleDelete = async (batch: TransferBatch): Promise<void> => {
     if (
       !window.confirm(
         `Biztosan törölni szeretnéd a(z) "${batch.name}" köteget? Ez a művelet nem vonható vissza.`
@@ -112,7 +112,7 @@ const BatchManager: React.FC = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleString('hu-HU', {
       year: 'numeric',
       month: '2-digit',
@@ -122,15 +122,15 @@ const BatchManager: React.FC = () => {
     });
   };
 
-  const handlePreviewBatch = (batch: TransferBatch) => {
+  const handlePreviewBatch = (batch: TransferBatch): void => {
     setSelectedBatchId(batch.id);
   };
 
-  const handleClosePreview = () => {
+  const handleClosePreview = (): void => {
     setSelectedBatchId(null);
   };
 
-  const formatAmount = (amount: string) => {
+  const formatAmount = (amount: string): string => {
     const num = parseFloat(amount);
     return new Intl.NumberFormat('hu-HU', {
       style: 'currency',

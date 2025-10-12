@@ -23,6 +23,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth, useIsCompanyAdmin } from '../../hooks/useAuth';
 import { userManagementApi } from '../../services/api';
+import { getErrorMessage } from '../../utils/errorTypeGuards';
 
 interface CompanyUser {
   id: number;
@@ -52,30 +53,30 @@ const UserManagement: React.FC = () => {
     }
   }, [state.currentCompany]);
 
-  const loadUsers = async () => {
+  const loadUsers = async (): Promise<void> => {
     setLoading(true);
     try {
       const response = await userManagementApi.getCompanyUsers();
       setUsers(response.data);
-    } catch (error: any) {
-      setError(error.response?.data?.detail || 'Nem sikerült betölteni a felhasználókat');
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, 'Nem sikerült betölteni a felhasználókat'));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRoleChange = async (userId: number, newRole: 'ADMIN' | 'USER') => {
+  const handleRoleChange = async (userId: number, newRole: 'ADMIN' | 'USER'): Promise<void> => {
     try {
       await userManagementApi.updateUserRole(userId, newRole);
       setUsers((prev) =>
         prev.map((user) => (user.id === userId ? { ...user, role: newRole } : user))
       );
-    } catch (error: any) {
-      setError(error.response?.data?.detail || 'Nem sikerült frissíteni a felhasználó szerepkörét');
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, 'Nem sikerült frissíteni a felhasználó szerepkörét'));
     }
   };
 
-  const handleRemoveUser = async (userId: number) => {
+  const handleRemoveUser = async (userId: number): Promise<void> => {
     if (!window.confirm('Biztosan el szeretné távolítani ezt a felhasználót?')) {
       return;
     }
@@ -83,8 +84,8 @@ const UserManagement: React.FC = () => {
     try {
       await userManagementApi.removeUser(userId);
       setUsers((prev) => prev.filter((user) => user.id !== userId));
-    } catch (error: any) {
-      setError(error.response?.data?.detail || 'Nem sikerült eltávolítani a felhasználót');
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, 'Nem sikerült eltávolítani a felhasználót'));
     }
   };
 

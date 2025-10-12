@@ -20,7 +20,7 @@ class TokenManager {
     return TokenManager.instance;
   }
 
-  private processQueue(error: any, token: string | null = null) {
+  private processQueue(error: any, token: string | null = null): void {
     this.failedQueue.forEach(({ resolve, reject }) => {
       if (error) {
         reject(error);
@@ -36,7 +36,7 @@ class TokenManager {
     onTokenRefresh: (accessToken: string, refreshToken?: string) => void,
     onLogout: () => void,
     axiosInstance: any = axios
-  ) {
+  ): void {
 
     // Request interceptor to add auth header
     axiosInstance.interceptors.request.use(
@@ -141,7 +141,7 @@ class TokenManager {
     );
   }
 
-  public clearTokens() {
+  public clearTokens(): void {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('userData');
@@ -157,7 +157,7 @@ class TokenManager {
     return localStorage.getItem('refreshToken');
   }
 
-  public setTokens(accessToken: string, refreshToken: string) {
+  public setTokens(accessToken: string, refreshToken: string): void {
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
   }

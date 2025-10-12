@@ -85,35 +85,35 @@ const TrustedPartners: React.FC = () => {
   const partners = partnersResponse?.data?.results || [];
   const totalCount = partnersResponse?.data?.count || 0;
 
-  const handleChangePage = (_event: unknown, newPage: number) => {
+  const handleChangePage = (_event: unknown, newPage: number): void => {
     setPage(newPage);
   };
 
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>): void => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
 
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
     setSearchTerm(event.target.value);
     setPage(0);
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id: number): void => {
     setDeleteConfirmId(id);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = (): void => {
     if (deleteConfirmId) {
       deleteMutation.mutate(deleteConfirmId);
     }
   };
 
-  const handleToggleActive = (partner: TrustedPartner) => {
+  const handleToggleActive = (partner: TrustedPartner): void => {
     toggleActiveMutation.mutate({ id: partner.id, is_active: !partner.is_active });
   };
 
-  const handleToggleAutoPay = (partner: TrustedPartner) => {
+  const handleToggleAutoPay = (partner: TrustedPartner): void => {
     toggleAutoPayMutation.mutate({ id: partner.id, auto_pay: !partner.auto_pay });
   };
 

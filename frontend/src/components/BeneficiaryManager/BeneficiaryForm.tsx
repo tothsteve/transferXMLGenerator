@@ -106,7 +106,7 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
     setAccountNumberValue(beneficiary?.account_number ?? '');
   }, [beneficiary, reset]);
 
-  const handleFormSubmit = async (data: FormData) => {
+  const handleFormSubmit = async (data: FormData): Promise<void> => {
     // Validate that at least one identifier is provided
     if (!data.account_number && !data.vat_number && !data.tax_number) {
       setError('account_number', {
@@ -219,13 +219,13 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
     }
   };
 
-  const handleClose = () => {
+  const handleClose = (): void => {
     reset();
     setAccountNumberValue('');
     onClose();
   };
 
-  const handleAccountNumberChange = (value: string) => {
+  const handleAccountNumberChange = (value: string): string => {
     // Format the input in real-time
     const formatted = formatAccountNumberOnInput(value);
     setAccountNumberValue(formatted);

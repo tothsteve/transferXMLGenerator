@@ -65,49 +65,49 @@ const BeneficiaryManager: React.FC = () => {
   const pageSize = 20;
   const totalPages = Math.ceil((beneficiariesData?.count || 0) / pageSize);
 
-  const handleCreateBeneficiary = async (data: Omit<Beneficiary, 'id'>) => {
+  const handleCreateBeneficiary = async (data: Omit<Beneficiary, 'id'>): Promise<void> => {
     try {
       await createMutation.mutateAsync(data);
       setShowForm(false);
       refetch();
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Error will be handled by the form component through React Hook Form
       throw error;
     }
   };
 
-  const handleUpdateBeneficiary = async (id: number, data: Partial<Beneficiary>) => {
+  const handleUpdateBeneficiary = async (id: number, data: Partial<Beneficiary>): Promise<void> => {
     try {
       await updateMutation.mutateAsync({ id, data });
       refetch();
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Error will be handled by the calling component
       throw error;
     }
   };
 
-  const handleDeleteBeneficiary = async (id: number) => {
+  const handleDeleteBeneficiary = async (id: number): Promise<void> => {
     if (window.confirm('Biztosan törölni szeretné ezt a kedvezményezettet?')) {
       await deleteMutation.mutateAsync(id);
       refetch();
     }
   };
 
-  const handleEditBeneficiary = (beneficiary: Beneficiary) => {
+  const handleEditBeneficiary = (beneficiary: Beneficiary): void => {
     setEditingBeneficiary(beneficiary);
     setShowForm(true);
   };
 
-  const handleFormClose = () => {
+  const handleFormClose = (): void => {
     setShowForm(false);
     setEditingBeneficiary(null);
   };
 
-  const handleImportSuccess = () => {
+  const handleImportSuccess = (): void => {
     refetch();
   };
 
-  const handleSort = (field: string, direction: 'asc' | 'desc') => {
+  const handleSort = (field: string, direction: 'asc' | 'desc'): void => {
     setSortField(field);
     setSortDirection(direction);
     setCurrentPage(1); // Reset to first page when sorting
@@ -115,7 +115,7 @@ const BeneficiaryManager: React.FC = () => {
     setTimeout(() => refetch(), 100);
   };
 
-  const clearFilters = () => {
+  const clearFilters = (): void => {
     setSearchTerm('');
     setShowActive(undefined);
     setShowFrequent(undefined);
@@ -127,11 +127,11 @@ const BeneficiaryManager: React.FC = () => {
   const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(null);
   const filterMenuOpen = Boolean(filterAnchorEl);
 
-  const handleFilterClick = (event: React.MouseEvent<HTMLElement>) => {
+  const handleFilterClick = (event: React.MouseEvent<HTMLElement>): void => {
     setFilterAnchorEl(event.currentTarget);
   };
 
-  const handleFilterClose = () => {
+  const handleFilterClose = (): void => {
     setFilterAnchorEl(null);
   };
 

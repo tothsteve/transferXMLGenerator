@@ -9,6 +9,7 @@ import { UploadStep } from './UploadStep';
 import { ReviewStep } from './ReviewStep';
 import { TemplateStep } from './TemplateStep';
 import { apiClient } from '../../services/api';
+import { hasResponseData, hasMessage, getErrorMessage } from '../../utils/errorTypeGuards';
 
 interface PDFImportWizardProps {
   onComplete?: (template: TransferTemplate) => void;
@@ -50,17 +51,17 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete: _o
   const { success } = useToast();
   const queryClient = useQueryClient();
 
-  const handleFilesSelected = (files: File[]) => {
+  const handleFilesSelected = (files: File[]): void => {
     setSelectedFiles(files);
     setErrorMessage(null);
   };
 
-  const handleRemoveFile = (index: number) => {
+  const handleRemoveFile = (index: number): void => {
     const newFiles = selectedFiles.filter((_, i) => i !== index);
     setSelectedFiles(newFiles);
   };
 
-  const handleProcessFiles = async () => {
+  const handleProcessFiles = async (): Promise<void> => {
     if (selectedFiles.length === 0) {
       setErrorMessage('Válasszon legalább egy PDF fájlt');
       return;
@@ -100,12 +101,12 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete: _o
 
       setCurrentStep(2);
       success('PDF fájlok sikeresen feldolgozva!');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('PDF processing error:', err);
-      if (err.response?.data) {
+      if (hasResponseData(err)) {
         const errorData = err.response.data;
         setErrorMessage(errorData.details || errorData.error || 'Hiba a PDF feldolgozás során');
-      } else if (err.message) {
+      } else if (hasMessage(err)) {
         setErrorMessage(`Hálózati hiba: ${err.message}`);
       } else {
         setErrorMessage('Váratlan hiba történt. Kérjük, próbálja újra.');
@@ -115,7 +116,7 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete: _o
     }
   };
 
-  const handleConfirmTemplate = async () => {
+  const handleConfirmTemplate = async (): Promise<void> => {
     if (!previewData) return;
 
     try {
@@ -134,21 +135,21 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete: _o
 
         // Don't auto-navigate, let user decide when to proceed via buttons in TemplateStep
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Template verification failed:', error);
       setErrorMessage(
-        `Hiba: A sablon nem található az adatbázisban. ${error.response?.data?.detail || error.message}`
+        `Hiba: A sablon nem található az adatbázisban. ${getErrorMessage(error, 'Ismeretlen hiba')}`
       );
     }
   };
 
-  const handleBack = () => {
+  const handleBack = (): void => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = (): void => {
     navigate('/templates');
   };
 

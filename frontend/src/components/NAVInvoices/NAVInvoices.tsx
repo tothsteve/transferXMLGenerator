@@ -60,6 +60,7 @@ import { useToastContext } from '../../context/ToastContext';
 import { navInvoicesApi, trustedPartnersApi, bankAccountsApi } from '../../services/api';
 import { useBulkMarkUnpaid, useBulkMarkPrepared, useBulkMarkPaid } from '../../hooks/api';
 import NAVInvoiceTable from './NAVInvoiceTable';
+import { hasResponseData, hasResponseStatus, getErrorMessage } from '../../utils/errorTypeGuards';
 
 interface Invoice {
   id: number;
@@ -186,7 +187,7 @@ const NAVInvoices: React.FC = () => {
   const [dateTo, setDateTo] = useState<string>('');
 
   // Helper functions for date range presets using date-fns
-  const getMonthRange = (date: Date) => {
+  const getMonthRange = (date: Date): { from: string; to: string } => {
     return {
       from: format(startOfMonth(date), 'yyyy-MM-dd'),
       to: format(endOfMonth(date), 'yyyy-MM-dd'),
@@ -201,7 +202,7 @@ const NAVInvoices: React.FC = () => {
     getMonthRange(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1));
 
   // Get current base date from dateFrom field or fallback to current date
-  const getCurrentBaseDate = () => {
+  const getCurrentBaseDate = (): Date => {
     if (dateFrom) {
       return new Date(dateFrom + 'T00:00:00');
     }
@@ -209,7 +210,7 @@ const NAVInvoices: React.FC = () => {
   };
 
   // Apply date range preset
-  const applyDatePreset = (preset: 'current' | 'previous' | 'next') => {
+  const applyDatePreset = (preset: 'current' | 'previous' | 'next'): void => {
     let range;
     if (preset === 'current') {
       range = getCurrentMonthRange();
@@ -223,7 +224,7 @@ const NAVInvoices: React.FC = () => {
   };
 
   // Navigate to previous/next month based on current selected date
-  const navigateMonth = (direction: 'previous' | 'next') => {
+  const navigateMonth = (direction: 'previous' | 'next'): void => {
     const baseDate = getCurrentBaseDate();
     const targetDate =
       direction === 'previous'
@@ -285,7 +286,7 @@ const NAVInvoices: React.FC = () => {
   const bulkMarkPaidMutation = useBulkMarkPaid();
 
   // Load invoices
-  const loadInvoices = useCallback(async () => {
+  const loadInvoices = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
 
@@ -351,10 +352,10 @@ const NAVInvoices: React.FC = () => {
   ]);
 
   // Check if supplier is already a trusted partner
-  const checkSupplierTrustedStatus = async (supplierTaxNumber: string) => {
+  const checkSupplierTrustedStatus = async (supplierTaxNumber: string): Promise<boolean> => {
     if (!supplierTaxNumber) {
       setIsSupplierTrusted(false);
-      return;
+      return false;
     }
 
     try {
@@ -370,16 +371,18 @@ const NAVInvoices: React.FC = () => {
         false;
 
       setIsSupplierTrusted(isTrusted);
+      return isTrusted;
     } catch (error) {
       console.error('Error checking trusted partner status:', error);
       setIsSupplierTrusted(false);
+      return false;
     } finally {
       setCheckingTrustedStatus(false);
     }
   };
 
   // Load invoice details with line items
-  const loadInvoiceDetails = async (invoiceId: number) => {
+  const loadInvoiceDetails = async (invoiceId: number): Promise<void> => {
     try {
       setInvoiceDetailsLoading(true);
       const response = await navInvoicesApi.getById(invoiceId);
@@ -421,7 +424,7 @@ const NAVInvoices: React.FC = () => {
     dateTo,
   ]);
 
-  const handleViewInvoice = async (invoice: Invoice) => {
+  const handleViewInvoice = async (invoice: Invoice): Promise<void> => {
     setInvoiceDetailsOpen(true);
     await loadInvoiceDetails(invoice.id);
   };
@@ -429,7 +432,7 @@ const NAVInvoices: React.FC = () => {
   // Track if we need to refresh the invoice list when closing the detail dialog
   const [shouldRefreshOnClose, setShouldRefreshOnClose] = useState<boolean>(false);
 
-  const handleCloseInvoiceDetails = () => {
+  const handleCloseInvoiceDetails = (): void => {
     setInvoiceDetailsOpen(false);
     setSelectedInvoice(null);
     setInvoiceLineItems([]);
@@ -446,7 +449,7 @@ const NAVInvoices: React.FC = () => {
   };
 
   // Add supplier as trusted partner
-  const handleAddTrustedPartner = async () => {
+  const handleAddTrustedPartner = async (): Promise<void> => {
     if (
       !selectedInvoice ||
       !selectedInvoice.supplier_name ||
@@ -509,12 +512,18 @@ const NAVInvoices: React.FC = () => {
       } else {
         showSuccess(`${selectedInvoice.supplier_name} hozzáadva a megbízható partnerekhez`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error adding trusted partner:', error);
-      if (error?.response?.data?.non_field_errors?.[0]) {
-        showError(error.response.data.non_field_errors[0]);
-      } else if (error?.response?.data?.tax_number?.[0]) {
-        showError(`Adószám hiba: ${error.response.data.tax_number[0]}`);
+      if (hasResponseData(error)) {
+        if (error.response.data.non_field_errors && Array.isArray(error.response.data.non_field_errors)) {
+          const errorMsg = error.response.data.non_field_errors[0];
+          showError(typeof errorMsg === 'string' ? errorMsg : 'Hiba a megbízható partner hozzáadása során');
+        } else if (error.response.data.tax_number && Array.isArray(error.response.data.tax_number)) {
+          const errorMsg = error.response.data.tax_number[0];
+          showError(`Adószám hiba: ${typeof errorMsg === 'string' ? errorMsg : 'Ismeretlen hiba'}`);
+        } else {
+          showError(getErrorMessage(error, 'Hiba a megbízható partner hozzáadása során'));
+        }
       } else {
         showError('Hiba a megbízható partner hozzáadása során');
       }
@@ -523,13 +532,13 @@ const NAVInvoices: React.FC = () => {
     }
   };
 
-  const handleSort = (field: string, direction: 'asc' | 'desc') => {
+  const handleSort = (field: string, direction: 'asc' | 'desc'): void => {
     setSortField(field);
     setSortDirection(direction);
     setCurrentPage(1); // Reset to first page when sorting
   };
 
-  const clearFilters = () => {
+  const clearFilters = (): void => {
     setSearchTerm('');
     setDirectionFilter('');
     setPaymentStatusFilter('');
@@ -541,7 +550,7 @@ const NAVInvoices: React.FC = () => {
     setSortDirection('desc');
   };
 
-  const refetch = () => {
+  const refetch = (): void => {
     loadInvoices();
   };
 
@@ -615,20 +624,20 @@ const NAVInvoices: React.FC = () => {
   };
 
   // Format amount helper function
-  const formatAmount = (amount: number, currency: string) => {
+  const formatAmount = (amount: number, currency: string): string => {
     if (currency === 'HUF') {
       return `${formatNumber(amount)} Ft`;
     }
     return `${formatNumber(amount)} ${currency}`;
   };
 
-  const handlePageSizeChange = (event: any) => {
+  const handlePageSizeChange = (event: any): void => {
     setPageSize(event.target.value);
     setCurrentPage(1); // Reset to first page when changing page size
   };
 
   // Selection handlers
-  const handleSelectInvoice = (invoiceId: number, selected: boolean) => {
+  const handleSelectInvoice = (invoiceId: number, selected: boolean): void => {
     if (selected) {
       setSelectedInvoices((prev) => [...prev, invoiceId]);
     } else {
@@ -636,7 +645,7 @@ const NAVInvoices: React.FC = () => {
     }
   };
 
-  const handleSelectAll = (selected: boolean) => {
+  const handleSelectAll = (selected: boolean): void => {
     if (selected) {
       setSelectedInvoices(invoices.map((invoice) => invoice.id));
     } else {
@@ -645,7 +654,7 @@ const NAVInvoices: React.FC = () => {
   };
 
   // Generate transfers from selected invoices using new API with tax number fallback
-  const handleGenerateTransfers = async () => {
+  const handleGenerateTransfers = async (): Promise<void> => {
     if (selectedInvoices.length === 0) {
       showError('Kérjük, válasszon ki legalább egy számlát');
       return;
@@ -705,35 +714,33 @@ const NAVInvoices: React.FC = () => {
 
       // Clear selections
       setSelectedInvoices([]);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error generating transfers:', error);
       console.log('Error details:', {
-        status: error?.response?.status,
-        data: error?.response?.data,
-        message: error?.message,
+        status: hasResponseStatus(error) ? error.response.status : 'N/A',
+        data: hasResponseData(error) ? error.response.data : 'N/A',
+        message: getErrorMessage(error, 'Ismeretlen hiba'),
       });
 
-      if (error?.response?.status === 401) {
+      if (hasResponseStatus(error) && error.response.status === 401) {
         showError('Nincs jogosultság az átutalások generálásához. Kérjük jelentkezzen be újra.');
-      } else if (error?.response?.status === 403) {
+      } else if (hasResponseStatus(error) && error.response.status === 403) {
         showError('Nincs engedély az átutalások generálásához');
-      } else if (error?.response?.data?.error) {
+      } else if (hasResponseData(error) && error.response.data.error) {
         showError(error.response.data.error);
-      } else if (error?.response?.data?.errors) {
+      } else if (hasResponseData(error) && error.response.data.errors && Array.isArray(error.response.data.errors)) {
         const errorMessage = error.response.data.errors.join('\n\n');
         showError(errorMessage);
-      } else if (error?.response?.data?.detail) {
+      } else if (hasResponseData(error) && error.response.data.detail) {
         showError(`API hiba: ${error.response.data.detail}`);
       } else {
-        showError(
-          `Hiba történt az átutalások generálásakor: ${error?.message || 'Ismeretlen hiba'}`
-        );
+        showError(`Hiba történt az átutalások generálásakor: ${getErrorMessage(error, 'Ismeretlen hiba')}`);
       }
     }
   };
 
   // Bulk payment status update handlers
-  const handleBulkMarkUnpaid = async () => {
+  const handleBulkMarkUnpaid = async (): Promise<void> => {
     if (selectedInvoices.length === 0) return;
 
     try {
@@ -741,12 +748,12 @@ const NAVInvoices: React.FC = () => {
       showSuccess(`${selectedInvoices.length} számla megjelölve "Fizetésre vár" státuszként`);
       setSelectedInvoices([]);
       await loadInvoices(); // Refresh the list
-    } catch (error: any) {
-      showError(error?.response?.data?.error || 'Hiba történt a státusz frissítésekor');
+    } catch (error: unknown) {
+      showError(getErrorMessage(error, 'Hiba történt a státusz frissítésekor'));
     }
   };
 
-  const handleBulkMarkPrepared = async () => {
+  const handleBulkMarkPrepared = async (): Promise<void> => {
     if (selectedInvoices.length === 0) return;
 
     try {
@@ -754,12 +761,12 @@ const NAVInvoices: React.FC = () => {
       showSuccess(`${selectedInvoices.length} számla megjelölve "Előkészítve" státuszként`);
       setSelectedInvoices([]);
       await loadInvoices(); // Refresh the list
-    } catch (error: any) {
-      showError(error?.response?.data?.error || 'Hiba történt a státusz frissítésekor');
+    } catch (error: unknown) {
+      showError(getErrorMessage(error, 'Hiba történt a státusz frissítésekor'));
     }
   };
 
-  const handleBulkMarkPaid = async () => {
+  const handleBulkMarkPaid = async (): Promise<void> => {
     if (selectedInvoices.length === 0) return;
 
     try {
@@ -789,8 +796,8 @@ const NAVInvoices: React.FC = () => {
       showSuccess(`${selectedInvoices.length} számla megjelölve "Kifizetve" státuszként`);
       setSelectedInvoices([]);
       await loadInvoices(); // Refresh the list
-    } catch (error: any) {
-      showError(error?.response?.data?.error || 'Hiba történt a státusz frissítésekor');
+    } catch (error: unknown) {
+      showError(getErrorMessage(error, 'Hiba történt a státusz frissítésekor'));
     }
   };
 
@@ -800,11 +807,11 @@ const NAVInvoices: React.FC = () => {
   const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(null);
   const filterMenuOpen = Boolean(filterAnchorEl);
 
-  const handleFilterClick = (event: React.MouseEvent<HTMLElement>) => {
+  const handleFilterClick = (event: React.MouseEvent<HTMLElement>): void => {
     setFilterAnchorEl(event.currentTarget);
   };
 
-  const handleFilterClose = () => {
+  const handleFilterClose = (): void => {
     setFilterAnchorEl(null);
   };
 

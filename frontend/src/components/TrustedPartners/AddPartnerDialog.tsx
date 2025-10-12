@@ -29,6 +29,7 @@ import { Add, Search, PersonAdd, ArrowUpward, ArrowDownward } from '@mui/icons-m
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trustedPartnersApi } from '../../services/api';
 import { TrustedPartner, AvailablePartner } from '../../types/api';
+import { hasResponseData } from '../../utils/errorTypeGuards';
 
 interface AddPartnerDialogProps {
   open: boolean;
@@ -42,7 +43,7 @@ interface TabPanelProps {
   value: number;
 }
 
-function TabPanel(props: TabPanelProps) {
+function TabPanel(props: TabPanelProps): React.ReactElement {
   const { children, value, index, ...other } = props;
 
   return (
@@ -144,13 +145,20 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
 
       // Do NOT close dialog - user can continue adding partners
     },
-    onError: (error: any) => {
-      if (error.response?.data?.partner_name) {
-        setError(error.response.data.partner_name[0]);
-      } else if (error.response?.data?.tax_number) {
-        setError(error.response.data.tax_number[0]);
-      } else if (error.response?.data?.non_field_errors) {
-        setError(error.response.data.non_field_errors[0]);
+    onError: (error: unknown) => {
+      if (hasResponseData(error)) {
+        if (error.response.data.partner_name && Array.isArray(error.response.data.partner_name)) {
+          const errorMsg = error.response.data.partner_name[0];
+          setError(typeof errorMsg === 'string' ? errorMsg : 'Hiba történt a partner mentésekor');
+        } else if (error.response.data.tax_number && Array.isArray(error.response.data.tax_number)) {
+          const errorMsg = error.response.data.tax_number[0];
+          setError(typeof errorMsg === 'string' ? errorMsg : 'Hiba történt a partner mentésekor');
+        } else if (error.response.data.non_field_errors && Array.isArray(error.response.data.non_field_errors)) {
+          const errorMsg = error.response.data.non_field_errors[0];
+          setError(typeof errorMsg === 'string' ? errorMsg : 'Hiba történt a partner mentésekor');
+        } else {
+          setError('Hiba történt a partner mentésekor. Kérlek próbáld újra!');
+        }
       } else {
         setError('Hiba történt a partner mentésekor. Kérlek próbáld újra!');
       }
@@ -160,14 +168,15 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
   const availablePartners = availablePartnersResponse?.data?.results || [];
   const availablePartnersCount = availablePartnersResponse?.data?.count || 0;
 
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number): void => {
     setTabValue(newValue);
     setError('');
     setSuccessMessage('');
   };
 
   const handleManualInputChange =
-    (field: keyof typeof manualFormData) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    (field: keyof typeof manualFormData) =>
+    (event: React.ChangeEvent<HTMLInputElement>): void => {
       setManualFormData((prev) => ({
         ...prev,
         [field]: event.target.type === 'checkbox' ? event.target.checked : event.target.value,
@@ -175,7 +184,7 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
       setError('');
     };
 
-  const handleManualSubmit = () => {
+  const handleManualSubmit = (): void => {
     if (!manualFormData.partner_name.trim()) {
       setError('Partner neve kötelező mező.');
       return;
@@ -188,7 +197,7 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
     createMutation.mutate(manualFormData);
   };
 
-  const handleAddFromInvoices = (availablePartner: AvailablePartner) => {
+  const handleAddFromInvoices = (availablePartner: AvailablePartner): void => {
     createMutation.mutate({
       partner_name: availablePartner.partner_name,
       tax_number: availablePartner.tax_number,
@@ -197,28 +206,30 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
     });
   };
 
-  const handleAvailablePartnersPageChange = (_event: unknown, newPage: number) => {
+  const handleAvailablePartnersPageChange = (_event: unknown, newPage: number): void => {
     setAvailablePartnersPage(newPage);
   };
 
-  const handleAvailablePartnersRowsPerPageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvailablePartnersRowsPerPageChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ): void => {
     setAvailablePartnersRowsPerPage(parseInt(event.target.value, 10));
     setAvailablePartnersPage(0);
   };
 
-  const handleAvailablePartnersSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvailablePartnersSearchChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
     setAvailablePartnersSearch(event.target.value);
     setAvailablePartnersPage(0);
   };
 
-  const handleSort = (field: string) => {
+  const handleSort = (field: string): void => {
     const isCurrentlyAsc = availablePartnersOrdering === field;
     const newOrdering = isCurrentlyAsc ? `-${field}` : field;
     setAvailablePartnersOrdering(newOrdering);
     setAvailablePartnersPage(0);
   };
 
-  const getSortIcon = (field: string) => {
+  const getSortIcon = (field: string): React.ReactElement | null => {
     if (availablePartnersOrdering === field) {
       return <ArrowUpward sx={{ fontSize: 16 }} />;
     } else if (availablePartnersOrdering === `-${field}`) {
