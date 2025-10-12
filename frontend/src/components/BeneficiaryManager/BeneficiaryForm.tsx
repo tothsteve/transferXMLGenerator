@@ -44,6 +44,23 @@ interface FormData {
   is_active: boolean;
 }
 
+// Type guard for backend validation errors
+const hasValidationErrors = (
+  error: unknown
+): error is { response: { status: number; data: Record<string, string | string[]> } } => {
+  if (typeof error !== 'object' || error === null) return false;
+  if (!('response' in error)) return false;
+
+  const errorWithResponse = error as { response: unknown };
+  if (typeof errorWithResponse.response !== 'object' || errorWithResponse.response === null)
+    return false;
+  if (!('status' in errorWithResponse.response) || !('data' in errorWithResponse.response))
+    return false;
+
+  const response = errorWithResponse.response as { status: unknown; data: unknown };
+  return typeof response.status === 'number' && typeof response.data === 'object';
+};
+
 const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
   isOpen,
   onClose,
@@ -175,9 +192,9 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
       await onSubmit(submitData);
       reset();
       setAccountNumberValue('');
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Handle backend validation errors
-      if (error.response?.status === 400 && error.response?.data) {
+      if (hasValidationErrors(error) && error.response.status === 400) {
         const backendErrors = error.response.data;
 
         // Set field-specific errors from backend
@@ -188,9 +205,10 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
             field === 'description' ||
             field === 'remittance_information'
           ) {
-            const errorMessage = Array.isArray(backendErrors[field])
-              ? backendErrors[field][0]
-              : backendErrors[field];
+            const fieldErrors = backendErrors[field];
+            const errorMessage = Array.isArray(fieldErrors)
+              ? fieldErrors[0] || 'Validation error'
+              : fieldErrors || 'Validation error';
             setError(field as keyof FormData, {
               type: 'manual',
               message: errorMessage,

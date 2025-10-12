@@ -47,6 +47,23 @@ interface BeneficiaryTableProps {
   sortDirection?: 'asc' | 'desc';
 }
 
+// Type guard for backend validation errors
+const hasValidationErrors = (
+  error: unknown
+): error is { response: { status: number; data: Record<string, string | string[]> } } => {
+  if (typeof error !== 'object' || error === null) return false;
+  if (!('response' in error)) return false;
+
+  const errorWithResponse = error as { response: unknown };
+  if (typeof errorWithResponse.response !== 'object' || errorWithResponse.response === null)
+    return false;
+  if (!('status' in errorWithResponse.response) || !('data' in errorWithResponse.response))
+    return false;
+
+  const response = errorWithResponse.response as { status: unknown; data: unknown };
+  return typeof response.status === 'number' && typeof response.data === 'object';
+};
+
 const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
   beneficiaries,
   isLoading,
@@ -169,16 +186,17 @@ const BeneficiaryTable: React.FC<BeneficiaryTableProps> = ({
         setEditingId(null);
         setEditData({});
         setFieldErrors({});
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Handle backend validation errors
-        if (error.response?.status === 400 && error.response?.data) {
+        if (hasValidationErrors(error) && error.response.status === 400) {
           const backendErrors = error.response.data;
           const newFieldErrors: { [key: string]: string } = {};
 
           Object.keys(backendErrors).forEach((field) => {
-            const errorMessage = Array.isArray(backendErrors[field])
-              ? backendErrors[field][0]
-              : backendErrors[field];
+            const fieldErrors = backendErrors[field];
+            const errorMessage = Array.isArray(fieldErrors)
+              ? fieldErrors[0] || 'Validation error'
+              : fieldErrors || 'Validation error';
             newFieldErrors[field] = errorMessage;
           });
 

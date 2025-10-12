@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  UseQueryResult,
+} from '@tanstack/react-query';
 import {
   beneficiariesApi,
   templatesApi,
@@ -14,6 +19,7 @@ import {
   Transfer,
   BulkCreateTransferRequest,
   GenerateXmlRequest,
+  ApiResponse,
 } from '../types/api';
 import {
   BeneficiarySchema,
@@ -49,7 +55,7 @@ export function useBeneficiaries(params?: {
   is_active?: boolean;
   page?: number;
   ordering?: string;
-}) {
+}): UseQueryResult<ApiResponse<Beneficiary>, Error> {
   return useQuery({
     queryKey: [...queryKeys.beneficiaries, params],
     queryFn: () => beneficiariesApi.getAll(params),
