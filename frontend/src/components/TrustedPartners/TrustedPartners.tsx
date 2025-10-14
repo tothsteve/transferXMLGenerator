@@ -59,7 +59,7 @@ const TrustedPartners: React.FC = () => {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => trustedPartnersApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
+      void queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
       setDeleteConfirmId(null);
     },
   });
@@ -69,7 +69,7 @@ const TrustedPartners: React.FC = () => {
     mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) =>
       trustedPartnersApi.partialUpdate(id, { is_active }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
+      void queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
     },
   });
 
@@ -78,7 +78,7 @@ const TrustedPartners: React.FC = () => {
     mutationFn: ({ id, auto_pay }: { id: number; auto_pay: boolean }) =>
       trustedPartnersApi.partialUpdate(id, { auto_pay }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
+      void queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
     },
   });
 
@@ -272,7 +272,7 @@ const TrustedPartners: React.FC = () => {
         open={isAddDialogOpen}
         onClose={() => setIsAddDialogOpen(false)}
         onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
+          void queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
           // Don't close dialog - let AddPartnerDialog handle its own state
         }}
       />

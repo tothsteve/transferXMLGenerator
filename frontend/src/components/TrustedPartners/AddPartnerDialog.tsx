@@ -137,8 +137,8 @@ const AddPartnerDialog: React.FC<AddPartnerDialogProps> = ({ open, onClose, onSu
       }
 
       // Invalidate queries to refresh both trusted partners and available partners lists
-      queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
-      queryClient.invalidateQueries({ queryKey: ['availablePartners'] });
+      void queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
+      void queryClient.invalidateQueries({ queryKey: ['availablePartners'] });
 
       // Call onSuccess for parent component
       onSuccess();

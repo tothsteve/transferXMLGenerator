@@ -97,7 +97,7 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete: _o
       setPreviewData(response.data);
 
       // Invalidate templates cache to refresh template lists
-      queryClient.invalidateQueries({ queryKey: queryKeys.templates });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.templates });
 
       setCurrentStep(2);
       success('PDF fájlok sikeresen feldolgozva!');
@@ -150,7 +150,7 @@ export const PDFImportWizard: React.FC<PDFImportWizardProps> = ({ onComplete: _o
   };
 
   const handleCancel = (): void => {
-    navigate('/templates');
+    void navigate('/templates');
   };
 
   const steps = [

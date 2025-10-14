@@ -322,7 +322,7 @@ const TransferWorkflow: React.FC = () => {
       if (template) {
         console.log('Auto-loading template from TemplateBuilder:', template);
         setSelectedTemplate(template as TransferTemplate);
-        handleLoadTemplate(state.templateId);
+        void handleLoadTemplate(state.templateId);
       }
 
       // Clear the location state to prevent re-loading on refresh
@@ -362,7 +362,7 @@ const TransferWorkflow: React.FC = () => {
       if (template) {
         console.log('Auto-loading template from URL parameter:', template);
         setSelectedTemplate(template as TransferTemplate);
-        handleLoadTemplate(templateId);
+        void handleLoadTemplate(templateId);
 
         // Remove the template parameter from URL to clean it up
         searchParams.delete('template');

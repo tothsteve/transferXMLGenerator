@@ -405,7 +405,7 @@ const NAVInvoices: React.FC = () => {
   };
 
   useEffect(() => {
-    loadInvoices();
+    void loadInvoices();
     // Clear selections when filters or page change
     setSelectedInvoices([]);
   }, [
@@ -443,7 +443,7 @@ const NAVInvoices: React.FC = () => {
 
     // Refresh the invoice list if changes were made (preserving filters)
     if (shouldRefreshOnClose) {
-      loadInvoices();
+      void loadInvoices();
       setShouldRefreshOnClose(false);
     }
   };
@@ -551,7 +551,7 @@ const NAVInvoices: React.FC = () => {
   };
 
   const refetch = (): void => {
-    loadInvoices();
+    void loadInvoices();
   };
 
   // Calculate totals for selected or filtered invoices
@@ -701,7 +701,7 @@ const NAVInvoices: React.FC = () => {
         addToast('success', `${transfer_count} átutalás sikeresen létrehozva`, '', 8000);
 
         // Navigate to transfers page to show the created transfers
-        navigate('/transfers', {
+        void navigate('/transfers', {
           state: {
             source: 'nav_invoices_generated',
             transfers: transfers, // Pass the created transfers data
@@ -747,7 +747,7 @@ const NAVInvoices: React.FC = () => {
       await bulkMarkUnpaidMutation.mutateAsync(selectedInvoices);
       showSuccess(`${selectedInvoices.length} számla megjelölve "Fizetésre vár" státuszként`);
       setSelectedInvoices([]);
-      await loadInvoices(); // Refresh the list
+      void loadInvoices(); // Refresh the list
     } catch (error: unknown) {
       showError(getErrorMessage(error, 'Hiba történt a státusz frissítésekor'));
     }
@@ -760,7 +760,7 @@ const NAVInvoices: React.FC = () => {
       await bulkMarkPreparedMutation.mutateAsync(selectedInvoices);
       showSuccess(`${selectedInvoices.length} számla megjelölve "Előkészítve" státuszként`);
       setSelectedInvoices([]);
-      await loadInvoices(); // Refresh the list
+      void loadInvoices(); // Refresh the list
     } catch (error: unknown) {
       showError(getErrorMessage(error, 'Hiba történt a státusz frissítésekor'));
     }
@@ -795,7 +795,7 @@ const NAVInvoices: React.FC = () => {
       await bulkMarkPaidMutation.mutateAsync(requestData);
       showSuccess(`${selectedInvoices.length} számla megjelölve "Kifizetve" státuszként`);
       setSelectedInvoices([]);
-      await loadInvoices(); // Refresh the list
+      void loadInvoices(); // Refresh the list
     } catch (error: unknown) {
       showError(getErrorMessage(error, 'Hiba történt a státusz frissítésekor'));
     }

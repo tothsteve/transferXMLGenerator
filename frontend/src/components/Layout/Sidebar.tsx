@@ -67,12 +67,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
 
     // If already on transfers page, force a reset by navigating with reset flag
     if (location.pathname === '/transfers') {
-      navigate('/transfers', {
+      void navigate('/transfers', {
         replace: true,
         state: { reset: true, timestamp: Date.now() },
       });
     } else {
-      navigate('/transfers');
+      void navigate('/transfers');
     }
 
     if (isMobile) onClose();

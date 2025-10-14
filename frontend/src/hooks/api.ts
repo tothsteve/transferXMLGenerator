@@ -103,8 +103,8 @@ export function useCreateBeneficiary(): UseMutationResult<Beneficiary, Error, Om
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.beneficiaries });
-      queryClient.invalidateQueries({ queryKey: queryKeys.beneficiariesFrequent });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.beneficiaries });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.beneficiariesFrequent });
     },
   });
 }
@@ -118,8 +118,8 @@ export function useUpdateBeneficiary(): UseMutationResult<Beneficiary, Error, { 
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.beneficiaries });
-      queryClient.invalidateQueries({ queryKey: queryKeys.beneficiariesFrequent });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.beneficiaries });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.beneficiariesFrequent });
     },
   });
 }
@@ -132,8 +132,8 @@ export function useDeleteBeneficiary(): UseMutationResult<void, Error, number> {
       await beneficiariesApi.delete(id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.beneficiaries });
-      queryClient.invalidateQueries({ queryKey: queryKeys.beneficiariesFrequent });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.beneficiaries });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.beneficiariesFrequent });
     },
   });
 }
@@ -186,7 +186,7 @@ export function useCreateTemplate(): UseMutationResult<
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.templates });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.templates });
     },
   });
 }
@@ -204,8 +204,8 @@ export function useUpdateTemplate(): UseMutationResult<
       return response.data;
     },
     onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.templates });
-      queryClient.invalidateQueries({ queryKey: queryKeys.template(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.templates });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.template(id) });
     },
   });
 }
@@ -218,7 +218,7 @@ export function useDeleteTemplate(): UseMutationResult<void, Error, number> {
       await templatesApi.delete(id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.templates });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.templates });
     },
   });
 }
@@ -284,8 +284,8 @@ export function useAddTemplateBeneficiary(): UseMutationResult<
       };
     }) => templatesApi.addBeneficiary(templateId, data),
     onSuccess: (_, { templateId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.templates });
-      queryClient.invalidateQueries({ queryKey: queryKeys.template(templateId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.templates });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.template(templateId) });
     },
   });
 }
@@ -302,8 +302,8 @@ export function useRemoveTemplateBeneficiary(): UseMutationResult<
       await templatesApi.removeBeneficiary(templateId, beneficiaryId);
     },
     onSuccess: (_, { templateId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.templates });
-      queryClient.invalidateQueries({ queryKey: queryKeys.template(templateId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.templates });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.template(templateId) });
     },
   });
 }
@@ -339,8 +339,8 @@ export function useUpdateTemplateBeneficiary(): UseMutationResult<
       };
     }) => templatesApi.updateBeneficiary(templateId, data),
     onSuccess: (_, { templateId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.templates });
-      queryClient.invalidateQueries({ queryKey: queryKeys.template(templateId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.templates });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.template(templateId) });
     },
   });
 }
@@ -376,7 +376,7 @@ export function useBulkCreateTransfers(): UseMutationResult<unknown, Error, Bulk
   return useMutation({
     mutationFn: (data: BulkCreateTransferRequest) => transfersApi.bulkCreate(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transfers });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.transfers });
     },
   });
 }
@@ -421,7 +421,7 @@ export function useGenerateXml(): UseMutationResult<GenerateXmlResponse, Error, 
     },
     onSuccess: () => {
       // Invalidate batches query to update the dashboard counter
-      queryClient.invalidateQueries({ queryKey: queryKeys.batches });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.batches });
     },
   });
 }
@@ -436,7 +436,7 @@ export function useGenerateKHExport(): UseMutationResult<GenerateKHExportRespons
     },
     onSuccess: () => {
       // Invalidate batches query to update the dashboard counter
-      queryClient.invalidateQueries({ queryKey: queryKeys.batches });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.batches });
     },
   });
 }
@@ -494,7 +494,7 @@ export function useMarkBatchUsedInBank(): UseMutationResult<unknown, Error, numb
   return useMutation({
     mutationFn: (batchId: number) => batchesApi.markUsedInBank(batchId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.batches });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.batches });
     },
   });
 }
@@ -505,7 +505,7 @@ export function useMarkBatchUnusedInBank(): UseMutationResult<unknown, Error, nu
   return useMutation({
     mutationFn: (batchId: number) => batchesApi.markUnusedInBank(batchId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.batches });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.batches });
     },
   });
 }
@@ -527,7 +527,7 @@ export function useDeleteBatch(): UseMutationResult<void, Error, number> {
       await batchesApi.delete(batchId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.batches });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.batches });
     },
   });
 }
@@ -597,8 +597,8 @@ export function useUploadExcel(): UseMutationResult<ExcelImportResponse, Error, 
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.beneficiaries });
-      queryClient.invalidateQueries({ queryKey: queryKeys.beneficiariesFrequent });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.beneficiaries });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.beneficiariesFrequent });
     },
   });
 }

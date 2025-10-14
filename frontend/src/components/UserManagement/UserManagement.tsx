@@ -49,7 +49,7 @@ const UserManagement: React.FC = () => {
   // Load company users from API
   React.useEffect(() => {
     if (state.currentCompany) {
-      loadUsers();
+      void loadUsers();
     }
   }, [state.currentCompany]);
 

@@ -103,7 +103,7 @@ const Settings: React.FC = () => {
       setIsEditing(false);
 
       // Invalidate and refetch default account
-      queryClient.invalidateQueries({ queryKey: ['bankAccount', 'default'] });
+      void queryClient.invalidateQueries({ queryKey: ['bankAccount', 'default'] });
 
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(''), 3000);

@@ -69,7 +69,7 @@ const BeneficiaryManager: React.FC = () => {
     try {
       await createMutation.mutateAsync(data);
       setShowForm(false);
-      refetch();
+      void refetch();
     } catch (error: unknown) {
       // Error will be handled by the form component through React Hook Form
       throw error;
@@ -79,7 +79,7 @@ const BeneficiaryManager: React.FC = () => {
   const handleUpdateBeneficiary = async (id: number, data: Partial<Beneficiary>): Promise<void> => {
     try {
       await updateMutation.mutateAsync({ id, data });
-      refetch();
+      void refetch();
     } catch (error: unknown) {
       // Error will be handled by the calling component
       throw error;
@@ -89,7 +89,7 @@ const BeneficiaryManager: React.FC = () => {
   const handleDeleteBeneficiary = async (id: number): Promise<void> => {
     if (window.confirm('Biztosan törölni szeretné ezt a kedvezményezettet?')) {
       await deleteMutation.mutateAsync(id);
-      refetch();
+      void refetch();
     }
   };
 
@@ -104,7 +104,7 @@ const BeneficiaryManager: React.FC = () => {
   };
 
   const handleImportSuccess = (): void => {
-    refetch();
+    void refetch();
   };
 
   const handleSort = (field: string, direction: 'asc' | 'desc'): void => {

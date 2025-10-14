@@ -45,7 +45,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   };
 
   const handleSettings = (): void => {
-    navigate('/settings');
+    void navigate('/settings');
     handleMenuClose();
   };
 

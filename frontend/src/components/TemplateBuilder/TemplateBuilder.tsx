@@ -125,7 +125,7 @@ const TemplateBuilder: React.FC = () => {
       }
 
       setShowForm(false);
-      refetch();
+      void refetch();
       showNotification(`Sablon "${data.name}" sikeresen létrehozva!`, 'success');
     } catch (error) {
       console.error('Failed to create template:', error);
@@ -228,7 +228,7 @@ const TemplateBuilder: React.FC = () => {
 
       setShowForm(false);
       setEditingTemplate(null);
-      refetch();
+      void refetch();
       showNotification(`Sablon "${data.name}" sikeresen frissítve!`, 'success');
     } catch (error) {
       console.error('Failed to update template:', error);
@@ -240,7 +240,7 @@ const TemplateBuilder: React.FC = () => {
     if (window.confirm('Biztosan törölni szeretné ezt a sablont?')) {
       try {
         await deleteMutation.mutateAsync(id);
-        refetch();
+        void refetch();
       } catch (error) {
         console.error('Failed to delete template:', error);
       }
@@ -259,7 +259,7 @@ const TemplateBuilder: React.FC = () => {
 
   const handleLoadTemplate = (id: number): void => {
     // Navigate to transfers page with template ID - let TransferWorkflow handle the loading
-    navigate('/transfers', {
+    void navigate('/transfers', {
       state: {
         templateId: id,
         loadFromTemplate: true,

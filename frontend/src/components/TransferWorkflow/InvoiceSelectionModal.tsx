@@ -103,7 +103,7 @@ const InvoiceSelectionModal: React.FC<InvoiceSelectionModalProps> = ({
           setIsFetching(false);
         }
       };
-      fetchInvoices();
+      void fetchInvoices();
     }
   }, [isOpen, searchTerm]);
 
