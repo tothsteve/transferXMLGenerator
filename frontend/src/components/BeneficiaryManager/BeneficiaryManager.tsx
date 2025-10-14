@@ -63,7 +63,7 @@ const BeneficiaryManager: React.FC = () => {
 
   // Calculate pagination based on our forced page size
   const pageSize = 20;
-  const totalPages = Math.ceil((beneficiariesData?.count || 0) / pageSize);
+  const totalPages = Math.ceil((beneficiariesData?.count !== null && beneficiariesData?.count !== undefined ? beneficiariesData.count : 0) / pageSize);
 
   const handleCreateBeneficiary = async (data: Omit<Beneficiary, 'id'>): Promise<void> => {
     try {

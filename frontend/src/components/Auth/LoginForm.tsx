@@ -29,7 +29,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
       ...prev,
       [name]: value,
     }));
-    if (state.error) {
+    if (state.error !== null && state.error !== '') {
       clearError();
     }
   };
@@ -101,7 +101,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
             Bejelentkezés
           </Typography>
 
-          {state.error && (
+          {state.error !== null && state.error !== '' && (
             <Alert severity="error" sx={{ width: '100%', mb: 2 }}>
               {state.error}
             </Alert>

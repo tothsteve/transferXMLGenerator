@@ -46,8 +46,8 @@ const BatchManager: React.FC = () => {
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
   const { data: batchesData, isLoading, error } = useBatches();
   const { data: selectedBatch, isLoading: isLoadingBatchDetails } = useBatch(
-    selectedBatchId || undefined,
-    !!selectedBatchId
+    selectedBatchId !== null && selectedBatchId !== undefined ? selectedBatchId : undefined,
+    selectedBatchId !== null && selectedBatchId !== undefined
   );
   const markUsedMutation = useMarkBatchUsedInBank();
   const markUnusedMutation = useMarkBatchUnusedInBank();
@@ -221,7 +221,7 @@ const BatchManager: React.FC = () => {
                       <Typography variant="body2" fontWeight="medium">
                         {batch.name}
                       </Typography>
-                      {batch.description && (
+                      {batch.description !== null && batch.description !== undefined && batch.description !== '' && (
                         <Typography variant="caption" color="text.secondary">
                           {batch.description}
                         </Typography>
@@ -243,7 +243,7 @@ const BatchManager: React.FC = () => {
                       <Stack direction="row" alignItems="center" spacing={1}>
                         <AccessTimeIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
                         <Typography variant="body2">
-                          {batch.xml_generated_at ? formatDate(batch.xml_generated_at) : 'N/A'}
+                          {batch.xml_generated_at !== null && batch.xml_generated_at !== undefined && batch.xml_generated_at !== '' ? formatDate(batch.xml_generated_at) : 'N/A'}
                         </Typography>
                       </Stack>
                     </TableCell>
@@ -256,7 +256,7 @@ const BatchManager: React.FC = () => {
                       />
                     </TableCell>
                     <TableCell>
-                      {batch.bank_usage_date ? (
+                      {batch.bank_usage_date !== null && batch.bank_usage_date !== undefined && batch.bank_usage_date !== '' ? (
                         <Typography variant="body2" color="success.main">
                           {formatDate(batch.bank_usage_date)}
                         </Typography>
@@ -341,7 +341,7 @@ const BatchManager: React.FC = () => {
       )}
 
       <BatchDetailsDialog
-        open={!!selectedBatchId}
+        open={selectedBatchId !== null && selectedBatchId !== undefined}
         onClose={handleClosePreview}
         batch={selectedBatch || null}
         isLoading={isLoadingBatchDetails}

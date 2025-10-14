@@ -106,84 +106,127 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
     setAccountNumberValue(beneficiary?.account_number ?? '');
   }, [beneficiary, reset]);
 
-  const handleFormSubmit = async (data: FormData): Promise<void> => {
-    // Validate that at least one identifier is provided
-    if (!data.account_number && !data.vat_number && !data.tax_number) {
+  // Helper: Check if at least one identifier is provided
+  const validateIdentifiers = (data: FormData): boolean => {
+    const isEmpty = (val: string | undefined): boolean => val === null || val === undefined || val === '';
+    if (isEmpty(data.account_number) && isEmpty(data.vat_number) && isEmpty(data.tax_number)) {
       setError('account_number', {
         type: 'manual',
         message: 'Meg kell adni a számlaszámot, adóazonosító jelet vagy céges adószámot',
       });
-      return;
+      return false;
     }
+    return true;
+  };
 
-    // Validate account number if provided
-    let formattedAccountNumber: string | undefined;
-    if (data.account_number) {
-      const validation = validateAndFormatHungarianAccountNumber(data.account_number);
-      if (!validation.isValid) {
-        setError('account_number', {
-          type: 'manual',
-          message: validation.error || 'Érvénytelen számlaszám',
-        });
-        return;
-      }
-      formattedAccountNumber = validation.formatted;
+  // Helper: Validate and format account number
+  const validateAccountNumber = (accountNumber: string | undefined): string | undefined => {
+    if (accountNumber === null || accountNumber === undefined || accountNumber === '') {
+      return undefined;
     }
-
-    // Validate VAT number if provided (10 digits)
-    if (data.vat_number) {
-      const cleanVat = data.vat_number.replace(/[\s-]/g, '');
-      if (!/^\d{10}$/.test(cleanVat)) {
-        setError('vat_number', {
-          type: 'manual',
-          message: 'Magyar személyi adóazonosító jel 10 számjegyből kell álljon (pl. 8450782546)',
-        });
-        return;
-      }
+    const validation = validateAndFormatHungarianAccountNumber(accountNumber);
+    if (!validation.isValid) {
+      const errorMsg = validation.error !== null && validation.error !== undefined && validation.error !== ''
+        ? validation.error
+        : 'Érvénytelen számlaszám';
+      setError('account_number', { type: 'manual', message: errorMsg });
+      return null as unknown as undefined;
     }
+    return validation.formatted;
+  };
 
-    // Validate tax number if provided (8 digits)
-    if (data.tax_number) {
-      const cleanTax = data.tax_number.replace(/[\s-]/g, '');
-      if (!/^\d{8}$/.test(cleanTax)) {
-        setError('tax_number', {
-          type: 'manual',
-          message: 'Magyar céges adószám 8 számjegyből kell álljon (pl. 12345678)',
-        });
-        return;
-      }
-    }
-
-    // Validate and normalize name
-    const nameValidation = validateBeneficiaryName(data.name);
-    if (!nameValidation.isValid) {
-      setError('name', {
+  // Helper: Validate VAT number
+  const validateVatNumber = (vatNumber: string | undefined): boolean => {
+    if (vatNumber === null || vatNumber === undefined || vatNumber === '') return true;
+    const cleanVat = vatNumber.replace(/[\s-]/g, '');
+    if (!/^\d{10}$/.test(cleanVat)) {
+      setError('vat_number', {
         type: 'manual',
-        message: nameValidation.error || 'Érvénytelen név',
+        message: 'Magyar személyi adóazonosító jel 10 számjegyből kell álljon (pl. 8450782546)',
       });
-      return;
+      return false;
     }
+    return true;
+  };
 
-    // Validate and normalize remittance information
-    if (data.remittance_information) {
-      const remittanceValidation = validateRemittanceInfo(data.remittance_information);
-      if (!remittanceValidation.isValid) {
-        setError('remittance_information', {
-          type: 'manual',
-          message: remittanceValidation.error || 'Érvénytelen közlemény',
-        });
-        return;
+  // Helper: Validate tax number
+  const validateTaxNumber = (taxNumber: string | undefined): boolean => {
+    if (taxNumber === null || taxNumber === undefined || taxNumber === '') return true;
+    const cleanTax = taxNumber.replace(/[\s-]/g, '');
+    if (!/^\d{8}$/.test(cleanTax)) {
+      setError('tax_number', {
+        type: 'manual',
+        message: 'Magyar céges adószám 8 számjegyből kell álljon (pl. 12345678)',
+      });
+      return false;
+    }
+    return true;
+  };
+
+  // Helper: Validate name field
+  const validateName = (name: string): boolean => {
+    const nameValidation = validateBeneficiaryName(name);
+    if (!nameValidation.isValid) {
+      const errorMsg = nameValidation.error !== null && nameValidation.error !== undefined && nameValidation.error !== ''
+        ? nameValidation.error
+        : 'Érvénytelen név';
+      setError('name', { type: 'manual', message: errorMsg });
+      return false;
+    }
+    return true;
+  };
+
+  // Helper: Validate remittance info
+  const validateRemittance = (remittanceInfo: string | undefined): boolean => {
+    if (remittanceInfo === null || remittanceInfo === undefined || remittanceInfo === '') return true;
+    const remittanceValidation = validateRemittanceInfo(remittanceInfo);
+    if (!remittanceValidation.isValid) {
+      const errorMsg = remittanceValidation.error !== null && remittanceValidation.error !== undefined && remittanceValidation.error !== ''
+        ? remittanceValidation.error
+        : 'Érvénytelen közlemény';
+      setError('remittance_information', { type: 'manual', message: errorMsg });
+      return false;
+    }
+    return true;
+  };
+
+  // Helper: Handle backend errors
+  const handleBackendErrors = (error: unknown): void => {
+    if (!hasValidationErrors(error) || error.response.status !== 400) return;
+
+    const backendErrors = error.response.data;
+    Object.keys(backendErrors).forEach((field) => {
+      if (['account_number', 'name', 'description', 'remittance_information'].includes(field)) {
+        const fieldErrors = backendErrors[field];
+        const errorMessage = Array.isArray(fieldErrors)
+          ? (fieldErrors[0] !== null && fieldErrors[0] !== undefined && fieldErrors[0] !== '' ? fieldErrors[0] : 'Validation error')
+          : (fieldErrors !== null && fieldErrors !== undefined && fieldErrors !== '' ? fieldErrors : 'Validation error');
+        setError(field as keyof FormData, { type: 'manual', message: errorMessage });
       }
-    }
+    });
+  };
 
+  const handleFormSubmit = async (data: FormData): Promise<void> => {
+    // Run all validations
+    if (!validateIdentifiers(data)) return;
+
+    const formattedAccountNumber = validateAccountNumber(data.account_number);
+    if (formattedAccountNumber === null) return;
+
+    if (!validateVatNumber(data.vat_number)) return;
+    if (!validateTaxNumber(data.tax_number)) return;
+    if (!validateName(data.name)) return;
+    if (!validateRemittance(data.remittance_information)) return;
+
+    // Build submit data
     const submitData: Omit<Beneficiary, 'id'> = {
       ...data,
       name: normalizeWhitespace(data.name),
-      ...(formattedAccountNumber && { account_number: formattedAccountNumber }),
-      ...(data.vat_number && { vat_number: data.vat_number.replace(/[\s-]/g, '') }),
-      ...(data.tax_number && { tax_number: data.tax_number.replace(/[\s-]/g, '') }),
-      description: data.description || '',
-      remittance_information: data.remittance_information
+      ...(formattedAccountNumber !== null && formattedAccountNumber !== undefined && formattedAccountNumber !== '' && { account_number: formattedAccountNumber }),
+      ...(data.vat_number !== null && data.vat_number !== undefined && data.vat_number !== '' && { vat_number: data.vat_number.replace(/[\s-]/g, '') }),
+      ...(data.tax_number !== null && data.tax_number !== undefined && data.tax_number !== '' && { tax_number: data.tax_number.replace(/[\s-]/g, '') }),
+      description: data.description !== null && data.description !== undefined && data.description !== '' ? data.description : '',
+      remittance_information: data.remittance_information !== null && data.remittance_information !== undefined && data.remittance_information !== ''
         ? normalizeWhitespace(data.remittance_information)
         : '',
     };
@@ -193,29 +236,7 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
       reset();
       setAccountNumberValue('');
     } catch (error: unknown) {
-      // Handle backend validation errors
-      if (hasValidationErrors(error) && error.response.status === 400) {
-        const backendErrors = error.response.data;
-
-        // Set field-specific errors from backend
-        Object.keys(backendErrors).forEach((field) => {
-          if (
-            field === 'account_number' ||
-            field === 'name' ||
-            field === 'description' ||
-            field === 'remittance_information'
-          ) {
-            const fieldErrors = backendErrors[field];
-            const errorMessage = Array.isArray(fieldErrors)
-              ? fieldErrors[0] || 'Validation error'
-              : fieldErrors || 'Validation error';
-            setError(field as keyof FormData, {
-              type: 'manual',
-              message: errorMessage,
-            });
-          }
-        });
-      }
+      handleBackendErrors(error);
     }
   };
 
@@ -243,7 +264,7 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
       <DialogTitle>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
           <Typography variant="h6">
-            {beneficiary ? 'Kedvezményezett szerkesztése' : 'Új kedvezményezett'}
+            {beneficiary !== null && beneficiary !== undefined ? 'Kedvezményezett szerkesztése' : 'Új kedvezményezett'}
           </Typography>
           <IconButton onClick={handleClose} size="small">
             <CloseIcon />
@@ -266,7 +287,7 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
               })}
               error={!!errors.name}
               helperText={
-                errors.name?.message ||
+                errors.name?.message !== null && errors.name?.message !== undefined && errors.name?.message !== '' ? errors.name.message :
                 'Csak angol betűk, magyar ékezetes betűk, számok és megadott írásjelek használhatók'
               }
             />
@@ -276,9 +297,9 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
               control={control}
               rules={{
                 validate: (value) => {
-                  if (!value) return true; // Optional field now
+                  if (value === null || value === undefined || value === '') return true; // Optional field now
                   const validation = validateAndFormatHungarianAccountNumber(value);
-                  return validation.isValid || validation.error || 'Érvénytelen számlaszám';
+                  return validation.isValid || (validation.error !== null && validation.error !== undefined && validation.error !== '' ? validation.error : 'Érvénytelen számlaszám');
                 },
               }}
               render={({ field }) => (
@@ -294,7 +315,7 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
                   onBlur={field.onBlur}
                   error={!!errors.account_number}
                   helperText={
-                    errors.account_number?.message ||
+                    errors.account_number?.message !== null && errors.account_number?.message !== undefined && errors.account_number?.message !== '' ? errors.account_number.message :
                     'Magyar számlaszám formátum: 16 vagy 24 számjegy, automatikus formázás'
                   }
                   InputProps={{
@@ -310,7 +331,7 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
               placeholder="8440961790"
               {...register('vat_number', {
                 validate: (value) => {
-                  if (!value) return true; // Optional field
+                  if (value === null || value === undefined || value === '') return true; // Optional field
                   const cleanVat = value.replace(/[\s-]/g, '');
                   if (!/^\d{10}$/.test(cleanVat)) {
                     return 'Magyar személyi adóazonosító jel 10 számjegyből kell álljon (pl. 8440961790)';
@@ -320,7 +341,7 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
               })}
               error={!!errors.vat_number}
               helperText={
-                errors.vat_number?.message ||
+                errors.vat_number?.message !== null && errors.vat_number?.message !== undefined && errors.vat_number?.message !== '' ? errors.vat_number.message :
                 'Magyar személyi adóazonosító jel 10 számjegyből áll (alkalmazottak azonosítására)'
               }
               InputProps={{
@@ -334,7 +355,7 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
               placeholder="12345678"
               {...register('tax_number', {
                 validate: (value) => {
-                  if (!value) return true; // Optional field
+                  if (value === null || value === undefined || value === '') return true; // Optional field
                   const cleanTax = value.replace(/[\s-]/g, '');
                   if (!/^\d{8}$/.test(cleanTax)) {
                     return 'Magyar céges adószám 8 számjegyből kell álljon (pl. 12345678)';
@@ -344,7 +365,7 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
               })}
               error={!!errors.tax_number}
               helperText={
-                errors.tax_number?.message ||
+                errors.tax_number?.message !== null && errors.tax_number?.message !== undefined && errors.tax_number?.message !== '' ? errors.tax_number.message :
                 'Magyar céges adószám első 8 számjegye (cégek és szervezetek azonosítására)'
               }
               InputProps={{
@@ -367,14 +388,14 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
               placeholder="Alapértelmezett közlemény az utalásokhoz..."
               {...register('remittance_information', {
                 validate: (value) => {
-                  if (!value) return true;
+                  if (value === null || value === undefined || value === '') return true;
                   const validation = validateRemittanceInfo(value);
-                  return validation.isValid || validation.error;
+                  return validation.isValid || (validation.error !== null && validation.error !== undefined && validation.error !== '' ? validation.error : true);
                 },
               })}
               error={!!errors.remittance_information}
               helperText={
-                errors.remittance_information?.message ||
+                errors.remittance_information?.message !== null && errors.remittance_information?.message !== undefined && errors.remittance_information?.message !== '' ? errors.remittance_information.message :
                 'Maximum 140 karakter. Csak angol betűk, magyar ékezetes betűk, számok és megadott írásjelek használhatók'
               }
             />
@@ -407,7 +428,7 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
         <DialogActions>
           <Button onClick={handleClose}>Mégse</Button>
           <Button type="submit" variant="contained" disabled={isLoading}>
-            {isLoading ? 'Mentés...' : beneficiary ? 'Frissítés' : 'Létrehozás'}
+            {isLoading ? 'Mentés...' : (beneficiary !== null && beneficiary !== undefined ? 'Frissítés' : 'Létrehozás')}
           </Button>
         </DialogActions>
       </form>

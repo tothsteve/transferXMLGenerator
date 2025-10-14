@@ -35,7 +35,7 @@ const SimpleRegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =>
       ...prev,
       [name]: value,
     }));
-    if (state.error) {
+    if (state.error !== null && state.error !== '') {
       clearError();
     }
   };
@@ -57,7 +57,7 @@ const SimpleRegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =>
     e.preventDefault();
 
     const error = validateForm();
-    if (error) {
+    if (error !== null && error !== '') {
       clearError();
       return;
     }
@@ -116,7 +116,7 @@ const SimpleRegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =>
             Hozzon létre új fiókot és céget
           </Typography>
 
-          {state.error && (
+          {state.error !== null && state.error !== '' && (
             <Alert severity="error" sx={{ width: '100%', mb: 2 }}>
               {state.error}
             </Alert>
