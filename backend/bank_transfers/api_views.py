@@ -1245,11 +1245,18 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
 
         for invoice in invoices:
             try:
+                # Determine execution date - use payment_due_date if available, otherwise use provided date
                 if invoice.payment_due_date:
                     execution_date = invoice.payment_due_date
                 else:
                     execution_date = datetime.strptime(execution_date_str, '%Y-%m-%d').date()
-                
+
+                # If execution date is in the past, set it to today
+                today = date.today()
+                if execution_date < today:
+                    execution_date = today
+                    warnings.append(f'Számla {invoice.nav_invoice_number}: Lejárati dátum múltbeli volt ({invoice.payment_due_date if invoice.payment_due_date else execution_date_str}), mai dátumra állítva')
+
                 # Extract supplier tax number (normalize to 8 digits)
                 supplier_tax_number = invoice.supplier_tax_number
                 if not supplier_tax_number:
