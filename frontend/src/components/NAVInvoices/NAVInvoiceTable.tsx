@@ -114,7 +114,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
   onSelectAll,
 }) => {
   // Helper functions for checkbox selection
-  const safeSelectedInvoices = selectedInvoices || [];
+  const safeSelectedInvoices = selectedInvoices !== null && selectedInvoices !== undefined ? selectedInvoices : [];
   const selectedCount = safeSelectedInvoices.length;
   const totalCount = invoices.length;
 
@@ -210,7 +210,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
     invoiceCategory?: string | null
   ): React.ReactElement | string => {
     // Show Receipt icon for SIMPLIFIED invoices when payment_method is null
-    if (!paymentMethod && invoiceCategory?.toUpperCase() === 'SIMPLIFIED') {
+    if ((paymentMethod === null || paymentMethod === undefined || paymentMethod === '') && invoiceCategory?.toUpperCase() === 'SIMPLIFIED') {
       return (
         <Tooltip title="Egyszerűsített">
           <ReceiptIcon color="success" fontSize="small" />
@@ -219,7 +219,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
     }
 
     // Show Card icon for NORMAL invoices when payment_method is null
-    if (!paymentMethod && invoiceCategory?.toUpperCase() === 'NORMAL') {
+    if ((paymentMethod === null || paymentMethod === undefined || paymentMethod === '') && invoiceCategory?.toUpperCase() === 'NORMAL') {
       return (
         <Tooltip title="Bankkártya (feltételezett)">
           <CardIcon color="secondary" fontSize="small" />
@@ -227,7 +227,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
       );
     }
 
-    if (!paymentMethod) return '-';
+    if (paymentMethod === null || paymentMethod === undefined || paymentMethod === '') return '-';
 
     const method = paymentMethod.toUpperCase().trim();
 
@@ -435,7 +435,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
                   >
                     {invoice.partner_name}
                   </Typography>
-                  {invoice.partner_tax_number && (
+                  {invoice.partner_tax_number !== null && invoice.partner_tax_number !== undefined && invoice.partner_tax_number !== '' && (
                     <Typography
                       variant="caption"
                       color="text.secondary"
@@ -453,18 +453,18 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
               </TableCell>
               <TableCell>
                 <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
-                  {invoice.fulfillment_date_formatted || '-'}
+                  {invoice.fulfillment_date_formatted !== null && invoice.fulfillment_date_formatted !== undefined && invoice.fulfillment_date_formatted !== '' ? invoice.fulfillment_date_formatted : '-'}
                 </Typography>
               </TableCell>
               <TableCell>
                 <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
-                  {invoice.payment_due_date_formatted || '-'}
+                  {invoice.payment_due_date_formatted !== null && invoice.payment_due_date_formatted !== undefined && invoice.payment_due_date_formatted !== '' ? invoice.payment_due_date_formatted : '-'}
                 </Typography>
               </TableCell>
               <TableCell align="center">
                 <PaymentStatusBadge
                   paymentStatus={invoice.payment_status}
-                  {...(invoice.payment_status_date_formatted && {
+                  {...(invoice.payment_status_date_formatted !== null && invoice.payment_status_date_formatted !== undefined && invoice.payment_status_date_formatted !== '' && {
                     paymentStatusDate: invoice.payment_status_date_formatted,
                   })}
                   size="small"

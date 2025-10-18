@@ -66,7 +66,7 @@ const StatCard: React.FC<StatCardProps> = ({
   const numericValue = typeof value === 'number' ? value : parseInt(value.toString()) || 0;
   const animatedValue = useAnimatedCounter(numericValue, 800);
 
-  if (isLoading) {
+  if (isLoading !== null && isLoading !== undefined && isLoading) {
     return (
       <Card elevation={1}>
         <CardContent>
@@ -112,7 +112,7 @@ const StatCard: React.FC<StatCardProps> = ({
             <Typography variant="h4" fontWeight="bold">
               {typeof value === 'number' ? animatedValue.toLocaleString('hu-HU') : value}
             </Typography>
-            {trend && (
+            {trend !== null && trend !== undefined && trend !== '' && (
               <Chip
                 label={trend}
                 size="small"
@@ -152,12 +152,12 @@ const Dashboard: React.FC = () => {
   const { data: templatesData, isLoading: templatesLoading } = useTemplates();
   const { data: batchesData, isLoading: batchesLoading } = useBatches();
 
-  const totalBeneficiaries = beneficiariesData?.count || 0;
-  const totalTemplates = templatesData?.count || 0;
-  const activeBeneficiaries = beneficiariesData?.results?.filter((b) => b.is_active)?.length || 0;
+  const totalBeneficiaries = beneficiariesData?.count !== null && beneficiariesData?.count !== undefined ? beneficiariesData.count : 0;
+  const totalTemplates = templatesData?.count !== null && templatesData?.count !== undefined ? templatesData.count : 0;
+  const activeBeneficiaries = beneficiariesData?.results?.filter((b) => b.is_active)?.length !== null && beneficiariesData?.results?.filter((b) => b.is_active)?.length !== undefined ? beneficiariesData.results.filter((b) => b.is_active).length : 0;
   const frequentBeneficiaries =
-    beneficiariesData?.results?.filter((b) => b.is_frequent)?.length || 0;
-  const totalBatches = batchesData?.count || 0;
+    beneficiariesData?.results?.filter((b) => b.is_frequent)?.length !== null && beneficiariesData?.results?.filter((b) => b.is_frequent)?.length !== undefined ? beneficiariesData.results.filter((b) => b.is_frequent).length : 0;
+  const totalBatches = batchesData?.count !== null && batchesData?.count !== undefined ? batchesData.count : 0;
 
   const isLoading = beneficiariesLoading || templatesLoading || batchesLoading;
 

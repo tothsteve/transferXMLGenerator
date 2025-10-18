@@ -156,7 +156,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
                     fontSize: '0.875rem',
                   }}
                 />
-                {item.badge && (
+                {item.badge !== null && item.badge !== undefined && item.badge !== '' && (
                   <Chip
                     label={item.badge}
                     size="small"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   Box,
@@ -98,6 +98,7 @@ const TransferWorkflow: React.FC = () => {
     filename: string;
   } | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const templateLoadedRef = useRef(false);
 
   const { data: templatesData } = useTemplates();
   const { data: defaultAccount } = useDefaultBankAccount();
@@ -138,6 +139,7 @@ const TransferWorkflow: React.FC = () => {
       setTransfers([]);
       setXmlPreview(null);
       setValidationErrors([]);
+      templateLoadedRef.current = false; // Reset flag
       return;
     }
   }, [location.pathname, location.state, location.key]);
@@ -281,7 +283,16 @@ const TransferWorkflow: React.FC = () => {
       });
 
       console.log('Enriched transfers:', enrichedTransfers);
-      setTransfers(enrichedTransfers);
+
+      // MERGE with existing transfers instead of replacing them
+      // This allows template loading to add transfers to NAV-generated ones
+      setTransfers((prev) => {
+        console.log('Previous transfers count:', prev.length);
+        console.log('New template transfers count:', enrichedTransfers.length);
+        const merged = [...prev, ...enrichedTransfers];
+        console.log('Merged transfers count:', merged.length);
+        return merged;
+      });
     } catch (error) {
       console.error('Failed to load template:', error);
     }
@@ -316,12 +327,14 @@ const TransferWorkflow: React.FC = () => {
       state?.templateId &&
       state.loadFromTemplate &&
       templates.length > 0 &&
-      defaultAccount
+      defaultAccount &&
+      !templateLoadedRef.current
     ) {
       const template = templates.find((t) => t.id === state.templateId);
       if (template) {
         console.log('Auto-loading template from TemplateBuilder:', template);
         setSelectedTemplate(template as TransferTemplate);
+        templateLoadedRef.current = true; // Set flag to prevent re-execution
         void handleLoadTemplate(state.templateId);
       }
 
@@ -348,7 +361,7 @@ const TransferWorkflow: React.FC = () => {
       // Clear the location state to prevent re-loading on refresh
       window.history.replaceState({}, '');
     }
-  }, [location.state, templates, defaultAccount, handleLoadTemplate]);
+  }, [location.state, templates, defaultAccount]); // Note: handleLoadTemplate removed to prevent infinite loop
 
   // Handle template parameter from URL (e.g., /transfers?template=123)
   useEffect(() => {
@@ -669,6 +682,13 @@ const TransferWorkflow: React.FC = () => {
 
       console.log('Transfers to create:', transfersToCreate.length);
       console.log('Transfers to update:', transfersToUpdate.length);
+      console.log('Transfers to create details:', transfersToCreate.map((t, i) => ({
+        index: i,
+        beneficiary: t.beneficiary,
+        amount: t.amount,
+        has_id: !!t.id,
+        has_beneficiary: !!t.beneficiary
+      })));
 
       // Collect all transfer IDs that will be available after saving
       const allTransferIds: number[] = [];
@@ -677,6 +697,16 @@ const TransferWorkflow: React.FC = () => {
       let createdTransfers: Transfer[] = [];
       if (transfersToCreate.length > 0) {
         console.log('Creating transfers:', transfersToCreate);
+
+        // Validate that all transfers have beneficiary IDs
+        const transfersWithoutBeneficiary = transfersToCreate.filter((t: TransferData) => !t.beneficiary);
+        if (transfersWithoutBeneficiary.length > 0) {
+          console.error('Transfers without beneficiary:', transfersWithoutBeneficiary);
+          setValidationErrors([
+            `${transfersWithoutBeneficiary.length} átutalás nem rendelkezik kedvezményezettel. Ez nem várható hiba - ellenőrizze a sablon betöltési logikát.`
+          ]);
+          return false;
+        }
 
         const transfersPayload = transfersToCreate.map((t: TransferData, _index: number) => ({
           originator_account_id: defaultAccount!.id,
@@ -696,13 +726,26 @@ const TransferWorkflow: React.FC = () => {
         });
 
         console.log('Bulk create response:', bulkResult);
+        console.log('Response type:', typeof bulkResult);
+        console.log('Is array?', Array.isArray(bulkResult));
 
         // Handle the response structure - check if it's wrapped or direct array
-        createdTransfers = Array.isArray(bulkResult)
-          ? (bulkResult as Transfer[])
-          : ((bulkResult as { transfers?: Transfer[]; results?: Transfer[] })?.transfers ||
-             (bulkResult as { transfers?: Transfer[]; results?: Transfer[] })?.results ||
-             []);
+        // First check if it's an Axios response with .data property
+        const responseData = (bulkResult !== null &&
+                             typeof bulkResult === 'object' &&
+                             'data' in bulkResult)
+          ? (bulkResult as { data: unknown }).data
+          : bulkResult;
+
+        console.log('Response data:', responseData);
+
+        createdTransfers = Array.isArray(responseData)
+          ? (responseData as Transfer[])
+          : (responseData !== null &&
+             typeof responseData === 'object' &&
+             ((responseData as { transfers?: Transfer[]; results?: Transfer[] })?.transfers ||
+              (responseData as { transfers?: Transfer[]; results?: Transfer[] })?.results ||
+              [])) || [];
 
         console.log('Created transfers:', createdTransfers);
 
