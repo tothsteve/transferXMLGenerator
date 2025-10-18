@@ -62,17 +62,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
   const navigate = useNavigate();
   const location = useLocation();
 
-  const handleTransferClick = (e: React.MouseEvent) => {
+  const handleTransferClick = (e: React.MouseEvent): void => {
     e.preventDefault();
 
     // If already on transfers page, force a reset by navigating with reset flag
     if (location.pathname === '/transfers') {
-      navigate('/transfers', {
+      void navigate('/transfers', {
         replace: true,
-        state: { reset: true, timestamp: Date.now() }
+        state: { reset: true, timestamp: Date.now() },
       });
     } else {
-      navigate('/transfers');
+      void navigate('/transfers');
     }
 
     if (isMobile) onClose();
@@ -116,12 +116,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
       {/* Navigation */}
       <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
         <List sx={{ p: 1 }}>
-          {navigation.map((item) => (
+          {navigation.map((item: NavigationItem) => (
             <ListItem key={item.name} disablePadding sx={{ mb: 0.5 }}>
               <ListItemButton
                 component={item.href === '/transfers' ? 'div' : NavLink}
                 to={item.href === '/transfers' ? undefined : item.href}
-                onClick={item.href === '/transfers' ? handleTransferClick : (isMobile ? onClose : undefined)}
+                onClick={
+                  item.href === '/transfers' ? handleTransferClick : isMobile ? onClose : undefined
+                }
                 sx={{
                   borderRadius: 1,
                   '&.active': {
@@ -134,13 +136,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
                   '&:hover': {
                     bgcolor: 'grey.50',
                   },
-                  ...(item.href === '/transfers' && location.pathname === '/transfers' && {
-                    bgcolor: 'primary.50',
-                    color: 'primary.600',
-                    '& .MuiListItemIcon-root': {
+                  ...(item.href === '/transfers' &&
+                    location.pathname === '/transfers' && {
+                      bgcolor: 'primary.50',
                       color: 'primary.600',
-                    },
-                  }),
+                      '& .MuiListItemIcon-root': {
+                        color: 'primary.600',
+                      },
+                    }),
                 }}
               >
                 <ListItemIcon sx={{ minWidth: 40 }}>
@@ -153,30 +156,30 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
                     fontSize: '0.875rem',
                   }}
                 />
-                {(item as any).badge && (
+                {item.badge !== null && item.badge !== undefined && item.badge !== '' && (
                   <Chip
-                    label={(item as any).badge}
+                    label={item.badge}
                     size="small"
                     color="primary"
                     variant="filled"
                     sx={{
                       height: 20,
                       fontSize: '0.7rem',
-                      fontWeight: 'bold'
+                      fontWeight: 'bold',
                     }}
                   />
                 )}
               </ListItemButton>
             </ListItem>
           ))}
-          
+
           {/* Admin Navigation */}
           {isAdmin && (
             <>
               <Divider sx={{ my: 1 }} />
-              <Typography 
-                variant="caption" 
-                color="text.secondary" 
+              <Typography
+                variant="caption"
+                color="text.secondary"
                 sx={{ px: 2, py: 1, fontWeight: 600, textTransform: 'uppercase' }}
               >
                 Adminisztráció
@@ -204,7 +207,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
                     <ListItemIcon sx={{ minWidth: 40 }}>
                       <item.icon />
                     </ListItemIcon>
-                    <ListItemText 
+                    <ListItemText
                       primary={item.name}
                       primaryTypographyProps={{
                         fontWeight: 600,
@@ -236,7 +239,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
             '& .MuiDrawer-paper': {
               width: width,
               boxSizing: 'border-box',
-              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%)',
+              background:
+                'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%)',
               backdropFilter: 'blur(20px)',
               borderRight: '1px solid rgba(255, 255, 255, 0.2)',
             },
@@ -254,7 +258,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
             '& .MuiDrawer-paper': {
               width: width,
               boxSizing: 'border-box',
-              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%)',
+              background:
+                'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%)',
               backdropFilter: 'blur(20px)',
               borderRight: '1px solid rgba(255, 255, 255, 0.2)',
             },

@@ -1,13 +1,13 @@
 /**
  * Hungarian Bank Account Number Validation and Formatting Utilities
- * 
+ *
  * Hungarian BBAN (Basic Bank Account Number) format:
  * - Bank code: 3 digits
- * - Branch code: 4 digits  
+ * - Branch code: 4 digits
  * - Account number: 16 digits
  * - National checksum: 1 digit
  * - Total: 24 digits (3+4+16+1)
- * 
+ *
  * Also supports legacy 16-digit format for backwards compatibility
  */
 
@@ -24,14 +24,14 @@ export interface AccountValidationResult {
  * @returns AccountValidationResult with validation status and formatted number
  */
 export const validateAndFormatHungarianAccountNumber = (
-  accountNumber: string, 
+  accountNumber: string,
   validateChecksum: boolean = false
 ): AccountValidationResult => {
   if (!accountNumber) {
     return {
       isValid: false,
       formatted: '',
-      error: 'Számlaszám megadása kötelező'
+      error: 'Számlaszám megadása kötelező',
     };
   }
 
@@ -40,7 +40,7 @@ export const validateAndFormatHungarianAccountNumber = (
     return {
       isValid: false,
       formatted: accountNumber,
-      error: 'A számlaszám csak számokat és kötőjeleket tartalmazhat'
+      error: 'A számlaszám csak számokat és kötőjeleket tartalmazhat',
     };
   }
 
@@ -52,13 +52,13 @@ export const validateAndFormatHungarianAccountNumber = (
     return {
       isValid: false,
       formatted: accountNumber,
-      error: 'Magyar számlaszám 16 vagy 24 számjegyből áll'
+      error: 'Magyar számlaszám 16 vagy 24 számjegyből áll',
     };
   }
 
   // Format based on length
   let formatted: string;
-  
+
   if (digitsOnly.length === 16) {
     // 16 digits: XXXXXXXX-XXXXXXXX
     formatted = `${digitsOnly.slice(0, 8)}-${digitsOnly.slice(8, 16)}`;
@@ -69,7 +69,7 @@ export const validateAndFormatHungarianAccountNumber = (
     return {
       isValid: false,
       formatted: accountNumber,
-      error: 'Érvénytelen számlaszám formátum'
+      error: 'Érvénytelen számlaszám formátum',
     };
   }
 
@@ -78,7 +78,7 @@ export const validateAndFormatHungarianAccountNumber = (
     return {
       isValid: false,
       formatted,
-      error: 'Érvénytelen ellenőrző összeg a számlaszámban'
+      error: 'Érvénytelen ellenőrző összeg a számlaszámban',
     };
   }
 
@@ -96,7 +96,7 @@ export const validateAndFormatHungarianAccountNumber = (
 export const formatAccountNumberOnInput = (value: string): string => {
   // Remove all non-digit characters
   const digitsOnly = value.replace(/\D/g, '');
-  
+
   // Don't format if empty or too long
   if (!digitsOnly || digitsOnly.length > 24) {
     return digitsOnly;
@@ -129,7 +129,7 @@ export const cleanAccountNumber = (accountNumber: string): string => {
 export const validateHungarianAccountChecksum = (accountNumber: string): boolean => {
   // Remove any formatting
   const digits = accountNumber.replace(/\D/g, '');
-  
+
   if (digits.length === 16) {
     // Legacy 16-digit format - no specific checksum validation defined
     return true; // Accept for backwards compatibility
@@ -137,7 +137,7 @@ export const validateHungarianAccountChecksum = (accountNumber: string): boolean
     // All 24-digit numbers are treated as BBAN with checksum validation
     return validateHungarianBBANChecksum(digits);
   }
-  
+
   return false;
 };
 
@@ -154,23 +154,26 @@ const validateHungarianBBANChecksum = (digits: string): boolean => {
 
     // Extract components according to BBAN specification
     // const bankCode = digits.substring(0, 3);      // 3 digits
-    // const branchCode = digits.substring(3, 7);    // 4 digits 
+    // const branchCode = digits.substring(3, 7);    // 4 digits
     const accountNumber = digits.substring(7, 23); // 16 digits
     const checksumDigit = parseInt(digits.substring(23, 24)); // 1 digit
 
     // Apply checksum algorithm to the 16-digit account number
     let sum = 0;
     const weights = [9, 7, 3, 1]; // Repeating pattern
-    
+
     for (let i = 0; i < 16; i++) {
-      const digit = parseInt(accountNumber[i]);
-      const weight = weights[i % 4]; // Cycle through [9, 7, 3, 1]
+      const char = accountNumber[i];
+      if (!char) continue;
+      const digit = parseInt(char);
+      const weight = weights[i % 4];
+      if (weight === undefined) continue;
       sum += digit * weight;
     }
 
     // Calculate expected checksum: (10 - (sum mod 10)) mod 10
     const calculatedChecksum = (10 - (sum % 10)) % 10;
-    
+
     return calculatedChecksum === checksumDigit;
   } catch (error) {
     return false;
@@ -190,13 +193,13 @@ export const isValidHungarianAccountNumber = (accountNumber: string): boolean =>
 /**
  * Calculates the correct checksum digit for a Hungarian BBAN
  * @param bankCode - 3-digit bank code
- * @param branchCode - 4-digit branch code  
+ * @param branchCode - 4-digit branch code
  * @param accountNumber - 16-digit account number
  * @returns The calculated checksum digit (0-9)
  */
 export const calculateHungarianBBANChecksum = (
-  bankCode: string, 
-  branchCode: string, 
+  _bankCode: string,
+  _branchCode: string,
   accountNumber: string
 ): number => {
   if (accountNumber.length !== 16) {
@@ -205,10 +208,13 @@ export const calculateHungarianBBANChecksum = (
 
   let sum = 0;
   const weights = [9, 7, 3, 1]; // Repeating pattern
-  
+
   for (let i = 0; i < 16; i++) {
-    const digit = parseInt(accountNumber[i]);
-    const weight = weights[i % 4]; // Cycle through [9, 7, 3, 1]
+    const char = accountNumber[i];
+    if (!char) continue;
+    const digit = parseInt(char);
+    const weight = weights[i % 4];
+    if (weight === undefined) continue;
     sum += digit * weight;
   }
 
@@ -225,8 +231,8 @@ export const calculateHungarianBBANChecksum = (
  * @returns Complete 24-digit BBAN with correct checksum
  */
 export const generateValidHungarianBBAN = (
-  bankCode: string, 
-  branchCode: string, 
+  bankCode: string,
+  branchCode: string,
   accountNumber: string
 ): string => {
   if (bankCode.length !== 3 || !/^\d{3}$/.test(bankCode)) {
@@ -251,20 +257,20 @@ export const EXAMPLE_ACCOUNT_NUMBERS = {
   // Test examples for format validation (16-digit legacy format)
   format16: '1177342500989949', // Should format to: 11773425-00989949
   formatted16: '11773425-00989949',
-  
+
   // Valid 24-digit BBAN with correct checksums
   validBBAN: '117734212345678901234566', // Bank:117, Branch:7342, Account:1234567890123456, Checksum:6
   validBBAN2: '103200012345678901234566', // Bank:103, Branch:2000, Account:1234567890123456, Checksum:6 (same account = same checksum)
-  
+
   // Format examples (may have incorrect checksums)
   format24: '121000111901487412345678', // Should format to: 12100011-19014874-12345678
   formatted24: '12100011-19014874-12345678',
-  
+
   // Invalid examples
   invalid: '123456789', // Too short
   invalidChars: '1177-3425-ABCD-9949', // Contains letters
   invalidChecksum: '117734212345678901234567', // Wrong checksum (should be 6, not 7)
-  
+
   // Known Hungarian bank prefixes for testing structure
   otpBank: '117', // OTP Bank (3-digit code)
   nav: '103', // Hungarian Treasury (NAV) (3-digit code)

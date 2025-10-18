@@ -19,7 +19,7 @@ import {
   Chip,
   List,
   ListItem,
-  ListItemText
+  ListItemText,
 } from '@mui/material';
 import {
   Description as DescriptionIcon,
@@ -27,7 +27,7 @@ import {
   Add as AddIcon,
   AttachMoney as AttachMoneyIcon,
   Warning as WarningIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
 } from '@mui/icons-material';
 import { PDFProcessingResult } from './PDFImportWizard';
 
@@ -37,12 +37,8 @@ interface ReviewStepProps {
   onConfirm: () => void;
 }
 
-export const ReviewStep: React.FC<ReviewStepProps> = ({
-  previewData,
-  onBack,
-  onConfirm,
-}) => {
-  const formatCurrency = (amount: number) => {
+export const ReviewStep: React.FC<ReviewStepProps> = ({ previewData, onBack, onConfirm }) => {
+  const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('hu-HU', {
       style: 'currency',
       currency: 'HUF',
@@ -58,34 +54,53 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
         <Typography variant="h6" component="h2" fontWeight="bold" gutterBottom>
           Adatok Áttekintése
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
-          {previewData.template_updated 
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ display: { xs: 'none', sm: 'block' } }}
+        >
+          {previewData.template_updated
             ? 'Ellenőrizze a kinyert tranzakciókat és erősítse meg a sablon frissítését'
-            : 'Ellenőrizze a kinyert tranzakciókat és erősítse meg a sablon létrehozását'
-          }
+            : 'Ellenőrizze a kinyert tranzakciókat és erősítse meg a sablon létrehozását'}
         </Typography>
       </Box>
 
       {/* Summary Cards */}
-      <Box 
-        sx={{ 
+      <Box
+        sx={{
           display: 'grid',
           gridTemplateColumns: {
             xs: 'repeat(2, 1fr)',
             sm: 'repeat(4, 1fr)',
           },
           gap: { xs: 1.5, sm: 2 },
-          mb: 3
+          mb: 3,
         }}
       >
         <Card elevation={1}>
           <CardContent sx={{ p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 2 } } }}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} alignItems="center" spacing={{ xs: 1, sm: 2 }} textAlign={{ xs: 'center', sm: 'left' }}>
-              <Avatar sx={{ bgcolor: 'primary.main', width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 } }}>
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              alignItems="center"
+              spacing={{ xs: 1, sm: 2 }}
+              textAlign={{ xs: 'center', sm: 'left' }}
+            >
+              <Avatar
+                sx={{
+                  bgcolor: 'primary.main',
+                  width: { xs: 32, sm: 40 },
+                  height: { xs: 32, sm: 40 },
+                }}
+              >
                 <DescriptionIcon fontSize="small" />
               </Avatar>
               <Box>
-                <Typography variant="h5" fontWeight="bold" color="primary" sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
+                <Typography
+                  variant="h5"
+                  fontWeight="bold"
+                  color="primary"
+                  sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }}
+                >
                   {previewData.transactions_processed}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -98,12 +113,28 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
 
         <Card elevation={1}>
           <CardContent sx={{ p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 2 } } }}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} alignItems="center" spacing={{ xs: 1, sm: 2 }} textAlign={{ xs: 'center', sm: 'left' }}>
-              <Avatar sx={{ bgcolor: 'success.main', width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 } }}>
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              alignItems="center"
+              spacing={{ xs: 1, sm: 2 }}
+              textAlign={{ xs: 'center', sm: 'left' }}
+            >
+              <Avatar
+                sx={{
+                  bgcolor: 'success.main',
+                  width: { xs: 32, sm: 40 },
+                  height: { xs: 32, sm: 40 },
+                }}
+              >
                 <CheckCircleIcon fontSize="small" />
               </Avatar>
               <Box>
-                <Typography variant="h5" fontWeight="bold" color="success.main" sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
+                <Typography
+                  variant="h5"
+                  fontWeight="bold"
+                  color="success.main"
+                  sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }}
+                >
                   {previewData.beneficiaries_matched}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -116,12 +147,28 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
 
         <Card elevation={1}>
           <CardContent sx={{ p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 2 } } }}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} alignItems="center" spacing={{ xs: 1, sm: 2 }} textAlign={{ xs: 'center', sm: 'left' }}>
-              <Avatar sx={{ bgcolor: 'warning.main', width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 } }}>
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              alignItems="center"
+              spacing={{ xs: 1, sm: 2 }}
+              textAlign={{ xs: 'center', sm: 'left' }}
+            >
+              <Avatar
+                sx={{
+                  bgcolor: 'warning.main',
+                  width: { xs: 32, sm: 40 },
+                  height: { xs: 32, sm: 40 },
+                }}
+              >
                 <AddIcon fontSize="small" />
               </Avatar>
               <Box>
-                <Typography variant="h5" fontWeight="bold" color="warning.main" sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
+                <Typography
+                  variant="h5"
+                  fontWeight="bold"
+                  color="warning.main"
+                  sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }}
+                >
                   {previewData.beneficiaries_created}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -134,12 +181,28 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
 
         <Card elevation={1}>
           <CardContent sx={{ p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 2 } } }}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} alignItems="center" spacing={{ xs: 1, sm: 2 }} textAlign={{ xs: 'center', sm: 'left' }}>
-              <Avatar sx={{ bgcolor: 'secondary.main', width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 } }}>
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              alignItems="center"
+              spacing={{ xs: 1, sm: 2 }}
+              textAlign={{ xs: 'center', sm: 'left' }}
+            >
+              <Avatar
+                sx={{
+                  bgcolor: 'secondary.main',
+                  width: { xs: 32, sm: 40 },
+                  height: { xs: 32, sm: 40 },
+                }}
+              >
                 <AttachMoneyIcon fontSize="small" />
               </Avatar>
               <Box>
-                <Typography variant="h6" fontWeight="bold" color="secondary.main" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
+                <Typography
+                  variant="h6"
+                  fontWeight="bold"
+                  color="secondary.main"
+                  sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}
+                >
                   {formatCurrency(previewData.total_amount)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -152,16 +215,13 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
       </Box>
 
       {/* Template Info */}
-      <Alert 
-        severity={previewData.template_updated ? "info" : "success"} 
+      <Alert
+        severity={previewData.template_updated ? 'info' : 'success'}
         sx={{ mb: 4 }}
         icon={previewData.template_updated ? <InfoIcon /> : <DescriptionIcon />}
       >
         <AlertTitle>
-          {previewData.template_updated 
-            ? 'Frissítendő sablon' 
-            : 'Létrehozandó sablon'
-          }
+          {previewData.template_updated ? 'Frissítendő sablon' : 'Létrehozandó sablon'}
         </AlertTitle>
         <Typography variant="body2" component="div">
           <strong>Név:</strong> {previewData.template.name}
@@ -171,8 +231,8 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
         </Typography>
         {previewData.template_updated && (
           <Typography variant="body2" sx={{ mt: 2 }}>
-            A rendszer észlelte, hogy már létezik sablon ugyanezekkel a kedvezményezettekkel. 
-            Az összegek és közlemények frissítésre kerülnek az új értékekkel.
+            A rendszer észlelte, hogy már létezik sablon ugyanezekkel a kedvezményezettekkel. Az
+            összegek és közlemények frissítésre kerülnek az új értékekkel.
           </Typography>
         )}
       </Alert>
@@ -197,15 +257,19 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
       {/* Transaction Table */}
       <Paper elevation={1} sx={{ mb: 3 }}>
         <Box sx={{ p: { xs: 2, sm: 3 }, borderBottom: 1, borderColor: 'divider' }}>
-          <Typography variant="h6" fontWeight={600} sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
+          <Typography
+            variant="h6"
+            fontWeight={600}
+            sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
+          >
             Kinyert Tranzakciók
           </Typography>
         </Box>
         <TableContainer sx={{ overflowX: 'auto' }}>
-          <Table 
-            sx={{ 
+          <Table
+            sx={{
               tableLayout: { xs: 'auto', sm: 'fixed' },
-              minWidth: { xs: 650, sm: '100%' }
+              minWidth: { xs: 650, sm: '100%' },
             }}
             size="small"
           >
@@ -217,33 +281,43 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
                 <TableCell sx={{ width: { sm: '22%' }, fontWeight: 600, fontSize: '0.8rem' }}>
                   Számlaszám
                 </TableCell>
-                <TableCell align="right" sx={{ width: { sm: '15%' }, fontWeight: 600, fontSize: '0.8rem' }}>
+                <TableCell
+                  align="right"
+                  sx={{ width: { sm: '15%' }, fontWeight: 600, fontSize: '0.8rem' }}
+                >
                   Összeg
                 </TableCell>
                 <TableCell sx={{ width: { sm: '25%' }, fontWeight: 600, fontSize: '0.8rem' }}>
                   Közlemény
                 </TableCell>
-                <TableCell align="center" sx={{ width: { sm: '13%' }, fontWeight: 600, fontSize: '0.8rem' }}>
+                <TableCell
+                  align="center"
+                  sx={{ width: { sm: '13%' }, fontWeight: 600, fontSize: '0.8rem' }}
+                >
                   Állapot
                 </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {previewData.preview.map((transaction, index) => (
-                <TableRow key={index} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                <TableRow
+                  key={index}
+                  hover
+                  sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                >
                   <TableCell sx={{ py: 1.5 }}>
                     <Typography variant="body2" fontWeight={500} sx={{ fontSize: '0.85rem' }}>
                       {transaction.beneficiary_name}
                     </Typography>
                   </TableCell>
                   <TableCell sx={{ py: 1.5 }}>
-                    <Typography 
-                      variant="body2" 
-                      sx={{ 
+                    <Typography
+                      variant="body2"
+                      sx={{
                         fontFamily: 'monospace',
                         fontSize: '0.7rem',
                         wordBreak: 'break-all',
-                        lineHeight: 1.2
+                        lineHeight: 1.2,
                       }}
                     >
                       {transaction.account_number}
@@ -255,14 +329,14 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
                     </Typography>
                   </TableCell>
                   <TableCell sx={{ py: 1.5 }}>
-                    <Typography 
-                      variant="body2" 
+                    <Typography
+                      variant="body2"
                       color="text.secondary"
-                      sx={{ 
+                      sx={{
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
-                        fontSize: '0.8rem'
+                        fontSize: '0.8rem',
                       }}
                       title={transaction.remittance_info || '-'}
                     >
@@ -271,28 +345,28 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
                   </TableCell>
                   <TableCell align="center" sx={{ py: 1.5 }}>
                     {transaction.beneficiary_id ? (
-                      <Chip 
-                        label="Meglévő" 
-                        color="success" 
+                      <Chip
+                        label="Meglévő"
+                        color="success"
                         size="small"
-                        sx={{ 
+                        sx={{
                           fontSize: '0.7rem',
                           height: 20,
                           '& .MuiChip-label': { px: 1 },
-                          '& .MuiChip-icon': { fontSize: 12 }
+                          '& .MuiChip-icon': { fontSize: 12 },
                         }}
                         icon={<CheckCircleIcon />}
                       />
                     ) : (
-                      <Chip 
-                        label="Új" 
-                        color="warning" 
+                      <Chip
+                        label="Új"
+                        color="warning"
                         size="small"
-                        sx={{ 
+                        sx={{
                           fontSize: '0.7rem',
                           height: 20,
                           '& .MuiChip-label': { px: 1 },
-                          '& .MuiChip-icon': { fontSize: 12 }
+                          '& .MuiChip-icon': { fontSize: 12 },
                         }}
                         icon={<AddIcon />}
                       />
@@ -306,7 +380,11 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
       </Paper>
 
       {/* Info Box */}
-      <Alert severity="info" sx={{ mb: 3, display: { xs: 'none', md: 'flex' } }} icon={<InfoIcon />}>
+      <Alert
+        severity="info"
+        sx={{ mb: 3, display: { xs: 'none', md: 'flex' } }}
+        icon={<InfoIcon />}
+      >
         <AlertTitle sx={{ mb: 1, fontSize: '0.9rem' }}>Tudnivalók</AlertTitle>
         <Box component="ul" sx={{ m: 0, pl: 1, fontSize: '0.8rem', '& li': { mb: 0.5 } }}>
           {previewData.template_updated ? (
@@ -326,13 +404,15 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
       </Alert>
 
       {/* Action Buttons */}
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        pt: 1,
-        gap: 2,
-        flexDirection: { xs: 'column', sm: 'row' }
-      }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          pt: 1,
+          gap: 2,
+          flexDirection: { xs: 'column', sm: 'row' },
+        }}
+      >
         <Button
           onClick={onBack}
           variant="outlined"
@@ -345,7 +425,7 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
           onClick={onConfirm}
           variant="contained"
           size="medium"
-          color={previewData.template_updated ? "primary" : "success"}
+          color={previewData.template_updated ? 'primary' : 'success'}
           startIcon={<CheckCircleIcon />}
           sx={{ width: { xs: '100%', sm: 'auto' }, minWidth: { sm: 200 } }}
         >

@@ -13,19 +13,19 @@ import {
   MenuItem,
   FormControlLabel,
   Checkbox,
-  Divider
+  Divider,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Search as SearchIcon,
   FilterList as FilterIcon,
-  Upload as UploadIcon
+  Upload as UploadIcon,
 } from '@mui/icons-material';
-import { 
-  useBeneficiaries, 
-  useCreateBeneficiary, 
-  useUpdateBeneficiary, 
-  useDeleteBeneficiary 
+import {
+  useBeneficiaries,
+  useCreateBeneficiary,
+  useUpdateBeneficiary,
+  useDeleteBeneficiary,
 } from '../../hooks/api';
 import { Beneficiary } from '../../types/api';
 import BeneficiaryTable from './BeneficiaryTable';
@@ -44,9 +44,9 @@ const BeneficiaryManager: React.FC = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const queryParams = {
-    search: searchTerm || undefined,
-    is_active: showActive,
-    is_frequent: showFrequent,
+    ...(searchTerm && { search: searchTerm }),
+    ...(showActive !== undefined && { is_active: showActive }),
+    ...(showFrequent !== undefined && { is_frequent: showFrequent }),
     page: currentPage,
     page_size: 20, // Force pagination with 20 items per page
     // Send all sorting to backend for proper cross-page sorting
@@ -60,54 +60,54 @@ const BeneficiaryManager: React.FC = () => {
 
   // All sorting handled by backend for proper cross-page sorting
   const beneficiaries = beneficiariesData?.results || [];
-  
+
   // Calculate pagination based on our forced page size
   const pageSize = 20;
-  const totalPages = Math.ceil((beneficiariesData?.count || 0) / pageSize);
+  const totalPages = Math.ceil((beneficiariesData?.count !== null && beneficiariesData?.count !== undefined ? beneficiariesData.count : 0) / pageSize);
 
-  const handleCreateBeneficiary = async (data: Omit<Beneficiary, 'id'>) => {
+  const handleCreateBeneficiary = async (data: Omit<Beneficiary, 'id'>): Promise<void> => {
     try {
       await createMutation.mutateAsync(data);
       setShowForm(false);
-      refetch();
-    } catch (error: any) {
+      void refetch();
+    } catch (error: unknown) {
       // Error will be handled by the form component through React Hook Form
       throw error;
     }
   };
 
-  const handleUpdateBeneficiary = async (id: number, data: Partial<Beneficiary>) => {
+  const handleUpdateBeneficiary = async (id: number, data: Partial<Beneficiary>): Promise<void> => {
     try {
       await updateMutation.mutateAsync({ id, data });
-      refetch();
-    } catch (error: any) {
+      void refetch();
+    } catch (error: unknown) {
       // Error will be handled by the calling component
       throw error;
     }
   };
 
-  const handleDeleteBeneficiary = async (id: number) => {
+  const handleDeleteBeneficiary = async (id: number): Promise<void> => {
     if (window.confirm('Biztosan törölni szeretné ezt a kedvezményezettet?')) {
       await deleteMutation.mutateAsync(id);
-      refetch();
+      void refetch();
     }
   };
 
-  const handleEditBeneficiary = (beneficiary: Beneficiary) => {
+  const handleEditBeneficiary = (beneficiary: Beneficiary): void => {
     setEditingBeneficiary(beneficiary);
     setShowForm(true);
   };
 
-  const handleFormClose = () => {
+  const handleFormClose = (): void => {
     setShowForm(false);
     setEditingBeneficiary(null);
   };
 
-  const handleImportSuccess = () => {
-    refetch();
+  const handleImportSuccess = (): void => {
+    void refetch();
   };
 
-  const handleSort = (field: string, direction: 'asc' | 'desc') => {
+  const handleSort = (field: string, direction: 'asc' | 'desc'): void => {
     setSortField(field);
     setSortDirection(direction);
     setCurrentPage(1); // Reset to first page when sorting
@@ -115,7 +115,7 @@ const BeneficiaryManager: React.FC = () => {
     setTimeout(() => refetch(), 100);
   };
 
-  const clearFilters = () => {
+  const clearFilters = (): void => {
     setSearchTerm('');
     setShowActive(undefined);
     setShowFrequent(undefined);
@@ -127,19 +127,31 @@ const BeneficiaryManager: React.FC = () => {
   const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(null);
   const filterMenuOpen = Boolean(filterAnchorEl);
 
-  const handleFilterClick = (event: React.MouseEvent<HTMLElement>) => {
+  const handleFilterClick = (event: React.MouseEvent<HTMLElement>): void => {
     setFilterAnchorEl(event.currentTarget);
   };
 
-  const handleFilterClose = () => {
+  const handleFilterClose = (): void => {
     setFilterAnchorEl(null);
   };
 
   return (
-    <Box sx={{ p: { xs: 0.5, sm: 0.5, md: 1 }, height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box
+      sx={{
+        p: { xs: 0.5, sm: 0.5, md: 1 },
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
       {/* Header */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', pb: 1, mb: 1 }}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={2}>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          justifyContent="space-between"
+          alignItems={{ xs: 'flex-start', sm: 'center' }}
+          spacing={2}
+        >
           <Box>
             <Typography variant="h5" component="h1" fontWeight="bold" sx={{ mb: 0.5 }}>
               Kedvezményezettek
@@ -156,11 +168,7 @@ const BeneficiaryManager: React.FC = () => {
             >
               Excel importálás
             </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setShowForm(true)}
-            >
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowForm(true)}>
               Új kedvezményezett
             </Button>
           </Stack>
@@ -238,7 +246,12 @@ const BeneficiaryManager: React.FC = () => {
               />
             </MenuItem>
             <Divider />
-            <MenuItem onClick={() => { clearFilters(); handleFilterClose(); }}>
+            <MenuItem
+              onClick={() => {
+                clearFilters();
+                handleFilterClose();
+              }}
+            >
               Szűrők törlése
             </MenuItem>
           </Menu>
@@ -259,20 +272,10 @@ const BeneficiaryManager: React.FC = () => {
               />
             )}
             {showActive === true && (
-              <Chip
-                label="Aktív"
-                size="small"
-                color="success"
-                variant="outlined"
-              />
+              <Chip label="Aktív" size="small" color="success" variant="outlined" />
             )}
             {showFrequent === true && (
-              <Chip
-                label="Gyakori"
-                size="small"
-                color="warning"
-                variant="outlined"
-              />
+              <Chip label="Gyakori" size="small" color="warning" variant="outlined" />
             )}
           </Stack>
         )}
@@ -284,7 +287,10 @@ const BeneficiaryManager: React.FC = () => {
       </Typography>
 
       {/* Table */}
-      <Paper elevation={1} sx={{ flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <Paper
+        elevation={1}
+        sx={{ flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+      >
         <BeneficiaryTable
           beneficiaries={beneficiaries}
           isLoading={isLoading}
@@ -299,14 +305,22 @@ const BeneficiaryManager: React.FC = () => {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <Box sx={{ mt: 1, p: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box
+          sx={{
+            mt: 1,
+            p: 1,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
           <Typography variant="body2" color="text.secondary">
             Oldal {currentPage} / {totalPages}
           </Typography>
           <Pagination
             count={totalPages}
             page={currentPage}
-            onChange={(event, page) => setCurrentPage(page)}
+            onChange={(_event, page) => setCurrentPage(page)}
             color="primary"
             size="small"
           />
@@ -317,9 +331,10 @@ const BeneficiaryManager: React.FC = () => {
       <BeneficiaryForm
         isOpen={showForm}
         onClose={handleFormClose}
-        onSubmit={editingBeneficiary ? 
-          (data) => handleUpdateBeneficiary(editingBeneficiary.id, data) :
-          handleCreateBeneficiary
+        onSubmit={
+          editingBeneficiary
+            ? (data) => handleUpdateBeneficiary(editingBeneficiary.id, data)
+            : handleCreateBeneficiary
         }
         beneficiary={editingBeneficiary}
         isLoading={createMutation.isPending || updateMutation.isPending}

@@ -13,14 +13,14 @@ import {
   List,
   ListItem,
   Stack,
-  IconButton
+  IconButton,
 } from '@mui/material';
 import {
   CloudUpload as CloudUploadIcon,
   Close as CloseIcon,
   Download as DownloadIcon,
   Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon
+  CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 import { useUploadExcel } from '../../hooks/api';
 
@@ -30,11 +30,7 @@ interface ExcelImportProps {
   onSuccess?: () => void;
 }
 
-const ExcelImport: React.FC<ExcelImportProps> = ({
-  isOpen,
-  onClose,
-  onSuccess,
-}) => {
+const ExcelImport: React.FC<ExcelImportProps> = ({ isOpen, onClose, onSuccess }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadResult, setUploadResult] = useState<{
@@ -44,7 +40,7 @@ const ExcelImport: React.FC<ExcelImportProps> = ({
 
   const uploadMutation = useUploadExcel();
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>): void => {
     const file = event.target.files?.[0];
     if (file) {
       setSelectedFile(file);
@@ -52,14 +48,14 @@ const ExcelImport: React.FC<ExcelImportProps> = ({
     }
   };
 
-  const handleUpload = async () => {
+  const handleUpload = async (): Promise<void> => {
     if (!selectedFile) return;
 
     try {
       const result = await uploadMutation.mutateAsync(selectedFile);
-      setUploadResult(result.data);
-      
-      if (result.data.errors?.length === 0 && onSuccess) {
+      setUploadResult(result);
+
+      if (result.errors?.length === 0 && onSuccess) {
         setTimeout(() => {
           onSuccess();
           handleClose();
@@ -70,19 +66,19 @@ const ExcelImport: React.FC<ExcelImportProps> = ({
     }
   };
 
-  const handleClose = () => {
+  const handleClose = (): void => {
     setSelectedFile(null);
     setUploadResult(null);
     uploadMutation.reset();
     onClose();
   };
 
-  const downloadTemplate = () => {
+  const downloadTemplate = (): void => {
     // Create a sample Excel template
     const csvContent = `Megjegyzés,Kedvezményezett neve,Számlaszám,Összeg,Teljesítés dátuma,Közlemény
 Példa,Teszt Kft.,12345678-12345678-12345678,100000,2025-01-15,Számla 2025-001
 ,Másik Cég Kft.,98765432-98765432-98765432,,,`;
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -98,9 +94,7 @@ Példa,Teszt Kft.,12345678-12345678-12345678,100000,2025-01-15,Számla 2025-001
     <Dialog open={isOpen} onClose={handleClose} maxWidth="md" fullWidth>
       <DialogTitle>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6">
-            Excel importálás
-          </Typography>
+          <Typography variant="h6">Excel importálás</Typography>
           <IconButton onClick={handleClose} size="small">
             <CloseIcon />
           </IconButton>
@@ -115,11 +109,7 @@ Példa,Teszt Kft.,12345678-12345678-12345678,100000,2025-01-15,Számla 2025-001
             <Typography variant="body2" sx={{ mb: 1 }}>
               Töltse le a sablon fájlt a helyes formátum megtekintéséhez.
             </Typography>
-            <Button 
-              size="small" 
-              onClick={downloadTemplate}
-              sx={{ textTransform: 'none' }}
-            >
+            <Button size="small" onClick={downloadTemplate} sx={{ textTransform: 'none' }}>
               Sablon letöltése
             </Button>
           </Alert>
@@ -138,19 +128,25 @@ Példa,Teszt Kft.,12345678-12345678-12345678,100000,2025-01-15,Számla 2025-001
                 textAlign: 'center',
                 cursor: 'pointer',
                 '&:hover': {
-                  backgroundColor: 'action.hover'
-                }
+                  backgroundColor: 'action.hover',
+                },
               }}
               onClick={() => fileInputRef.current?.click()}
             >
               <Stack spacing={2} alignItems="center">
                 <CloudUploadIcon sx={{ fontSize: 48, color: 'text.secondary' }} />
                 <Box>
-                  <Typography variant="body2" color="primary" component="span" sx={{ fontWeight: 500 }}>
+                  <Typography
+                    variant="body2"
+                    color="primary"
+                    component="span"
+                    sx={{ fontWeight: 500 }}
+                  >
                     Fájl kiválasztása
                   </Typography>
                   <Typography variant="body2" color="text.secondary" component="span">
-                    {' '}vagy húzza ide
+                    {' '}
+                    vagy húzza ide
                   </Typography>
                 </Box>
                 <Typography variant="caption" color="text.secondary">
@@ -165,17 +161,20 @@ Példa,Teszt Kft.,12345678-12345678-12345678,100000,2025-01-15,Számla 2025-001
                 />
               </Stack>
             </Paper>
-            
+
             {selectedFile && (
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Kiválasztott fájl: <Typography component="span" fontWeight={500}>{selectedFile.name}</Typography>
+                Kiválasztott fájl:{' '}
+                <Typography component="span" fontWeight={500}>
+                  {selectedFile.name}
+                </Typography>
               </Typography>
             )}
           </Box>
 
           {/* Upload result */}
           {uploadResult && (
-            <Alert 
+            <Alert
               severity={uploadResult.errors?.length > 0 ? 'warning' : 'success'}
               icon={uploadResult.errors?.length > 0 ? <WarningIcon /> : <CheckCircleIcon />}
             >
@@ -183,7 +182,7 @@ Példa,Teszt Kft.,12345678-12345678-12345678,100000,2025-01-15,Számla 2025-001
               <Typography variant="body2" gutterBottom>
                 Importált kedvezményezettek: {uploadResult.imported_count}
               </Typography>
-              
+
               {uploadResult.errors?.length > 0 && (
                 <Box sx={{ mt: 1 }}>
                   <Typography variant="body2" fontWeight={500} gutterBottom>
@@ -243,9 +242,7 @@ Példa,Teszt Kft.,12345678-12345678-12345678,100000,2025-01-15,Számla 2025-001
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={handleClose}>
-          Bezárás
-        </Button>
+        <Button onClick={handleClose}>Bezárás</Button>
         <Button
           variant="contained"
           onClick={handleUpload}

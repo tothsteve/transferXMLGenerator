@@ -1,6 +1,6 @@
 /**
  * Validation utilities for XML/CSV export string fields
- * 
+ *
  * Allowed characters for XML/CSV export:
  * - English alphabet (a-z, A-Z)
  * - Hungarian accented characters: áéíóúöüÁÉÍÓÚÖÜőŐűŰÄßäý
@@ -15,7 +15,8 @@ const ALLOWED_NUMBERS = '0123456789';
 const ALLOWED_SPECIAL_CHARS = ' \t\n-.,!?_:()+@;=<>~%*$#&/§';
 
 // Combined allowed character set
-const ALLOWED_CHARS = ALLOWED_ENGLISH_LETTERS + ALLOWED_HUNGARIAN_ACCENTS + ALLOWED_NUMBERS + ALLOWED_SPECIAL_CHARS;
+const ALLOWED_CHARS =
+  ALLOWED_ENGLISH_LETTERS + ALLOWED_HUNGARIAN_ACCENTS + ALLOWED_NUMBERS + ALLOWED_SPECIAL_CHARS;
 
 // Create regex pattern for allowed characters
 const ALLOWED_CHARS_REGEX = new RegExp(`^[${ALLOWED_CHARS.replace(/[[\]\\-]/g, '\\$&')}]*$`);
@@ -33,7 +34,8 @@ export const validateExportString = (value: string): { isValid: boolean; error?:
   if (!ALLOWED_CHARS_REGEX.test(value)) {
     return {
       isValid: false,
-      error: 'Csak angol betűk, magyar ékezetes betűk (áéíóúöüÁÉÍÓÚÖÜőŐűŰÄßäý), számok és a következő írásjelek engedélyezettek: -.,!?_:()+@;=<>~%*$#&/§'
+      error:
+        'Csak angol betűk, magyar ékezetes betűk (áéíóúöüÁÉÍÓÚÖÜőŐűŰÄßäý), számok és a következő írásjelek engedélyezettek: -.,!?_:()+@;=<>~%*$#&/§',
     };
   }
 
@@ -47,10 +49,10 @@ export const validateExportString = (value: string): { isValid: boolean; error?:
  */
 export const sanitizeExportString = (value: string): string => {
   if (!value) return '';
-  
+
   return value
     .split('')
-    .filter(char => ALLOWED_CHARS.includes(char))
+    .filter((char) => ALLOWED_CHARS.includes(char))
     .join('');
 };
 
@@ -61,7 +63,7 @@ export const sanitizeExportString = (value: string): string => {
  */
 export const normalizeWhitespace = (value: string): string => {
   if (!value) return '';
-  
+
   return value
     .trim() // Remove leading/trailing whitespace
     .replace(/\s+/g, ' '); // Replace multiple whitespace with single space
@@ -73,9 +75,11 @@ export const normalizeWhitespace = (value: string): string => {
  * @param value - String to process
  * @returns Object with processed string and validation result
  */
-export const validateAndSanitizeExportString = (value: string): { 
-  value: string; 
-  isValid: boolean; 
+export const validateAndSanitizeExportString = (
+  value: string
+): {
+  value: string;
+  isValid: boolean;
   error?: string;
   wasModified: boolean;
 } => {
@@ -84,22 +88,22 @@ export const validateAndSanitizeExportString = (value: string): {
   }
 
   const originalValue = value;
-  
+
   // First normalize whitespace
   let processedValue = normalizeWhitespace(value);
-  
+
   // Then sanitize by removing invalid characters
   const sanitizedValue = sanitizeExportString(processedValue);
-  
+
   // Check if the original value was valid
   const validation = validateExportString(originalValue);
   const wasModified = originalValue !== sanitizedValue;
-  
+
   return {
     value: sanitizedValue,
     isValid: validation.isValid,
-    error: validation.error,
-    wasModified
+    ...(validation.error && { error: validation.error }),
+    wasModified,
   };
 };
 
@@ -129,7 +133,9 @@ export const validateBeneficiaryName = (name: string): { isValid: boolean; error
  * @param remittanceInfo - Remittance information to validate
  * @returns Validation result object
  */
-export const validateRemittanceInfo = (remittanceInfo: string): { isValid: boolean; error?: string } => {
+export const validateRemittanceInfo = (
+  remittanceInfo: string
+): { isValid: boolean; error?: string } => {
   if (!remittanceInfo) {
     return { isValid: true }; // Optional field
   }

@@ -18,14 +18,14 @@ import {
   List,
   ListItem,
   ListItemText,
-  Tooltip
+  Tooltip,
 } from '@mui/material';
 import {
   Close as CloseIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
   Search as SearchIcon,
-  DragIndicator as DragIcon
+  DragIndicator as DragIcon,
 } from '@mui/icons-material';
 import {
   DndContext,
@@ -43,9 +43,7 @@ import {
   verticalListSortingStrategy,
   useSortable,
 } from '@dnd-kit/sortable';
-import {
-  CSS,
-} from '@dnd-kit/utilities';
+import { CSS } from '@dnd-kit/utilities';
 import { TransferTemplate, Beneficiary } from '../../types/api';
 import { useBeneficiaries } from '../../hooks/api';
 
@@ -71,8 +69,8 @@ interface TemplateFormData {
 interface BeneficiarySelection {
   beneficiary_id: number;
   beneficiary_name: string;
-  account_number: string | undefined;
-  vat_number: string | undefined;
+  account_number: string | null | undefined;
+  vat_number: string | null | undefined;
   default_amount: string;
   default_remittance_info: string;
   order: number;
@@ -81,18 +79,15 @@ interface BeneficiarySelection {
 // Sortable Beneficiary Component
 const SortableBeneficiary: React.FC<{
   beneficiary: BeneficiarySelection;
-  onUpdate: (beneficiaryId: number, field: 'default_amount' | 'default_remittance_info', value: string) => void;
+  onUpdate: (
+    beneficiaryId: number,
+    field: 'default_amount' | 'default_remittance_info',
+    value: string
+  ) => void;
   onRemove: (beneficiaryId: number) => void;
 }> = ({ beneficiary, onUpdate, onRemove }) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ 
-    id: beneficiary.beneficiary_id
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: beneficiary.beneficiary_id,
   });
 
   const style = {
@@ -102,13 +97,13 @@ const SortableBeneficiary: React.FC<{
   };
 
   return (
-    <Paper 
-      ref={setNodeRef} 
+    <Paper
+      ref={setNodeRef}
       style={style}
-      sx={{ 
+      sx={{
         p: 2,
         cursor: isDragging ? 'grabbing' : 'default',
-        '&:hover .drag-handle': { opacity: 1 }
+        '&:hover .drag-handle': { opacity: 1 },
       }}
     >
       <Stack direction="row" spacing={2}>
@@ -119,18 +114,18 @@ const SortableBeneficiary: React.FC<{
               {...listeners}
               size="small"
               className="drag-handle"
-              sx={{ 
+              sx={{
                 opacity: 0.3,
                 transition: 'opacity 0.2s',
                 cursor: 'grab',
-                '&:active': { cursor: 'grabbing' }
+                '&:active': { cursor: 'grabbing' },
               }}
             >
               <DragIcon />
             </IconButton>
           </Tooltip>
         </Box>
-        
+
         <Box sx={{ flex: 1 }}>
           <Typography variant="body1" fontWeight={500}>
             {beneficiary.beneficiary_name}
@@ -152,8 +147,15 @@ const SortableBeneficiary: React.FC<{
               </Typography>
             )}
           </Stack>
-          
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mt: 1 }}>
+
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+              gap: 2,
+              mt: 1,
+            }}
+          >
             <Box>
               <TextField
                 label="Alapértelmezett összeg (HUF)"
@@ -161,7 +163,9 @@ const SortableBeneficiary: React.FC<{
                 size="small"
                 fullWidth
                 value={beneficiary.default_amount || ''}
-                onChange={(e) => onUpdate(beneficiary.beneficiary_id, 'default_amount', e.target.value)}
+                onChange={(e) =>
+                  onUpdate(beneficiary.beneficiary_id, 'default_amount', e.target.value)
+                }
                 placeholder="0"
               />
             </Box>
@@ -171,13 +175,15 @@ const SortableBeneficiary: React.FC<{
                 size="small"
                 fullWidth
                 value={beneficiary.default_remittance_info || ''}
-                onChange={(e) => onUpdate(beneficiary.beneficiary_id, 'default_remittance_info', e.target.value)}
+                onChange={(e) =>
+                  onUpdate(beneficiary.beneficiary_id, 'default_remittance_info', e.target.value)
+                }
                 placeholder="Közlemény..."
               />
             </Box>
           </Box>
         </Box>
-        
+
         <Box sx={{ display: 'flex', alignItems: 'flex-start', pt: 1 }}>
           <Tooltip title="Eltávolítás">
             <IconButton
@@ -233,7 +239,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
   });
 
   const availableBeneficiaries = beneficiariesData?.results || [];
-  const selectedBeneficiaryIds = new Set(selectedBeneficiaries.map(b => b.beneficiary_id));
+  const selectedBeneficiaryIds = new Set(selectedBeneficiaries.map((b) => b.beneficiary_id));
 
   useEffect(() => {
     if (template) {
@@ -248,7 +254,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
       if (template.template_beneficiaries) {
         const templateBeneficiaries = template.template_beneficiaries
           .sort((a, b) => a.order - b.order) // Sort by order field
-          .map(tb => ({
+          .map((tb) => ({
             beneficiary_id: tb.beneficiary.id,
             beneficiary_name: tb.beneficiary.name,
             account_number: tb.beneficiary.account_number,
@@ -270,7 +276,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
     }
   }, [template, reset]);
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = (event: DragEndEvent): void => {
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
@@ -282,19 +288,21 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
       );
 
       if (oldIndex !== -1 && newIndex !== -1) {
-        const reorderedBeneficiaries = arrayMove(selectedBeneficiaries, oldIndex, newIndex).map((b, index) => ({
-          ...b,
-          order: index, // Update order based on new position
-        }));
+        const reorderedBeneficiaries = arrayMove(selectedBeneficiaries, oldIndex, newIndex).map(
+          (b, index) => ({
+            ...b,
+            order: index, // Update order based on new position
+          })
+        );
         setSelectedBeneficiaries(reorderedBeneficiaries);
       }
     }
   };
 
-  const handleFormSubmit = (data: Omit<TemplateFormData, 'beneficiaries'>) => {
+  const handleFormSubmit = (data: Omit<TemplateFormData, 'beneficiaries'>): void => {
     const formData: TemplateFormData = {
       ...data,
-      beneficiaries: selectedBeneficiaries.map(b => ({
+      beneficiaries: selectedBeneficiaries.map((b) => ({
         beneficiary_id: b.beneficiary_id,
         default_amount: b.default_amount,
         default_remittance_info: b.default_remittance_info,
@@ -303,7 +311,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
     onSubmit(formData);
   };
 
-  const handleClose = () => {
+  const handleClose = (): void => {
     reset();
     setSelectedBeneficiaries([]);
     setSearchTerm('');
@@ -311,37 +319,41 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
     onClose();
   };
 
-  const addBeneficiary = (beneficiary: Beneficiary) => {
+  const addBeneficiary = (beneficiary: Beneficiary): void => {
     if (!selectedBeneficiaryIds.has(beneficiary.id)) {
-      setSelectedBeneficiaries(prev => [...prev, {
-        beneficiary_id: beneficiary.id,
-        beneficiary_name: beneficiary.name,
-        account_number: beneficiary.account_number,
-        vat_number: beneficiary.vat_number,
-        default_amount: '',
-        default_remittance_info: beneficiary.remittance_information || '',
-        order: prev.length, // Add to the end
-      }]);
+      setSelectedBeneficiaries((prev) => [
+        ...prev,
+        {
+          beneficiary_id: beneficiary.id,
+          beneficiary_name: beneficiary.name,
+          account_number: beneficiary.account_number,
+          vat_number: beneficiary.vat_number,
+          default_amount: '',
+          default_remittance_info: beneficiary.remittance_information || '',
+          order: prev.length, // Add to the end
+        },
+      ]);
     }
     setShowBeneficiaryPicker(false);
     setSearchTerm('');
   };
 
-  const removeBeneficiary = (beneficiaryId: number) => {
-    setSelectedBeneficiaries(prev => 
-      prev
-        .filter(b => b.beneficiary_id !== beneficiaryId)
-        .map((b, index) => ({ ...b, order: index })) // Reorder after removal
+  const removeBeneficiary = (beneficiaryId: number): void => {
+    setSelectedBeneficiaries(
+      (prev) =>
+        prev
+          .filter((b) => b.beneficiary_id !== beneficiaryId)
+          .map((b, index) => ({ ...b, order: index })) // Reorder after removal
     );
   };
 
-  const updateBeneficiary = (beneficiaryId: number, field: 'default_amount' | 'default_remittance_info', value: string) => {
-    setSelectedBeneficiaries(prev => 
-      prev.map(b => 
-        b.beneficiary_id === beneficiaryId 
-          ? { ...b, [field]: value }
-          : b
-      )
+  const updateBeneficiary = (
+    beneficiaryId: number,
+    field: 'default_amount' | 'default_remittance_info',
+    value: string
+  ) => {
+    setSelectedBeneficiaries((prev) =>
+      prev.map((b) => (b.beneficiary_id === beneficiaryId ? { ...b, [field]: value } : b))
     );
   };
 
@@ -362,7 +374,9 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
         <DialogContent>
           <Stack spacing={4}>
             {/* Basic Template Info */}
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '2fr 1fr' }, gap: 3 }}>
+            <Box
+              sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '2fr 1fr' }, gap: 3 }}
+            >
               <Box>
                 <TextField
                   label="Sablon neve *"
@@ -404,7 +418,12 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
 
             {/* Beneficiaries Section */}
             <Box>
-              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+                sx={{ mb: 2 }}
+              >
                 <Typography variant="body1" fontWeight={500}>
                   Kedvezményezettek ({selectedBeneficiaries.length})
                 </Typography>
@@ -419,17 +438,15 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
               </Stack>
 
               {/* Beneficiary Picker Dialog */}
-              <Dialog 
-                open={showBeneficiaryPicker} 
+              <Dialog
+                open={showBeneficiaryPicker}
                 onClose={() => setShowBeneficiaryPicker(false)}
                 maxWidth="sm"
                 fullWidth
               >
                 <DialogTitle>
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Typography variant="h6">
-                      Kedvezményezett kiválasztása
-                    </Typography>
+                    <Typography variant="h6">Kedvezményezett kiválasztása</Typography>
                     <IconButton onClick={() => setShowBeneficiaryPicker(false)} size="small">
                       <CloseIcon />
                     </IconButton>
@@ -452,20 +469,20 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
                   />
                   <List sx={{ maxHeight: 300, overflow: 'auto' }}>
                     {availableBeneficiaries
-                      .filter(b => !selectedBeneficiaryIds.has(b.id))
-                      .map(beneficiary => (
+                      .filter((b) => !selectedBeneficiaryIds.has(b.id))
+                      .map((beneficiary) => (
                         <ListItem
                           key={beneficiary.id}
                           onClick={() => addBeneficiary(beneficiary)}
-                          sx={{ 
-                            border: 1, 
-                            borderColor: 'divider', 
-                            borderRadius: 1, 
+                          sx={{
+                            border: 1,
+                            borderColor: 'divider',
+                            borderRadius: 1,
                             mb: 1,
                             cursor: 'pointer',
                             '&:hover': {
-                              backgroundColor: 'action.hover'
-                            }
+                              backgroundColor: 'action.hover',
+                            },
                           }}
                         >
                           <ListItemText
@@ -478,7 +495,10 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
                                   </Typography>
                                 )}
                                 {beneficiary.vat_number && (
-                                  <Typography variant="body2" sx={{ color: 'info.main', fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ color: 'info.main', fontWeight: 500 }}
+                                  >
                                     Adóazonosító: {beneficiary.vat_number}
                                   </Typography>
                                 )}
@@ -498,17 +518,18 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
 
               {/* Selected Beneficiaries */}
               {selectedBeneficiaries.length === 0 ? (
-                <Paper 
-                  sx={{ 
-                    p: 4, 
-                    textAlign: 'center', 
-                    border: 2, 
-                    borderStyle: 'dashed', 
-                    borderColor: 'divider' 
+                <Paper
+                  sx={{
+                    p: 4,
+                    textAlign: 'center',
+                    border: 2,
+                    borderStyle: 'dashed',
+                    borderColor: 'divider',
                   }}
                 >
                   <Typography variant="body2" color="text.secondary">
-                    Nincs kiválasztott kedvezményezett. Kedvezményezetteket később is hozzáadhat a sablonhoz.
+                    Nincs kiválasztott kedvezményezett. Kedvezményezetteket később is hozzáadhat a
+                    sablonhoz.
                   </Typography>
                 </Paper>
               ) : (
@@ -518,14 +539,14 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
                     collisionDetection={closestCenter}
                     onDragEnd={handleDragEnd}
                   >
-                    <SortableContext 
-                      items={selectedBeneficiaries.map(b => b.beneficiary_id)}
+                    <SortableContext
+                      items={selectedBeneficiaries.map((b) => b.beneficiary_id)}
                       strategy={verticalListSortingStrategy}
                     >
                       <Stack spacing={2}>
                         {selectedBeneficiaries
                           .sort((a, b) => a.order - b.order) // Sort by order
-                          .map(beneficiary => (
+                          .map((beneficiary) => (
                             <SortableBeneficiary
                               key={beneficiary.beneficiary_id}
                               beneficiary={beneficiary}
@@ -539,19 +560,12 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
                 </Box>
               )}
             </Box>
-
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleClose}>
-            Mégse
-          </Button>
-          <Button
-            type="submit"
-            variant="contained"
-            disabled={isLoading}
-          >
-            {isLoading ? 'Mentés...' : (template ? 'Frissítés' : 'Létrehozás')}
+          <Button onClick={handleClose}>Mégse</Button>
+          <Button type="submit" variant="contained" disabled={isLoading}>
+            {isLoading ? 'Mentés...' : template ? 'Frissítés' : 'Létrehozás'}
           </Button>
         </DialogActions>
       </form>

@@ -14,13 +14,13 @@ import {
   IconButton,
   Alert,
   AlertTitle,
-  CircularProgress
+  CircularProgress,
 } from '@mui/material';
 import {
   CloudUpload as CloudUploadIcon,
   Delete as DeleteIcon,
   PictureAsPdf as PdfIcon,
-  CheckCircle as CheckCircleIcon
+  CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 
 interface UploadStepProps {
@@ -44,24 +44,27 @@ export const UploadStep: React.FC<UploadStepProps> = ({
   onProcessFiles,
   onCancel,
 }) => {
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    // Filter only PDF files and combine with existing files
-    const pdfFiles = acceptedFiles.filter(file => file.type === 'application/pdf');
-    const newFiles = [...selectedFiles, ...pdfFiles];
-    onFilesSelected(newFiles);
-  }, [selectedFiles, onFilesSelected]);
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      // Filter only PDF files and combine with existing files
+      const pdfFiles = acceptedFiles.filter((file) => file.type === 'application/pdf');
+      const newFiles = [...selectedFiles, ...pdfFiles];
+      onFilesSelected(newFiles);
+    },
+    [selectedFiles, onFilesSelected]
+  );
 
   const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
     onDrop,
     accept: {
-      'application/pdf': ['.pdf']
+      'application/pdf': ['.pdf'],
     },
     multiple: true,
     maxFiles: 10,
     maxSize: 50 * 1024 * 1024, // 50MB max file size
   });
 
-  const formatFileSize = (bytes: number) => {
+  const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
@@ -76,9 +79,13 @@ export const UploadStep: React.FC<UploadStepProps> = ({
         <Typography variant="h6" component="h2" fontWeight="bold" gutterBottom>
           PDF Fájlok Feltöltése
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 600, mx: 'auto', display: { xs: 'none', sm: 'block' } }}>
-          Töltse fel a havi NAV adó és fizetési PDF fájljait. A rendszer automatikusan 
-          felismeri a formátumokat és létrehozza a megfelelő sablont.
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ maxWidth: 600, mx: 'auto', display: { xs: 'none', sm: 'block' } }}
+        >
+          Töltse fel a havi NAV adó és fizetési PDF fájljait. A rendszer automatikusan felismeri a
+          formátumokat és létrehozza a megfelelő sablont.
         </Typography>
       </Box>
 
@@ -98,7 +105,10 @@ export const UploadStep: React.FC<UploadStepProps> = ({
 
       {/* Drag & Drop Zone */}
       <Paper
-        {...getRootProps()}
+        {...(() => {
+          const { className: _className, style: _style, ...rootProps } = getRootProps();
+          return rootProps;
+        })()}
         elevation={0}
         sx={{
           border: 2,
@@ -112,17 +122,17 @@ export const UploadStep: React.FC<UploadStepProps> = ({
           mb: 3,
           '&:hover': {
             borderColor: 'grey.400',
-            bgcolor: 'grey.100'
-          }
+            bgcolor: 'grey.100',
+          },
         }}
       >
         <input {...getInputProps()} />
-        <CloudUploadIcon 
-          sx={{ 
-            fontSize: { xs: 32, sm: 40 }, 
+        <CloudUploadIcon
+          sx={{
+            fontSize: { xs: 32, sm: 40 },
             color: isDragActive ? 'primary.main' : 'grey.400',
-            mb: 1
-          }} 
+            mb: 1,
+          }}
         />
         {isDragActive ? (
           <Box>
@@ -135,15 +145,28 @@ export const UploadStep: React.FC<UploadStepProps> = ({
           </Box>
         ) : (
           <Box>
-            <Typography variant="body1" gutterBottom sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}>
-              <Box component="span" color="primary.main" sx={{ textDecoration: 'underline', fontWeight: 600 }}>
+            <Typography
+              variant="body1"
+              gutterBottom
+              sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}
+            >
+              <Box
+                component="span"
+                color="primary.main"
+                sx={{ textDecoration: 'underline', fontWeight: 600 }}
+              >
                 Kattintson a fájlok kiválasztásához
               </Box>
               <Box component="span" sx={{ display: { xs: 'block', sm: 'inline' } }}>
-                {' '}vagy húzza ide őket
+                {' '}
+                vagy húzza ide őket
               </Box>
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
+            >
               PDF fájlok, max. 10 fájl, fájlonként max. 50MB
             </Typography>
           </Box>
@@ -157,8 +180,8 @@ export const UploadStep: React.FC<UploadStepProps> = ({
           <List dense>
             {fileRejections.map(({ file, errors }, index) => (
               <ListItem key={index} sx={{ px: 0, py: 0.25 }}>
-                <ListItemText 
-                  primary={`${file.name}: ${errors.map(e => e.message).join(', ')}`}
+                <ListItemText
+                  primary={`${file.name}: ${errors.map((e) => e.message).join(', ')}`}
                 />
               </ListItem>
             ))}
@@ -180,8 +203,16 @@ export const UploadStep: React.FC<UploadStepProps> = ({
                     <PdfIcon color="error" fontSize="small" />
                   </ListItemIcon>
                   <ListItemText
-                    primary={<Typography variant="body2" fontWeight={500}>{file.name}</Typography>}
-                    secondary={<Typography variant="caption" color="text.secondary">{formatFileSize(file.size)}</Typography>}
+                    primary={
+                      <Typography variant="body2" fontWeight={500}>
+                        {file.name}
+                      </Typography>
+                    }
+                    secondary={
+                      <Typography variant="caption" color="text.secondary">
+                        {formatFileSize(file.size)}
+                      </Typography>
+                    }
                   />
                   <ListItemSecondaryAction>
                     <IconButton
@@ -212,13 +243,15 @@ export const UploadStep: React.FC<UploadStepProps> = ({
       </Alert>
 
       {/* Action Buttons */}
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        pt: 1, 
-        gap: 2,
-        flexDirection: { xs: 'column', sm: 'row' }
-      }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          pt: 1,
+          gap: 2,
+          flexDirection: { xs: 'column', sm: 'row' },
+        }}
+      >
         <Button
           onClick={onCancel}
           variant="outlined"

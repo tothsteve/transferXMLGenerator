@@ -6,10 +6,7 @@ interface LoadingOverlayProps {
   message?: string;
 }
 
-const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ 
-  isVisible, 
-  message = 'Betöltés...' 
-}) => {
+const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ isVisible, message = 'Betöltés...' }) => {
   if (!isVisible) return null;
 
   return (

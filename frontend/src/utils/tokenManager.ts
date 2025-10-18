@@ -20,7 +20,7 @@ class TokenManager {
     return TokenManager.instance;
   }
 
-  private processQueue(error: any, token: string | null = null) {
+  private processQueue(error: any, token: string | null = null): void {
     this.failedQueue.forEach(({ resolve, reject }) => {
       if (error) {
         reject(error);
@@ -36,35 +36,28 @@ class TokenManager {
     onTokenRefresh: (accessToken: string, refreshToken?: string) => void,
     onLogout: () => void,
     axiosInstance: any = axios
-  ) {
-    console.log('🔧 Setting up interceptors on axios instance');
-    
+  ): void {
+
     // Request interceptor to add auth header
     axiosInstance.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
         const token = localStorage.getItem('accessToken');
-        console.log('🔑 TokenManager interceptor - token exists:', !!token);
-        console.log('🔑 Request URL:', config.url);
-        
+
         if (token && config.headers) {
           config.headers.Authorization = `Bearer ${token}`;
-          console.log('✅ Added Authorization header');
-          
+
           // Add company header if available
           const currentCompany = localStorage.getItem('currentCompany');
           if (currentCompany) {
             try {
               const company = JSON.parse(currentCompany);
               config.headers['X-Company-ID'] = company.id.toString();
-              console.log('✅ Added X-Company-ID header:', company.id);
             } catch (error) {
               console.error('Error parsing current company:', error);
             }
           } else {
-            console.log('⚠️ No currentCompany in localStorage');
           }
         } else {
-          console.log('❌ No token or headers available');
         }
         return config;
       },
@@ -86,14 +79,16 @@ class TokenManager {
             // If we're already refreshing, queue this request
             return new Promise((resolve, reject) => {
               this.failedQueue.push({ resolve, reject });
-            }).then((token) => {
-              if (originalRequest.headers) {
-                originalRequest.headers.Authorization = `Bearer ${token}`;
-              }
-              return axiosInstance(originalRequest);
-            }).catch((err) => {
-              return Promise.reject(err);
-            });
+            })
+              .then((token) => {
+                if (originalRequest.headers) {
+                  originalRequest.headers.Authorization = `Bearer ${token}`;
+                }
+                return axiosInstance(originalRequest);
+              })
+              .catch((err) => {
+                return Promise.reject(err);
+              });
           }
 
           originalRequest._retry = true;
@@ -108,13 +103,12 @@ class TokenManager {
           }
 
           try {
-            const response = await axios.post<TokenRefreshResponse>(
-              '/auth/token/refresh/',
-              { refresh: refreshToken }
-            );
+            const response = await axios.post<TokenRefreshResponse>('/auth/token/refresh/', {
+              refresh: refreshToken,
+            });
 
             const { access, refresh } = response.data;
-            
+
             // Update tokens
             localStorage.setItem('accessToken', access);
             if (refresh) {
@@ -147,7 +141,7 @@ class TokenManager {
     );
   }
 
-  public clearTokens() {
+  public clearTokens(): void {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('userData');
@@ -163,7 +157,7 @@ class TokenManager {
     return localStorage.getItem('refreshToken');
   }
 
-  public setTokens(accessToken: string, refreshToken: string) {
+  public setTokens(accessToken: string, refreshToken: string): void {
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
   }

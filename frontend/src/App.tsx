@@ -1,4 +1,3 @@
-import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter as Router } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
@@ -10,23 +9,36 @@ import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import customTheme from './theme/customTheme';
 
+// Type guard for error objects with response status
+function hasResponseStatus(error: unknown): error is { response: { status: number } } {
+  if (typeof error !== 'object' || error === null) return false;
+  if (!('response' in error)) return false;
+
+  const errorWithResponse = error as { response: unknown };
+  if (typeof errorWithResponse.response !== 'object' || errorWithResponse.response === null) return false;
+  if (!('status' in errorWithResponse.response)) return false;
+
+  const response = errorWithResponse.response as { status: unknown };
+  return typeof response.status === 'number';
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000, // 5 minutes
       gcTime: 10 * 60 * 1000, // 10 minutes
-      retry: (failureCount, error: any) => {
+      retry: (failureCount, error: unknown) => {
         // Don't retry on 4xx errors
-        if (error?.response?.status >= 400 && error?.response?.status < 500) {
+        if (hasResponseStatus(error) && error.response.status >= 400 && error.response.status < 500) {
           return false;
         }
         return failureCount < 2;
       },
     },
     mutations: {
-      retry: (failureCount, error: any) => {
+      retry: (failureCount, error: unknown) => {
         // Don't retry mutations on client errors
-        if (error?.response?.status >= 400 && error?.response?.status < 500) {
+        if (hasResponseStatus(error) && error.response.status >= 400 && error.response.status < 500) {
           return false;
         }
         return failureCount < 1;
@@ -35,7 +47,7 @@ const queryClient = new QueryClient({
   },
 });
 
-function App() {
+function App(): React.ReactElement {
   return (
     <ErrorBoundary>
       <ThemeProvider theme={customTheme}>

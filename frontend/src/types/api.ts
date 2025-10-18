@@ -1,9 +1,9 @@
 export interface Beneficiary {
   id: number;
   name: string;
-  account_number?: string;  // Optional for VAT/tax-only beneficiaries
-  vat_number?: string;      // Hungarian VAT number for employee identification
-  tax_number?: string;      // Hungarian company tax number for corporate identification
+  account_number?: string | null | undefined; // Optional for VAT/tax-only beneficiaries
+  vat_number?: string | null | undefined; // Hungarian VAT number for employee identification
+  tax_number?: string | null | undefined; // Hungarian company tax number for corporate identification
   description: string;
   remittance_information: string;
   is_frequent: boolean;
@@ -21,19 +21,19 @@ export interface BankAccount {
 export interface TransferTemplate {
   id: number;
   name: string;
-  description?: string;
+  description?: string | null | undefined;
   is_active: boolean;
   beneficiary_count: number;
   created_at: string;
   updated_at: string;
-  template_beneficiaries?: TemplateBeneficiary[];
+  template_beneficiaries?: TemplateBeneficiary[] | undefined;
 }
 
 export interface TemplateBeneficiary {
   id: number;
-  template: number;
+  template?: number | undefined;
   beneficiary: Beneficiary;
-  default_amount?: number;
+  default_amount?: string | number | null | undefined;
   default_remittance: string;
   order: number;
   is_active: boolean;
@@ -41,46 +41,48 @@ export interface TemplateBeneficiary {
 
 // Transfer for create/update operations (uses IDs)
 export interface Transfer {
-  id?: number;
+  id?: number | undefined;
   beneficiary: number;
-  beneficiary_data?: Beneficiary;  // Optional expanded data
+  beneficiary_data?: Beneficiary | undefined; // Optional expanded data
   amount: string;
   currency: 'HUF' | 'EUR' | 'USD';
   execution_date: string;
   remittance_info: string;
-  nav_invoice?: number | null; // Optional link to NAV invoice
+  nav_invoice?: number | null | undefined; // Optional link to NAV invoice
+  order?: number | undefined;
   is_processed: boolean;
-  created_at?: string;
+  created_at?: string | undefined;
 }
 
 // Transfer as returned from API (with expanded data)
 export interface TransferWithBeneficiary {
-  id?: number;
-  beneficiary: Beneficiary;  // Full beneficiary object
+  id?: number | undefined;
+  beneficiary: Beneficiary; // Full beneficiary object
   amount: string;
   currency: 'HUF' | 'EUR' | 'USD';
   execution_date: string;
   remittance_info: string;
-  nav_invoice?: number | null;
+  nav_invoice?: number | null | undefined;
+  order?: number | undefined;
   is_processed: boolean;
-  created_at?: string;
+  created_at?: string | undefined;
 }
 
 export interface TransferBatch {
   id: number;
   name: string;
-  description?: string;
-  transfers: TransferWithBeneficiary[];  // Batches return transfers with expanded beneficiary data
+  description?: string | null | undefined;
+  transfers: TransferWithBeneficiary[]; // Batches return transfers with expanded beneficiary data
   total_amount: string;
   used_in_bank: boolean;
-  bank_usage_date?: string;
+  bank_usage_date?: string | null | undefined;
   order: number;
   transfer_count: number;
   xml_filename: string;
-  xml_generated_at?: string;
+  xml_generated_at?: string | null | undefined;
   created_at: string;
-  batch_format?: string;
-  batch_format_display?: string;
+  batch_format?: string | null | undefined;
+  batch_format_display?: string | null | undefined;
 }
 
 export interface ApiResponse<T> {
@@ -106,7 +108,7 @@ export interface BulkCreateTransferRequest {
 
 export interface GenerateXmlRequest {
   transfer_ids: number[];
-  batch_name?: string;
+  batch_name?: string | null;
 }
 
 export interface GenerateXmlResponse {
@@ -129,7 +131,7 @@ export interface GenerateKHExportResponse {
   content: string;
   filename: string;
   encoding: string;
-  content_encoding?: string;  // Optional field for base64 encoding indicator
+  content_encoding?: string | null; // Optional field for base64 encoding indicator
   transfer_count: number;
   total_amount: string;
 }
@@ -142,7 +144,7 @@ export interface TrustedPartner {
   auto_pay: boolean;
   invoice_count: number;
   last_invoice_date: string | null;
-  last_invoice_date_formatted?: string;
+  last_invoice_date_formatted?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -157,7 +159,7 @@ export interface AvailablePartner {
 export interface NAVInvoice {
   id: number;
   nav_invoice_number: string;
-  invoice_direction: 'INBOUND' | 'OUTBOUND';
+  invoice_direction: string; // 'INBOUND' | 'OUTBOUND' - using string for Zod v4 compatibility
   invoice_direction_display: string;
   partner_name: string;
   partner_tax_number: string;
@@ -171,8 +173,8 @@ export interface NAVInvoice {
   payment_due_date_formatted: string | null;
   payment_date: string | null;
   payment_date_formatted: string | null;
-  completion_date?: string | null;
-  last_modified_date?: string | null;
+  completion_date: string | null;
+  last_modified_date: string | null;
 
   // Financial
   currency_code: string;
@@ -185,8 +187,8 @@ export interface NAVInvoice {
 
   // Business
   invoice_operation: string | null;
-  invoice_category?: string | null;
-  invoice_appearance?: string | null;
+  invoice_category: string | null;
+  invoice_appearance: string | null;
   payment_method: string | null;
   original_invoice_number: string | null;
   payment_status: {
@@ -206,14 +208,14 @@ export interface NAVInvoice {
   created_at: string;
 
   // NAV metadata (available in detail view)
-  nav_source?: string | null;
-  original_request_version?: string | null;
+  nav_source: string | null;
+  original_request_version: string | null;
 
   // Partners (available in detail view)
-  supplier_name?: string;
-  customer_name?: string;
-  supplier_tax_number?: string;
-  customer_tax_number?: string;
-  supplier_bank_account_number?: string;
-  customer_bank_account_number?: string;
+  supplier_name: string | null;
+  customer_name: string | null;
+  supplier_tax_number: string | null;
+  customer_tax_number: string | null;
+  supplier_bank_account_number: string | null;
+  customer_bank_account_number: string | null;
 }

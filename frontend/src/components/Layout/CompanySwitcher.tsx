@@ -25,15 +25,15 @@ const CompanySwitcher: React.FC = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
 
-  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>): void => {
     setAnchorEl(event.currentTarget);
   };
 
-  const handleClose = () => {
+  const handleClose = (): void => {
     setAnchorEl(null);
   };
 
-  const handleSwitchCompany = async (company: Company) => {
+  const handleSwitchCompany = async (company: Company): Promise<void> => {
     if (company.id === state.currentCompany?.id) {
       handleClose();
       return;
@@ -102,8 +102,8 @@ const CompanySwitcher: React.FC = () => {
           Válasszon céget
         </Typography>
         <Divider />
-        
-        {state.companies.map((company) => (
+
+        {state.companies.map((company: Company) => (
           <MenuItem
             key={company.id}
             onClick={() => handleSwitchCompany(company)}

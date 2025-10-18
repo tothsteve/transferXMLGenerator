@@ -8,11 +8,9 @@ import {
   Select,
   MenuItem,
   SelectChangeEvent,
-  Chip
+  Chip,
 } from '@mui/material';
-import {
-  Description as TemplateIcon
-} from '@mui/icons-material';
+import { Description as TemplateIcon } from '@mui/icons-material';
 import { TransferTemplate } from '../../types/api';
 
 interface TemplateSelectorProps {
@@ -30,11 +28,11 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
   onLoadTemplate,
   isLoading = false,
 }) => {
-  const activeTemplates = templates.filter(t => t.is_active);
-  
-  const handleSelectChange = (event: SelectChangeEvent<number>) => {
+  const activeTemplates = templates.filter((t) => t.is_active);
+
+  const handleSelectChange = (event: SelectChangeEvent<number>): void => {
     const templateId = event.target.value as number;
-    const template = activeTemplates.find(t => t.id === templateId);
+    const template = activeTemplates.find((t) => t.id === templateId);
     if (template) {
       onSelectTemplate(template);
       // Automatically load the template when selected
@@ -46,9 +44,7 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
     <Paper elevation={1} sx={{ p: 3 }}>
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
         <TemplateIcon color="primary" />
-        <Typography variant="h6">
-          Sablon kiválasztása
-        </Typography>
+        <Typography variant="h6">Sablon kiválasztása</Typography>
         {isLoading && (
           <Typography variant="body2" color="primary" sx={{ ml: 2 }}>
             Betöltés...
@@ -57,14 +53,14 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
       </Stack>
 
       {activeTemplates.length === 0 ? (
-        <Box 
-          sx={{ 
-            textAlign: 'center', 
-            py: 4, 
-            border: 2, 
-            borderStyle: 'dashed', 
+        <Box
+          sx={{
+            textAlign: 'center',
+            py: 4,
+            border: 2,
+            borderStyle: 'dashed',
             borderColor: 'divider',
-            borderRadius: 1
+            borderRadius: 1,
           }}
         >
           <TemplateIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
@@ -85,7 +81,7 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
               if (!selected) {
                 return <Typography color="text.secondary">Válasszon sablont...</Typography>;
               }
-              const template = activeTemplates.find(t => t.id === selected);
+              const template = activeTemplates.find((t) => t.id === selected);
               return (
                 <Box>
                   <Typography variant="body1" fontWeight={500}>
@@ -135,16 +131,16 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
               <Typography variant="body2" color="text.secondary">
                 <Typography component="span" fontWeight={500}>
                   Kedvezményezettek:
-                </Typography>
-                {' '}{selectedTemplate.beneficiary_count}
+                </Typography>{' '}
+                {selectedTemplate.beneficiary_count}
               </Typography>
             </Box>
             <Box>
               <Typography variant="body2" color="text.secondary">
                 <Typography component="span" fontWeight={500}>
                   Létrehozva:
-                </Typography>
-                {' '}{new Date(selectedTemplate.created_at).toLocaleDateString('hu-HU')}
+                </Typography>{' '}
+                {new Date(selectedTemplate.created_at).toLocaleDateString('hu-HU')}
               </Typography>
             </Box>
           </Box>

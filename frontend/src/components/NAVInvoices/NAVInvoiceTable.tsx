@@ -25,20 +25,16 @@ import {
   CreditCard as CardIcon,
   Receipt as ReceiptIcon,
   AttachMoney as CashIcon,
-  CheckCircle as PaidIcon,
-  Schedule as UnpaidIcon,
-  Warning as OverdueIcon,
-  Assignment as PreparedIcon,
 } from '@mui/icons-material';
 
 interface Invoice {
   id: number;
   nav_invoice_number: string;
-  invoice_direction: 'INBOUND' | 'OUTBOUND';
+  invoice_direction: string; // 'INBOUND' | 'OUTBOUND' - using string for Zod v4 compatibility
   invoice_direction_display: string;
   partner_name: string;
   partner_tax_number: string;
-  
+
   // Dates
   issue_date: string;
   issue_date_formatted: string;
@@ -48,7 +44,7 @@ interface Invoice {
   payment_due_date_formatted: string | null;
   payment_date: string | null;
   payment_date_formatted: string | null;
-  
+
   // Financial
   currency_code: string;
   invoice_net_amount: number;
@@ -57,7 +53,7 @@ interface Invoice {
   invoice_vat_amount_formatted: string;
   invoice_gross_amount: number;
   invoice_gross_amount_formatted: string;
-  
+
   // Business
   invoice_operation: string | null;
   payment_method: string | null;
@@ -74,7 +70,7 @@ interface Invoice {
   is_overdue: boolean;
   is_paid: boolean;
   invoice_category?: string | null;
-  
+
   // System
   sync_status: string;
   created_at: string;
@@ -118,27 +114,29 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
   onSelectAll,
 }) => {
   // Helper functions for checkbox selection
-  const safeSelectedInvoices = selectedInvoices || [];
+  const safeSelectedInvoices = selectedInvoices !== null && selectedInvoices !== undefined ? selectedInvoices : [];
   const selectedCount = safeSelectedInvoices.length;
   const totalCount = invoices.length;
-  
+
   const isAllSelected = Boolean(totalCount > 0 && selectedCount === totalCount);
   const isIndeterminate = Boolean(selectedCount > 0 && selectedCount < totalCount);
 
-  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>): void => {
     if (onSelectAll) {
       onSelectAll(event.target.checked);
     }
   };
 
-  const handleSelectInvoice = (invoiceId: number) => (event: React.ChangeEvent<HTMLInputElement>) => {
-    event.stopPropagation(); // Prevent row click when checking checkbox
-    if (onSelectInvoice) {
-      onSelectInvoice(invoiceId, event.target.checked);
-    }
-  };
+  const handleSelectInvoice =
+    (invoiceId: number) =>
+    (event: React.ChangeEvent<HTMLInputElement>): void => {
+      event.stopPropagation(); // Prevent row click when checking checkbox
+      if (onSelectInvoice) {
+        onSelectInvoice(invoiceId, event.target.checked);
+      }
+    };
 
-  const handleSort = (field: string) => {
+  const handleSort = (field: string): void => {
     if (sortField === field) {
       // Toggle direction
       const newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
@@ -150,14 +148,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
     }
   };
 
-  const formatAmount = (amount: number, currency: string) => {
-    if (currency === 'HUF') {
-      return `${amount.toLocaleString('hu-HU', { maximumFractionDigits: 0 })} Ft`;
-    }
-    return `${amount.toLocaleString('hu-HU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
-  };
-
-  const getDirectionChip = (direction: string, display: string) => (
+  const getDirectionChip = (direction: string, display: string): React.ReactElement => (
     <Chip
       label={display}
       color={direction === 'OUTBOUND' ? 'primary' : 'secondary'}
@@ -167,72 +158,79 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
     />
   );
 
-  const getSortIcon = (field: string) => {
+  const getSortIcon = (field: string): React.ReactElement | null => {
     if (sortField !== field) return null;
-    return sortDirection === 'asc' ? <ArrowUpIcon fontSize="small" /> : <ArrowDownIcon fontSize="small" />;
+    return sortDirection === 'asc' ? (
+      <ArrowUpIcon fontSize="small" />
+    ) : (
+      <ArrowDownIcon fontSize="small" />
+    );
   };
 
-  const renderHeaderCell = (field: string, label: string, align: 'left' | 'right' | 'center' = 'left') => (
+  const renderHeaderCell = (
+    field: string,
+    label: string,
+    align: 'left' | 'right' | 'center' = 'left'
+  ): React.ReactElement => (
     <TableCell
       align={align}
-      sx={{ 
+      sx={{
         cursor: 'pointer',
         userSelect: 'none',
         '&:hover': { backgroundColor: 'action.hover' },
         fontWeight: 'bold',
-        backgroundColor: sortField === field ? 'action.selected' : 'background.paper'
+        backgroundColor: sortField === field ? 'action.selected' : 'background.paper',
       }}
       onClick={() => handleSort(field)}
     >
-      <Box sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start' 
-      }}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent:
+            align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start',
+        }}
+      >
         {label}
         {getSortIcon(field)}
       </Box>
     </TableCell>
   );
 
-  const getStornoIndicator = (operation: string | null) => {
+  const getStornoIndicator = (operation: string | null): React.ReactElement | null => {
     // Show "Igen" for STORNO invoices, empty for others
     if (operation === 'STORNO') {
-      return (
-        <Chip
-          label="Igen"
-          color="error"
-          size="small"
-          variant="filled"
-        />
-      );
+      return <Chip label="Igen" color="error" size="small" variant="filled" />;
     }
     return null;
   };
 
-  const getPaymentMethodIcon = (paymentMethod: string | null, invoiceCategory?: string | null) => {
+  const getPaymentMethodIcon = (
+    paymentMethod: string | null,
+    invoiceCategory?: string | null
+  ): React.ReactElement | string => {
     // Show Receipt icon for SIMPLIFIED invoices when payment_method is null
-    if (!paymentMethod && invoiceCategory?.toUpperCase() === 'SIMPLIFIED') {
+    if ((paymentMethod === null || paymentMethod === undefined || paymentMethod === '') && invoiceCategory?.toUpperCase() === 'SIMPLIFIED') {
       return (
         <Tooltip title="Egyszerűsített">
           <ReceiptIcon color="success" fontSize="small" />
         </Tooltip>
       );
     }
-    
+
     // Show Card icon for NORMAL invoices when payment_method is null
-    if (!paymentMethod && invoiceCategory?.toUpperCase() === 'NORMAL') {
+    if ((paymentMethod === null || paymentMethod === undefined || paymentMethod === '') && invoiceCategory?.toUpperCase() === 'NORMAL') {
       return (
         <Tooltip title="Bankkártya (feltételezett)">
           <CardIcon color="secondary" fontSize="small" />
         </Tooltip>
       );
     }
-    
-    if (!paymentMethod) return '-';
-    
+
+    if (paymentMethod === null || paymentMethod === undefined || paymentMethod === '') return '-';
+
     const method = paymentMethod.toUpperCase().trim();
-    
+
     switch (method) {
       case 'TRANSFER':
         return (
@@ -253,7 +251,7 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
           </Tooltip>
         );
       default:
-        console.log('Unknown payment method:', paymentMethod); // Debug log
+        // Silently handle unknown payment methods (like "OTHER") by showing the text
         return (
           <Tooltip title={paymentMethod}>
             <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
@@ -264,43 +262,61 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
     }
   };
 
-
-
   if (isLoading) {
     return (
       <TableContainer sx={{ flexGrow: 1 }}>
         <Table stickyHeader>
           <TableHead>
-            <TableRow sx={{
-              '& .MuiTableCell-head': {
-                backgroundColor: 'background.paper',
-                borderBottom: '2px solid',
-                borderBottomColor: 'divider',
-              }
-            }}>
+            <TableRow
+              sx={{
+                '& .MuiTableCell-head': {
+                  backgroundColor: 'background.paper',
+                  borderBottom: '2px solid',
+                  borderBottomColor: 'divider',
+                },
+              }}
+            >
               <TableCell sx={{ backgroundColor: 'background.paper', width: '60px' }}>
                 <Checkbox disabled />
               </TableCell>
               <TableCell sx={{ backgroundColor: 'background.paper' }}>Számlaszám</TableCell>
-              <TableCell align="center" sx={{ backgroundColor: 'background.paper' }}>Irány</TableCell>
+              <TableCell align="center" sx={{ backgroundColor: 'background.paper' }}>
+                Irány
+              </TableCell>
               <TableCell sx={{ backgroundColor: 'background.paper' }}>Partner</TableCell>
               <TableCell sx={{ backgroundColor: 'background.paper' }}>Kiállítás</TableCell>
               <TableCell sx={{ backgroundColor: 'background.paper' }}>Teljesítés</TableCell>
               <TableCell sx={{ backgroundColor: 'background.paper' }}>Fizetési határidő</TableCell>
-              <TableCell align="center" sx={{ backgroundColor: 'background.paper' }}>Fizetési mód</TableCell>
-              <TableCell align="center" sx={{ backgroundColor: 'background.paper' }}>Fizetési állapot</TableCell>
-              <TableCell align="right" sx={{ backgroundColor: 'background.paper' }}>Nettó</TableCell>
-              <TableCell align="right" sx={{ backgroundColor: 'background.paper' }}>ÁFA</TableCell>
-              <TableCell align="right" sx={{ backgroundColor: 'background.paper' }}>Bruttó</TableCell>
-              {showStornoColumn && <TableCell sx={{ backgroundColor: 'background.paper' }}>Sztornó</TableCell>}
-              <TableCell align="center" sx={{ backgroundColor: 'background.paper' }}>Részletek</TableCell>
+              <TableCell align="center" sx={{ backgroundColor: 'background.paper' }}>
+                Fizetési mód
+              </TableCell>
+              <TableCell align="center" sx={{ backgroundColor: 'background.paper' }}>
+                Fizetési állapot
+              </TableCell>
+              <TableCell align="right" sx={{ backgroundColor: 'background.paper' }}>
+                Nettó
+              </TableCell>
+              <TableCell align="right" sx={{ backgroundColor: 'background.paper' }}>
+                ÁFA
+              </TableCell>
+              <TableCell align="right" sx={{ backgroundColor: 'background.paper' }}>
+                Bruttó
+              </TableCell>
+              {showStornoColumn && (
+                <TableCell sx={{ backgroundColor: 'background.paper' }}>Sztornó</TableCell>
+              )}
+              <TableCell align="center" sx={{ backgroundColor: 'background.paper' }}>
+                Részletek
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {Array.from({ length: 10 }).map((_, index) => (
               <TableRow key={index}>
                 {Array.from({ length: showStornoColumn ? 14 : 13 }).map((_, cellIndex) => (
-                  <TableCell key={cellIndex}><Skeleton /></TableCell>
+                  <TableCell key={cellIndex}>
+                    <Skeleton />
+                  </TableCell>
                 ))}
               </TableRow>
             ))}
@@ -312,13 +328,13 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
 
   if (invoices.length === 0) {
     return (
-      <Box 
-        sx={{ 
-          flexGrow: 1, 
-          display: 'flex', 
-          alignItems: 'center', 
+      <Box
+        sx={{
+          flexGrow: 1,
+          display: 'flex',
+          alignItems: 'center',
           justifyContent: 'center',
-          py: 8
+          py: 8,
         }}
       >
         <Typography variant="h6" color="text.secondary">
@@ -332,13 +348,15 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
     <TableContainer sx={{ flexGrow: 1 }}>
       <Table stickyHeader size="small">
         <TableHead>
-          <TableRow sx={{
-            '& .MuiTableCell-head': {
-              backgroundColor: 'background.paper',
-              borderBottom: '2px solid',
-              borderBottomColor: 'divider',
-            }
-          }}>
+          <TableRow
+            sx={{
+              '& .MuiTableCell-head': {
+                backgroundColor: 'background.paper',
+                borderBottom: '2px solid',
+                borderBottomColor: 'divider',
+              },
+            }}
+          >
             <TableCell sx={{ width: '60px', backgroundColor: 'background.paper' }}>
               {onSelectAll && (
                 <Checkbox
@@ -350,7 +368,9 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
             </TableCell>
             {renderHeaderCell('nav_invoice_number', 'Számlaszám')}
             {renderHeaderCell('invoice_direction', 'Irány', 'center')}
-            <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'background.paper' }}>Partner</TableCell>
+            <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'background.paper' }}>
+              Partner
+            </TableCell>
             {renderHeaderCell('issue_date', 'Kiállítás')}
             {renderHeaderCell('fulfillment_date', 'Teljesítés')}
             {renderHeaderCell('payment_due_date', 'Fizetési határidő')}
@@ -359,20 +379,29 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
             {renderHeaderCell('invoice_net_amount', 'Nettó', 'right')}
             {renderHeaderCell('invoice_vat_amount', 'ÁFA', 'right')}
             {renderHeaderCell('invoice_gross_amount', 'Bruttó', 'right')}
-            {showStornoColumn && <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'background.paper' }}>Sztornó</TableCell>}
-            <TableCell align="center" sx={{ fontWeight: 'bold', backgroundColor: 'background.paper' }}>Részletek</TableCell>
+            {showStornoColumn && (
+              <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'background.paper' }}>
+                Sztornó
+              </TableCell>
+            )}
+            <TableCell
+              align="center"
+              sx={{ fontWeight: 'bold', backgroundColor: 'background.paper' }}
+            >
+              Részletek
+            </TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {invoices.map((invoice) => (
-            <TableRow 
-              key={invoice.id} 
+            <TableRow
+              key={invoice.id}
               hover
-              sx={{ 
-                '&:hover': { 
+              sx={{
+                '&:hover': {
                   backgroundColor: 'action.hover',
-                  cursor: 'pointer' 
-                }
+                  cursor: 'pointer',
+                },
               }}
               onClick={() => onView(invoice)}
             >
@@ -394,17 +423,24 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
               </TableCell>
               <TableCell>
                 <Box>
-                  <Typography variant="body2" sx={{ 
-                    maxWidth: 150, 
-                    overflow: 'hidden', 
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    fontSize: '0.8rem'
-                  }}>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      maxWidth: 150,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      fontSize: '0.8rem',
+                    }}
+                  >
                     {invoice.partner_name}
                   </Typography>
-                  {invoice.partner_tax_number && (
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                  {invoice.partner_tax_number !== null && invoice.partner_tax_number !== undefined && invoice.partner_tax_number !== '' && (
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ fontSize: '0.7rem' }}
+                    >
                       {invoice.partner_tax_number}
                     </Typography>
                   )}
@@ -417,18 +453,20 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
               </TableCell>
               <TableCell>
                 <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
-                  {invoice.fulfillment_date_formatted || '-'}
+                  {invoice.fulfillment_date_formatted !== null && invoice.fulfillment_date_formatted !== undefined && invoice.fulfillment_date_formatted !== '' ? invoice.fulfillment_date_formatted : '-'}
                 </Typography>
               </TableCell>
               <TableCell>
                 <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
-                  {invoice.payment_due_date_formatted || '-'}
+                  {invoice.payment_due_date_formatted !== null && invoice.payment_due_date_formatted !== undefined && invoice.payment_due_date_formatted !== '' ? invoice.payment_due_date_formatted : '-'}
                 </Typography>
               </TableCell>
               <TableCell align="center">
-                <PaymentStatusBadge 
+                <PaymentStatusBadge
                   paymentStatus={invoice.payment_status}
-                  paymentStatusDate={invoice.payment_status_date_formatted || undefined}
+                  {...(invoice.payment_status_date_formatted !== null && invoice.payment_status_date_formatted !== undefined && invoice.payment_status_date_formatted !== '' && {
+                    paymentStatusDate: invoice.payment_status_date_formatted,
+                  })}
                   size="small"
                   compact={true}
                   isOverdue={invoice.is_overdue}
@@ -453,17 +491,11 @@ const NAVInvoiceTable: React.FC<NAVInvoiceTableProps> = ({
                 </Typography>
               </TableCell>
               {showStornoColumn && (
-                <TableCell>
-                  {getStornoIndicator(invoice.invoice_operation)}
-                </TableCell>
+                <TableCell>{getStornoIndicator(invoice.invoice_operation)}</TableCell>
               )}
               <TableCell align="center" onClick={(e) => e.stopPropagation()}>
                 <Tooltip title="Számla részletei és tételek">
-                  <IconButton
-                    onClick={() => onView(invoice)}
-                    size="small"
-                    color="primary"
-                  >
+                  <IconButton onClick={() => onView(invoice)} size="small" color="primary">
                     <ViewIcon />
                   </IconButton>
                 </Tooltip>

@@ -1,4 +1,4 @@
-import React, { Component, ReactNode } from 'react';
+import { Component, ReactNode } from 'react';
 import { Alert, AlertTitle, Box, Typography, Button, Card, CardContent } from '@mui/material';
 import { Warning as WarningIcon } from '@mui/icons-material';
 
@@ -21,11 +21,11 @@ class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: any) {
+  componentDidCatch(error: Error, errorInfo: any): void {
     console.error('Error caught by boundary:', error, errorInfo);
   }
 
-  render() {
+  render(): ReactNode {
     if (this.state.hasError) {
       return (
         <Box
@@ -40,20 +40,21 @@ class ErrorBoundary extends Component<Props, State> {
         >
           <Card sx={{ maxWidth: 500, width: '100%' }}>
             <CardContent sx={{ textAlign: 'center', p: 4 }}>
-              <WarningIcon 
-                sx={{ 
-                  fontSize: 60, 
-                  color: 'error.main', 
-                  mb: 2 
-                }} 
+              <WarningIcon
+                sx={{
+                  fontSize: 60,
+                  color: 'error.main',
+                  mb: 2,
+                }}
               />
-              
+
               <Typography variant="h5" component="h2" gutterBottom>
                 Alkalmazás hiba történt
               </Typography>
-              
+
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Váratlan hiba történt az alkalmazásban. Kérjük, frissítse az oldalt vagy próbálja újra később.
+                Váratlan hiba történt az alkalmazásban. Kérjük, frissítse az oldalt vagy próbálja
+                újra később.
               </Typography>
 
               {this.state.error && (

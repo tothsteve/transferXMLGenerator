@@ -46,8 +46,8 @@ const BatchManager: React.FC = () => {
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
   const { data: batchesData, isLoading, error } = useBatches();
   const { data: selectedBatch, isLoading: isLoadingBatchDetails } = useBatch(
-    selectedBatchId || undefined,
-    !!selectedBatchId
+    selectedBatchId !== null && selectedBatchId !== undefined ? selectedBatchId : undefined,
+    selectedBatchId !== null && selectedBatchId !== undefined
   );
   const markUsedMutation = useMarkBatchUsedInBank();
   const markUnusedMutation = useMarkBatchUnusedInBank();
@@ -56,7 +56,7 @@ const BatchManager: React.FC = () => {
 
   const batches = batchesData?.results || [];
 
-  const handleUsageToggle = async (batch: TransferBatch) => {
+  const handleUsageToggle = async (batch: TransferBatch): Promise<void> => {
     try {
       if (batch.used_in_bank) {
         await markUnusedMutation.mutateAsync(batch.id);
@@ -68,18 +68,18 @@ const BatchManager: React.FC = () => {
     }
   };
 
-  const handleDownload = async (batch: TransferBatch) => {
+  const handleDownload = async (batch: TransferBatch): Promise<void> => {
     try {
       setDownloadingBatchId(batch.id);
       const response = await downloadMutation.mutateAsync(batch.id);
-      
+
       // Determine file type based on batch name
       const isKHExport = batch.name.includes('KH Export');
       const mimeType = isKHExport ? 'text/csv; charset=utf-8' : 'application/xml';
       const fileExtension = isKHExport ? 'csv' : 'xml';
-      
+
       // Create download link
-      const blob = new Blob([response.data], { type: mimeType });
+      const blob = new Blob([response as BlobPart], { type: mimeType });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -95,8 +95,12 @@ const BatchManager: React.FC = () => {
     }
   };
 
-  const handleDelete = async (batch: TransferBatch) => {
-    if (!window.confirm(`Biztosan törölni szeretnéd a(z) "${batch.name}" köteget? Ez a művelet nem vonható vissza.`)) {
+  const handleDelete = async (batch: TransferBatch): Promise<void> => {
+    if (
+      !window.confirm(
+        `Biztosan törölni szeretnéd a(z) "${batch.name}" köteget? Ez a művelet nem vonható vissza.`
+      )
+    ) {
       return;
     }
 
@@ -108,7 +112,7 @@ const BatchManager: React.FC = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleString('hu-HU', {
       year: 'numeric',
       month: '2-digit',
@@ -118,15 +122,15 @@ const BatchManager: React.FC = () => {
     });
   };
 
-  const handlePreviewBatch = (batch: TransferBatch) => {
+  const handlePreviewBatch = (batch: TransferBatch): void => {
     setSelectedBatchId(batch.id);
   };
 
-  const handleClosePreview = () => {
+  const handleClosePreview = (): void => {
     setSelectedBatchId(null);
   };
 
-  const formatAmount = (amount: string) => {
+  const formatAmount = (amount: string): string => {
     const num = parseFloat(amount);
     return new Intl.NumberFormat('hu-HU', {
       style: 'currency',
@@ -149,9 +153,7 @@ const BatchManager: React.FC = () => {
   if (error) {
     return (
       <Container maxWidth="xl" sx={{ py: 4 }}>
-        <Alert severity="error">
-          Hiba történt a kötegek betöltése során.
-        </Alert>
+        <Alert severity="error">Hiba történt a kötegek betöltése során.</Alert>
       </Container>
     );
   }
@@ -166,7 +168,8 @@ const BatchManager: React.FC = () => {
           </Typography>
         </Stack>
         <Typography variant="body1" color="text.secondary">
-          Itt kezelheted a generált kötegeket, letöltheted őket, és jelölheted, hogy fel lettek-e töltve az internetbankba.
+          Itt kezelheted a generált kötegeket, letöltheted őket, és jelölheted, hogy fel lettek-e
+          töltve az internetbankba.
         </Typography>
       </Box>
 
@@ -188,13 +191,27 @@ const BatchManager: React.FC = () => {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell><strong>Köteg neve</strong></TableCell>
-                  <TableCell><strong>Utalások száma</strong></TableCell>
-                  <TableCell><strong>Összeg</strong></TableCell>
-                  <TableCell><strong>Generálás dátuma</strong></TableCell>
-                  <TableCell><strong>Bank státusz</strong></TableCell>
-                  <TableCell><strong>Felhasználás dátuma</strong></TableCell>
-                  <TableCell align="center"><strong>Műveletek</strong></TableCell>
+                  <TableCell>
+                    <strong>Köteg neve</strong>
+                  </TableCell>
+                  <TableCell>
+                    <strong>Utalások száma</strong>
+                  </TableCell>
+                  <TableCell>
+                    <strong>Összeg</strong>
+                  </TableCell>
+                  <TableCell>
+                    <strong>Generálás dátuma</strong>
+                  </TableCell>
+                  <TableCell>
+                    <strong>Bank státusz</strong>
+                  </TableCell>
+                  <TableCell>
+                    <strong>Felhasználás dátuma</strong>
+                  </TableCell>
+                  <TableCell align="center">
+                    <strong>Műveletek</strong>
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -204,16 +221,16 @@ const BatchManager: React.FC = () => {
                       <Typography variant="body2" fontWeight="medium">
                         {batch.name}
                       </Typography>
-                      {batch.description && (
+                      {batch.description !== null && batch.description !== undefined && batch.description !== '' && (
                         <Typography variant="caption" color="text.secondary">
                           {batch.description}
                         </Typography>
                       )}
                     </TableCell>
                     <TableCell>
-                      <Chip 
-                        label={`${batch.transfer_count} utalás`} 
-                        size="small" 
+                      <Chip
+                        label={`${batch.transfer_count} utalás`}
+                        size="small"
                         variant="outlined"
                       />
                     </TableCell>
@@ -226,7 +243,7 @@ const BatchManager: React.FC = () => {
                       <Stack direction="row" alignItems="center" spacing={1}>
                         <AccessTimeIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
                         <Typography variant="body2">
-                          {batch.xml_generated_at ? formatDate(batch.xml_generated_at) : 'N/A'}
+                          {batch.xml_generated_at !== null && batch.xml_generated_at !== undefined && batch.xml_generated_at !== '' ? formatDate(batch.xml_generated_at) : 'N/A'}
                         </Typography>
                       </Stack>
                     </TableCell>
@@ -239,7 +256,7 @@ const BatchManager: React.FC = () => {
                       />
                     </TableCell>
                     <TableCell>
-                      {batch.bank_usage_date ? (
+                      {batch.bank_usage_date !== null && batch.bank_usage_date !== undefined && batch.bank_usage_date !== '' ? (
                         <Typography variant="body2" color="success.main">
                           {formatDate(batch.bank_usage_date)}
                         </Typography>
@@ -277,7 +294,7 @@ const BatchManager: React.FC = () => {
                             </IconButton>
                           </span>
                         </Tooltip>
-                        
+
                         <Tooltip title="Köteg törlése">
                           <span>
                             <IconButton
@@ -290,14 +307,22 @@ const BatchManager: React.FC = () => {
                             </IconButton>
                           </span>
                         </Tooltip>
-                        
-                        <Tooltip title={batch.used_in_bank ? 'Nem felhasználtként jelölés' : 'Felhasználtként jelölés'}>
+
+                        <Tooltip
+                          title={
+                            batch.used_in_bank
+                              ? 'Nem felhasználtként jelölés'
+                              : 'Felhasználtként jelölés'
+                          }
+                        >
                           <FormControlLabel
                             control={
                               <Switch
                                 checked={batch.used_in_bank}
                                 onChange={() => handleUsageToggle(batch)}
-                                disabled={markUsedMutation.isPending || markUnusedMutation.isPending}
+                                disabled={
+                                  markUsedMutation.isPending || markUnusedMutation.isPending
+                                }
                                 size="small"
                               />
                             }
@@ -316,7 +341,7 @@ const BatchManager: React.FC = () => {
       )}
 
       <BatchDetailsDialog
-        open={!!selectedBatchId}
+        open={selectedBatchId !== null && selectedBatchId !== undefined}
         onClose={handleClosePreview}
         batch={selectedBatch || null}
         isLoading={isLoadingBatchDetails}

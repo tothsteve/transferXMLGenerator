@@ -91,5 +91,8 @@ export const getSuccessMessage = (action: string, entity: string): string => {
     },
   };
 
-  return (messages as any)[action]?.[entity] || `${entity} sikeresen ${action === 'create' ? 'létrehozva' : 'módosítva'}`;
+  return (
+    (messages as any)[action]?.[entity] ||
+    `${entity} sikeresen ${action === 'create' ? 'létrehozva' : 'módosítva'}`
+  );
 };

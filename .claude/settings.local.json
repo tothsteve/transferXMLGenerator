@@ -19,7 +19,15 @@
       "Bash(python manage.py:*)",
       "Bash(git add:*)",
       "Bash(curl:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(npx tsc:*)",
+      "Bash(TransferWorkflow.original.tsx)",
+      "Bash(npx husky init:*)",
+      "Bash(npm run build:fast:*)",
+      "Bash(npm run lint:*)",
+      "Bash(awk:*)",
+      "Bash(npx eslint:*)",
+      "Bash(cat:*)"
     ],
     "deny": []
   }

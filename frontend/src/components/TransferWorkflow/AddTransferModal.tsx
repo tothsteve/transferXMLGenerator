@@ -20,13 +20,13 @@ import {
   Select,
   MenuItem,
   FormControl,
-  InputLabel
+  InputLabel,
 } from '@mui/material';
 import {
   Close as CloseIcon,
   Search as SearchIcon,
   Person as PersonIcon,
-  Edit as EditIcon
+  Edit as EditIcon,
 } from '@mui/icons-material';
 import { useBeneficiaries } from '../../hooks/api';
 import { Beneficiary } from '../../types/api';
@@ -51,11 +51,7 @@ interface FormData {
   currency: 'HUF' | 'EUR' | 'USD';
 }
 
-const AddTransferModal: React.FC<AddTransferModalProps> = ({
-  isOpen,
-  onClose,
-  onAdd,
-}) => {
+const AddTransferModal: React.FC<AddTransferModalProps> = ({ isOpen, onClose, onAdd }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBeneficiary, setSelectedBeneficiary] = useState<Beneficiary | null>(null);
   const [showBeneficiaryPicker, setShowBeneficiaryPicker] = useState(true);
@@ -69,9 +65,9 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({
   } = useForm<FormData>({
     defaultValues: {
       amount: '',
-      execution_date: new Date().toISOString().split('T')[0],
+      execution_date: new Date().toISOString().split('T')[0] as string,
       remittance_info: '',
-      currency: 'HUF',
+      currency: 'HUF' as const,
     },
   });
 
@@ -89,7 +85,7 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({
     }
   }, [selectedBeneficiary, setValue]);
 
-  const handleFormSubmit = (data: FormData) => {
+  const handleFormSubmit = (data: FormData): void => {
     if (!selectedBeneficiary) return;
 
     onAdd({
@@ -104,7 +100,7 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({
     handleClose();
   };
 
-  const handleClose = () => {
+  const handleClose = (): void => {
     reset();
     setSelectedBeneficiary(null);
     setSearchTerm('');
@@ -112,13 +108,13 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({
     onClose();
   };
 
-  const handleBeneficiarySelect = (beneficiary: Beneficiary) => {
+  const handleBeneficiarySelect = (beneficiary: Beneficiary): void => {
     setSelectedBeneficiary(beneficiary);
     setShowBeneficiaryPicker(false);
     setSearchTerm('');
   };
 
-  const handleChangeBeneficiary = () => {
+  const handleChangeBeneficiary = (): void => {
     setSelectedBeneficiary(null);
     setShowBeneficiaryPicker(true);
   };
@@ -127,16 +123,13 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({
     <Dialog open={isOpen} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6">
-            Új átutalás hozzáadása
-          </Typography>
+          <Typography variant="h6">Új átutalás hozzáadása</Typography>
           <IconButton onClick={handleClose} edge="end">
             <CloseIcon />
           </IconButton>
         </Stack>
       </DialogTitle>
       <DialogContent dividers>
-
         {showBeneficiaryPicker ? (
           /* Beneficiary Selection */
           <Stack spacing={2}>
@@ -170,15 +163,15 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({
                   {availableBeneficiaries.map((beneficiary) => (
                     <ListItem key={beneficiary.id} disablePadding>
                       <ListItemButton
-                        onClick={() => handleBeneficiarySelect(beneficiary)}
-                        sx={{ 
-                          border: 1, 
-                          borderColor: 'divider', 
-                          borderRadius: 1, 
+                        onClick={() => handleBeneficiarySelect(beneficiary as Beneficiary)}
+                        sx={{
+                          border: 1,
+                          borderColor: 'divider',
+                          borderRadius: 1,
                           mb: 1,
                           '&:hover': {
-                            bgcolor: 'action.hover'
-                          }
+                            bgcolor: 'action.hover',
+                          },
                         }}
                       >
                         <ListItemText
@@ -186,7 +179,11 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({
                             <Typography variant="body2" fontWeight={500}>
                               {beneficiary.name}
                               {beneficiary.vat_number && (
-                                <Typography component="span" variant="body2" sx={{ color: 'info.main', fontWeight: 400, ml: 1 }}>
+                                <Typography
+                                  component="span"
+                                  variant="body2"
+                                  sx={{ color: 'info.main', fontWeight: 400, ml: 1 }}
+                                >
                                   ({beneficiary.vat_number})
                                 </Typography>
                               )}
@@ -194,11 +191,20 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({
                           }
                           secondary={
                             <Box component="span">
-                              <Typography variant="caption" component="span" sx={{ fontFamily: 'monospace', display: 'block' }}>
+                              <Typography
+                                variant="caption"
+                                component="span"
+                                sx={{ fontFamily: 'monospace', display: 'block' }}
+                              >
                                 {beneficiary.account_number}
                               </Typography>
                               {beneficiary.description && (
-                                <Typography variant="caption" component="span" color="text.secondary" sx={{ display: 'block' }}>
+                                <Typography
+                                  variant="caption"
+                                  component="span"
+                                  color="text.secondary"
+                                  sx={{ display: 'block' }}
+                                >
                                   {beneficiary.description}
                                 </Typography>
                               )}
@@ -223,12 +229,20 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({
                     <Typography variant="body2" fontWeight={500}>
                       {selectedBeneficiary?.name}
                       {selectedBeneficiary?.vat_number && (
-                        <Typography component="span" variant="body2" sx={{ color: 'info.main', fontWeight: 400, ml: 1 }}>
+                        <Typography
+                          component="span"
+                          variant="body2"
+                          sx={{ color: 'info.main', fontWeight: 400, ml: 1 }}
+                        >
                           ({selectedBeneficiary.vat_number})
                         </Typography>
                       )}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ fontFamily: 'monospace' }}
+                    >
                       {selectedBeneficiary?.account_number}
                     </Typography>
                     {selectedBeneficiary?.description && (
@@ -237,11 +251,7 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({
                       </Typography>
                     )}
                   </Box>
-                  <Button
-                    size="small"
-                    onClick={handleChangeBeneficiary}
-                    startIcon={<EditIcon />}
-                  >
+                  <Button size="small" onClick={handleChangeBeneficiary} startIcon={<EditIcon />}>
                     Változtatás
                   </Button>
                 </Stack>
@@ -253,24 +263,20 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({
                   fullWidth
                   label="Összeg *"
                   type="number"
-                  {...register('amount', { 
+                  {...register('amount', {
                     required: 'Az összeg megadása kötelező',
-                    min: { value: 1, message: 'Az összegnek pozitívnak kell lennie' }
+                    min: { value: 1, message: 'Az összegnek pozitívnak kell lennie' },
                   })}
                   error={!!errors.amount}
                   helperText={errors.amount?.message}
-                  InputProps={{ 
-                    inputProps: { step: 1, min: 0 }
+                  InputProps={{
+                    inputProps: { step: 1, min: 0 },
                   }}
                   placeholder="0"
                 />
                 <FormControl sx={{ minWidth: 80 }}>
                   <InputLabel>Pénznem</InputLabel>
-                  <Select
-                    {...register('currency')}
-                    label="Pénznem"
-                    defaultValue="HUF"
-                  >
+                  <Select {...register('currency')} label="Pénznem" defaultValue="HUF">
                     <MenuItem value="HUF">HUF</MenuItem>
                     <MenuItem value="EUR">EUR</MenuItem>
                     <MenuItem value="USD">USD</MenuItem>
@@ -305,12 +311,10 @@ const AddTransferModal: React.FC<AddTransferModalProps> = ({
 
       {!showBeneficiaryPicker && (
         <DialogActions>
-          <Button onClick={handleClose}>
-            Mégse
-          </Button>
-          <Button 
-            variant="contained" 
-            onClick={handleSubmit(handleFormSubmit)}
+          <Button onClick={handleClose}>Mégse</Button>
+          <Button
+            variant="contained"
+            onClick={handleSubmit(handleFormSubmit as any)}
             disabled={!selectedBeneficiary}
           >
             Hozzáadás

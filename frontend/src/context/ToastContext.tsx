@@ -13,7 +13,7 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | undefined>(undefined);
 
-export const useToastContext = () => {
+export const useToastContext = (): ToastContextValue => {
   const context = useContext(ToastContext);
   if (!context) {
     throw new Error('useToastContext must be used within a ToastProvider');
@@ -30,13 +30,13 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
 
   // Listen for global toast events
   React.useEffect(() => {
-    const handleToastEvent = (event: CustomEvent) => {
+    const handleToastEvent = (event: CustomEvent): void => {
       const { type, title, message, duration } = event.detail;
       addToast(type, title, message, duration);
     };
 
     window.addEventListener('toast' as any, handleToastEvent);
-    return () => window.removeEventListener('toast' as any, handleToastEvent);
+    return (): void => window.removeEventListener('toast' as any, handleToastEvent);
   }, [addToast]);
 
   const value: ToastContextValue = {

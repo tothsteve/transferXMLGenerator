@@ -14,7 +14,7 @@ import {
   TablePagination,
   IconButton,
   Switch,
-  FormControlLabel,
+  // FormControlLabel,
   Chip,
   Dialog,
   DialogTitle,
@@ -25,99 +25,95 @@ import {
   Tooltip,
   InputAdornment,
 } from '@mui/material';
-import {
-  Edit,
-  Delete,
-  Add,
-  Search,
-  CheckCircle,
-  Cancel,
-  PersonAdd,
-} from '@mui/icons-material';
+import { Delete, Add, Search } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trustedPartnersApi } from '../../services/api';
-import { TrustedPartner, AvailablePartner } from '../../types/api';
+import { TrustedPartner } from '../../types/api';
 import AddPartnerDialog from './AddPartnerDialog';
 
 const TrustedPartners: React.FC = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
-  const [editingPartner, setEditingPartner] = useState<TrustedPartner | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch trusted partners
-  const { data: partnersResponse, isLoading, error } = useQuery({
+  const {
+    data: partnersResponse,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['trustedPartners', { page: page + 1, page_size: rowsPerPage, search: searchTerm }],
-    queryFn: () => trustedPartnersApi.getAll({ 
-      page: page + 1, 
-      page_size: rowsPerPage,
-      search: searchTerm || undefined,
-      ordering: '-created_at'
-    }),
+    queryFn: () =>
+      trustedPartnersApi.getAll({
+        page: page + 1,
+        page_size: rowsPerPage,
+        ...(searchTerm && { search: searchTerm }),
+        ordering: '-created_at',
+      }),
   });
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: (id: number) => trustedPartnersApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
+      void queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
       setDeleteConfirmId(null);
     },
   });
 
   // Toggle active status mutation
   const toggleActiveMutation = useMutation({
-    mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) => 
+    mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) =>
       trustedPartnersApi.partialUpdate(id, { is_active }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
+      void queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
     },
   });
 
   // Toggle auto-pay mutation
   const toggleAutoPayMutation = useMutation({
-    mutationFn: ({ id, auto_pay }: { id: number; auto_pay: boolean }) => 
+    mutationFn: ({ id, auto_pay }: { id: number; auto_pay: boolean }) =>
       trustedPartnersApi.partialUpdate(id, { auto_pay }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
+      void queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
     },
   });
 
   const partners = partnersResponse?.data?.results || [];
   const totalCount = partnersResponse?.data?.count || 0;
 
-  const handleChangePage = (event: unknown, newPage: number) => {
+  const handleChangePage = (_event: unknown, newPage: number): void => {
     setPage(newPage);
   };
 
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>): void => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
 
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
     setSearchTerm(event.target.value);
     setPage(0);
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id: number): void => {
     setDeleteConfirmId(id);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = (): void => {
     if (deleteConfirmId) {
       deleteMutation.mutate(deleteConfirmId);
     }
   };
 
-  const handleToggleActive = (partner: TrustedPartner) => {
+  const handleToggleActive = (partner: TrustedPartner): void => {
     toggleActiveMutation.mutate({ id: partner.id, is_active: !partner.is_active });
   };
 
-  const handleToggleAutoPay = (partner: TrustedPartner) => {
+  const handleToggleAutoPay = (partner: TrustedPartner): void => {
     toggleAutoPayMutation.mutate({ id: partner.id, auto_pay: !partner.auto_pay });
   };
 
@@ -143,17 +139,14 @@ const TrustedPartners: React.FC = () => {
         <Typography variant="h5" fontWeight="600">
           Automatikusan Fizetett Partnerek
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => setIsAddDialogOpen(true)}
-        >
+        <Button variant="contained" startIcon={<Add />} onClick={() => setIsAddDialogOpen(true)}>
           Partner hozzáadása
         </Button>
       </Box>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Az automatikusan fizetettnek jelölt partnerektől érkező számlák automatikusan kifizetve jelöltek lesznek a NAV szinkronizáció során.
+        Az automatikusan fizetettnek jelölt partnerektől érkező számlák automatikusan kifizetve
+        jelöltek lesznek a NAV szinkronizáció során.
       </Typography>
 
       <Paper elevation={2} sx={{ width: '100%', overflow: 'hidden' }}>
@@ -250,7 +243,9 @@ const TrustedPartners: React.FC = () => {
                 <TableRow>
                   <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                     <Typography variant="body2" color="text.secondary">
-                      {searchTerm ? 'Nincs találat a keresésre.' : 'Még nincsenek megbízható partnerek hozzáadva.'}
+                      {searchTerm
+                        ? 'Nincs találat a keresésre.'
+                        : 'Még nincsenek megbízható partnerek hozzáadva.'}
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -277,16 +272,13 @@ const TrustedPartners: React.FC = () => {
         open={isAddDialogOpen}
         onClose={() => setIsAddDialogOpen(false)}
         onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
+          void queryClient.invalidateQueries({ queryKey: ['trustedPartners'] });
           // Don't close dialog - let AddPartnerDialog handle its own state
         }}
       />
 
       {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteConfirmId !== null}
-        onClose={() => setDeleteConfirmId(null)}
-      >
+      <Dialog open={deleteConfirmId !== null} onClose={() => setDeleteConfirmId(null)}>
         <DialogTitle>Partner törlése</DialogTitle>
         <DialogContent>
           <Typography>
@@ -294,9 +286,7 @@ const TrustedPartners: React.FC = () => {
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteConfirmId(null)}>
-            Mégse
-          </Button>
+          <Button onClick={() => setDeleteConfirmId(null)}>Mégse</Button>
           <Button
             onClick={confirmDelete}
             color="error"

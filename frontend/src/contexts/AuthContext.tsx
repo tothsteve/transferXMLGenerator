@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import TokenManager from '../utils/tokenManager';
 import { authApi, apiClient } from '../services/api';
+import { hasResponseData, getErrorMessage } from '../utils/errorTypeGuards';
 
 export interface Company {
   id: number;
@@ -34,7 +35,10 @@ export interface AuthState {
 
 type AuthAction =
   | { type: 'AUTH_START' }
-  | { type: 'AUTH_SUCCESS'; payload: { user: User; companies: Company[]; accessToken: string; refreshToken: string } }
+  | {
+      type: 'AUTH_SUCCESS';
+      payload: { user: User; companies: Company[]; accessToken: string; refreshToken: string };
+    }
   | { type: 'AUTH_ERROR'; payload: string }
   | { type: 'LOGOUT' }
   | { type: 'SET_COMPANY'; payload: Company }
@@ -61,10 +65,11 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         error: null,
       };
     case 'AUTH_SUCCESS':
-      const currentCompany = action.payload.companies.find(
-        c => c.id === action.payload.user.last_active_company
-      ) || action.payload.companies[0] || null;
-      
+      const currentCompany =
+        action.payload.companies.find((c) => c.id === action.payload.user.last_active_company) ||
+        action.payload.companies[0] ||
+        null;
+
       return {
         ...state,
         isAuthenticated: true,
@@ -113,7 +118,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
   }
 };
 
-interface AuthContextType {
+export interface AuthContextType {
   state: AuthState;
   login: (username: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
@@ -135,7 +140,7 @@ export interface RegisterData {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const useAuth = () => {
+export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
@@ -154,16 +159,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Setup token manager interceptors
   useEffect(() => {
     console.log('🔧 Setting up TokenManager interceptors');
-    
-    const handleTokenRefresh = (accessToken: string, refreshToken?: string) => {
+
+    const handleTokenRefresh = (accessToken: string, refreshToken?: string): void => {
       console.log('🔄 Token refresh triggered');
       dispatch({
         type: 'TOKEN_REFRESH',
-        payload: { accessToken, refreshToken }
+        payload: { accessToken, ...(refreshToken && { refreshToken }) },
       });
     };
 
-    const handleLogout = () => {
+    const handleLogout = (): void => {
       console.log('👋 Logout triggered by TokenManager');
       dispatch({ type: 'LOGOUT' });
     };
@@ -174,7 +179,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Load saved authentication state on mount
   useEffect(() => {
-    const loadSavedAuth = () => {
+    const loadSavedAuth = (): void => {
       console.log('🔍 Loading saved authentication state...');
       try {
         const accessToken = localStorage.getItem('accessToken');
@@ -188,7 +193,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           hasRefreshToken: !!refreshToken,
           hasUserData: !!userData,
           hasCompaniesData: !!companiesData,
-          hasCurrentCompany: !!currentCompanyData
+          hasCurrentCompany: !!currentCompanyData,
         });
 
         if (accessToken && refreshToken && userData && companiesData) {
@@ -201,7 +206,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
           dispatch({
             type: 'AUTH_SUCCESS',
-            payload: { user, companies, accessToken, refreshToken }
+            payload: { user, companies, accessToken, refreshToken },
           });
 
           if (currentCompany) {
@@ -233,15 +238,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
     // Note: We removed the automatic localStorage clearing to prevent race conditions
     // localStorage will only be cleared on explicit logout action
-  }, [state.isAuthenticated, state.user, state.accessToken, state.refreshToken, state.currentCompany, state.companies]);
+  }, [
+    state.isAuthenticated,
+    state.user,
+    state.accessToken,
+    state.refreshToken,
+    state.currentCompany,
+    state.companies,
+  ]);
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string): Promise<void> => {
     dispatch({ type: 'AUTH_START' });
 
     try {
       const response = await authApi.login(username, password);
       const data = response.data;
-      
+
       dispatch({
         type: 'AUTH_SUCCESS',
         payload: {
@@ -251,11 +263,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           refreshToken: data.refresh,
         },
       });
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || 
-                          error.response?.data?.non_field_errors?.[0] ||
-                          error.message || 
-                          'Login failed';
+    } catch (error: unknown) {
+      let errorMessage = 'Login failed';
+
+      if (hasResponseData(error)) {
+        if (error.response.data.detail && typeof error.response.data.detail === 'string') {
+          errorMessage = error.response.data.detail;
+        } else if (error.response.data.non_field_errors && Array.isArray(error.response.data.non_field_errors)) {
+          const msg = error.response.data.non_field_errors[0];
+          errorMessage = typeof msg === 'string' ? msg : 'Login failed';
+        }
+      } else {
+        errorMessage = getErrorMessage(error, 'Login failed');
+      }
+
       dispatch({
         type: 'AUTH_ERROR',
         payload: errorMessage,
@@ -264,31 +285,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const register = async (data: RegisterData) => {
+  const register = async (data: RegisterData): Promise<void> => {
     dispatch({ type: 'AUTH_START' });
 
     try {
       await authApi.register(data);
-      
+
       // After successful registration, automatically login
       await login(data.username, data.password);
-      
-    } catch (error: any) {
-      const errorData = error.response?.data;
+    } catch (error: unknown) {
       let errorMessage = 'Registration failed';
-      
-      if (errorData) {
-        if (errorData.non_field_errors) {
-          errorMessage = errorData.non_field_errors[0];
-        } else if (errorData.username) {
-          errorMessage = `Username: ${errorData.username[0]}`;
-        } else if (errorData.email) {
-          errorMessage = `Email: ${errorData.email[0]}`;
-        } else if (errorData.company_tax_id) {
-          errorMessage = `Company Tax ID: ${errorData.company_tax_id[0]}`;
+
+      if (hasResponseData(error)) {
+        const errorData = error.response.data;
+        if (errorData.non_field_errors && Array.isArray(errorData.non_field_errors)) {
+          const msg = errorData.non_field_errors[0];
+          errorMessage = typeof msg === 'string' ? msg : 'Registration failed';
+        } else if (errorData.username && Array.isArray(errorData.username)) {
+          const msg = errorData.username[0];
+          errorMessage = `Username: ${typeof msg === 'string' ? msg : 'Invalid username'}`;
+        } else if (errorData.email && Array.isArray(errorData.email)) {
+          const msg = errorData.email[0];
+          errorMessage = `Email: ${typeof msg === 'string' ? msg : 'Invalid email'}`;
+        } else if (errorData.company_tax_id && Array.isArray(errorData.company_tax_id)) {
+          const msg = errorData.company_tax_id[0];
+          errorMessage = `Company Tax ID: ${typeof msg === 'string' ? msg : 'Invalid tax ID'}`;
         }
+      } else {
+        errorMessage = getErrorMessage(error, 'Registration failed');
       }
-      
+
       dispatch({
         type: 'AUTH_ERROR',
         payload: errorMessage,
@@ -297,12 +323,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const logout = () => {
+  const logout = (): void => {
     tokenManager.clearTokens();
     dispatch({ type: 'LOGOUT' });
   };
 
-  const switchCompany = async (company: Company) => {
+  const switchCompany = async (company: Company): Promise<void> => {
     if (!state.accessToken) {
       throw new Error('Not authenticated');
     }
@@ -310,14 +336,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       await authApi.switchCompany(company.id);
       dispatch({ type: 'SET_COMPANY', payload: company });
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.error || 'Failed to switch company';
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error, 'Failed to switch company');
       console.error('Failed to switch company:', errorMessage);
       throw new Error(errorMessage);
     }
   };
 
-  const clearError = () => {
+  const clearError = (): void => {
     dispatch({ type: 'CLEAR_ERROR' });
   };
 
@@ -330,9 +356,5 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     clearError,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

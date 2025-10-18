@@ -12,7 +12,7 @@ import {
   Skeleton,
   Avatar,
   Divider,
-  alpha
+  alpha,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -21,7 +21,7 @@ import {
   Visibility as ViewIcon,
   CalendarToday as CalendarIcon,
   Group as GroupIcon,
-  Description as TemplateIcon
+  Description as TemplateIcon,
 } from '@mui/icons-material';
 import { TransferTemplate } from '../../types/api';
 
@@ -44,15 +44,15 @@ const TemplateList: React.FC<TemplateListProps> = ({
 }) => {
   if (isLoading) {
     return (
-      <Box 
-        sx={{ 
+      <Box
+        sx={{
           display: 'grid',
           gridTemplateColumns: {
             xs: '1fr',
             sm: 'repeat(2, 1fr)',
-            lg: 'repeat(3, 1fr)'
+            lg: 'repeat(3, 1fr)',
           },
-          gap: 3
+          gap: 3,
         }}
       >
         {[...Array(6)].map((_, i) => (
@@ -90,52 +90,59 @@ const TemplateList: React.FC<TemplateListProps> = ({
   }
 
   return (
-    <Box 
-      sx={{ 
+    <Box
+      sx={{
         display: 'grid',
         gridTemplateColumns: {
           xs: '1fr',
           sm: 'repeat(2, 1fr)',
-          lg: 'repeat(3, 1fr)'
+          lg: 'repeat(3, 1fr)',
         },
-        gap: 3
+        gap: 3,
       }}
     >
       {templates.map((template) => (
-        <Card 
-          key={template.id} 
+        <Card
+          key={template.id}
           elevation={2}
-          sx={{ 
-            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%)',
+          sx={{
+            background:
+              'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%)',
             backdropFilter: 'blur(20px)',
             border: '1px solid rgba(255, 255, 255, 0.3)',
             borderRadius: 3,
             transition: 'all 0.3s ease-in-out',
-            '&:hover': { 
+            '&:hover': {
               boxShadow: '0 12px 32px rgba(0, 0, 0, 0.15)',
               transform: 'translateY(-4px)',
-              border: '1px solid rgba(37, 99, 235, 0.2)'
-            }
+              border: '1px solid rgba(37, 99, 235, 0.2)',
+            },
           }}
         >
           <CardContent>
             {/* Header with Avatar and Status */}
             <Stack direction="row" alignItems="flex-start" spacing={2} sx={{ mb: 2 }}>
-              <Avatar 
-                sx={{ 
-                  width: 48, 
+              <Avatar
+                sx={{
+                  width: 48,
                   height: 48,
-                  background: template.is_active 
+                  background: template.is_active
                     ? 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)'
                     : 'linear-gradient(135deg, #64748b 0%, #94a3b8 100%)',
-                  mt: 0.5
+                  mt: 0.5,
                 }}
               >
                 <TemplateIcon />
               </Avatar>
               <Box sx={{ minWidth: 0, flex: 1 }}>
                 <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-                  <Typography variant="h6" component="h3" noWrap fontWeight={700} sx={{ color: 'text.primary' }}>
+                  <Typography
+                    variant="h6"
+                    component="h3"
+                    noWrap
+                    fontWeight={700}
+                    sx={{ color: 'text.primary' }}
+                  >
                     {template.name}
                   </Typography>
                   <Chip
@@ -143,24 +150,24 @@ const TemplateList: React.FC<TemplateListProps> = ({
                     size="small"
                     color={template.is_active ? 'success' : 'default'}
                     variant="outlined"
-                    sx={{ 
+                    sx={{
                       minWidth: 'fit-content',
                       borderWidth: 2,
-                      fontWeight: 600
+                      fontWeight: 600,
                     }}
                   />
                 </Stack>
                 {template.description && (
-                  <Typography 
-                    variant="body2" 
-                    color="text.secondary" 
-                    sx={{ 
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       display: '-webkit-box',
                       WebkitLineClamp: 2,
                       WebkitBoxOrient: 'vertical',
-                      lineHeight: 1.4
+                      lineHeight: 1.4,
                     }}
                   >
                     {template.description}
@@ -171,11 +178,18 @@ const TemplateList: React.FC<TemplateListProps> = ({
 
             {/* Divider */}
             <Divider sx={{ my: 2, borderColor: alpha('#000', 0.05) }} />
-            
+
             {/* Metadata */}
             <Stack direction="row" spacing={3} sx={{ mb: 2 }}>
               <Stack direction="row" alignItems="center" spacing={1}>
-                <Avatar sx={{ width: 24, height: 24, bgcolor: 'secondary.main', background: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)' }}>
+                <Avatar
+                  sx={{
+                    width: 24,
+                    height: 24,
+                    bgcolor: 'secondary.main',
+                    background: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)',
+                  }}
+                >
                   <GroupIcon sx={{ fontSize: 14 }} />
                 </Avatar>
                 <Typography variant="body2" color="text.primary" fontWeight={500}>
@@ -186,7 +200,14 @@ const TemplateList: React.FC<TemplateListProps> = ({
                 </Typography>
               </Stack>
               <Stack direction="row" alignItems="center" spacing={1}>
-                <Avatar sx={{ width: 24, height: 24, bgcolor: 'primary.main', background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)' }}>
+                <Avatar
+                  sx={{
+                    width: 24,
+                    height: 24,
+                    bgcolor: 'primary.main',
+                    background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
+                  }}
+                >
                   <CalendarIcon sx={{ fontSize: 14 }} />
                 </Avatar>
                 <Typography variant="caption" color="text.secondary" fontWeight={500}>
@@ -194,7 +215,7 @@ const TemplateList: React.FC<TemplateListProps> = ({
                 </Typography>
               </Stack>
             </Stack>
-            
+
             {template.updated_at !== template.created_at && (
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1 }}>
                 <Typography variant="caption" color="text.secondary">
@@ -202,7 +223,6 @@ const TemplateList: React.FC<TemplateListProps> = ({
                 </Typography>
               </Stack>
             )}
-
           </CardContent>
           <CardActions sx={{ p: 3, pt: 0 }}>
             <Button
@@ -210,26 +230,26 @@ const TemplateList: React.FC<TemplateListProps> = ({
               startIcon={<PlayIcon />}
               onClick={() => onLoadTemplate(template.id)}
               disabled={!template.is_active}
-              sx={{ 
+              sx={{
                 flex: 1,
                 borderRadius: 2,
-                background: template.is_active 
+                background: template.is_active
                   ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)'
                   : 'linear-gradient(135deg, #9ca3af 0%, #d1d5db 100%)',
-                boxShadow: template.is_active 
-                  ? '0 4px 12px rgba(5, 150, 105, 0.3)'
-                  : 'none',
+                boxShadow: template.is_active ? '0 4px 12px rgba(5, 150, 105, 0.3)' : 'none',
                 color: template.is_active ? 'white' : '#6b7280',
-                '&:hover': template.is_active ? {
-                  background: 'linear-gradient(135deg, #047857 0%, #059669 100%)',
-                  transform: 'translateY(-1px)',
-                  boxShadow: '0 6px 16px rgba(5, 150, 105, 0.4)',
-                } : {},
+                '&:hover': template.is_active
+                  ? {
+                      background: 'linear-gradient(135deg, #047857 0%, #059669 100%)',
+                      transform: 'translateY(-1px)',
+                      boxShadow: '0 6px 16px rgba(5, 150, 105, 0.4)',
+                    }
+                  : {},
                 '&:disabled': {
                   background: 'linear-gradient(135deg, #9ca3af 0%, #d1d5db 100%)',
                   color: '#9ca3af',
-                  cursor: 'not-allowed'
-                }
+                  cursor: 'not-allowed',
+                },
               }}
             >
               {template.is_active ? 'Betöltés' : 'Inaktív'}
@@ -245,7 +265,7 @@ const TemplateList: React.FC<TemplateListProps> = ({
                   '&:hover': {
                     bgcolor: alpha('#2563eb', 0.2),
                     transform: 'scale(1.05)',
-                  }
+                  },
                 }}
               >
                 <ViewIcon fontSize="small" />
@@ -260,7 +280,7 @@ const TemplateList: React.FC<TemplateListProps> = ({
                   '&:hover': {
                     bgcolor: alpha('#d97706', 0.2),
                     transform: 'scale(1.05)',
-                  }
+                  },
                 }}
               >
                 <EditIcon fontSize="small" />
@@ -275,7 +295,7 @@ const TemplateList: React.FC<TemplateListProps> = ({
                   '&:hover': {
                     bgcolor: alpha('#dc2626', 0.2),
                     transform: 'scale(1.05)',
-                  }
+                  },
                 }}
               >
                 <DeleteIcon fontSize="small" />

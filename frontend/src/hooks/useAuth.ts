@@ -1,25 +1,25 @@
-import { useAuth as useAuthContext } from '../contexts/AuthContext';
+import { useAuth as useAuthContext, AuthContextType, Company } from '../contexts/AuthContext';
 
-export const useAuth = () => {
+export const useAuth = (): AuthContextType => {
   return useAuthContext();
 };
 
-export const useCurrentCompany = () => {
+export const useCurrentCompany = (): Company | null => {
   const { state } = useAuthContext();
   return state.currentCompany;
 };
 
-export const useIsAuthenticated = () => {
+export const useIsAuthenticated = (): boolean => {
   const { state } = useAuthContext();
   return state.isAuthenticated;
 };
 
-export const useUserRole = () => {
+export const useUserRole = (): string | null => {
   const { state } = useAuthContext();
   return state.currentCompany?.user_role || null;
 };
 
-export const useIsCompanyAdmin = () => {
+export const useIsCompanyAdmin = (): boolean => {
   const { state } = useAuthContext();
   return state.currentCompany?.user_role === 'ADMIN';
 };

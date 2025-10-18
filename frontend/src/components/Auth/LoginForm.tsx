@@ -8,7 +8,7 @@ import {
   Alert,
   CircularProgress,
   Link,
-  Container
+  Container,
 } from '@mui/material';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -23,20 +23,20 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
     password: '',
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
-    if (state.error) {
+    if (state.error !== null && state.error !== '') {
       clearError();
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
-    
+
     if (!formData.username.trim() || !formData.password.trim()) {
       return;
     }
@@ -80,11 +80,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
             <img
               src="/logo192.png"
               alt="ITCardigan Logo"
-              style={{ 
-                width: 64, 
-                height: 64, 
+              style={{
+                width: 64,
+                height: 64,
                 borderRadius: '50%',
-                border: '2px solid #e0e0e0'
+                border: '2px solid #e0e0e0',
               }}
             />
             <Box>
@@ -101,7 +101,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
             Bejelentkezés
           </Typography>
 
-          {state.error && (
+          {state.error !== null && state.error !== '' && (
             <Alert severity="error" sx={{ width: '100%', mb: 2 }}>
               {state.error}
             </Alert>
@@ -141,11 +141,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
               sx={{ mt: 3, mb: 2 }}
               disabled={state.isLoading || !formData.username.trim() || !formData.password.trim()}
             >
-              {state.isLoading ? (
-                <CircularProgress size={24} />
-              ) : (
-                'Bejelentkezés'
-              )}
+              {state.isLoading ? <CircularProgress size={24} /> : 'Bejelentkezés'}
             </Button>
             <Box textAlign="center">
               <Link
