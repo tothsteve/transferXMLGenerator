@@ -30,7 +30,7 @@ from .serializers import (
 from .utils import generate_xml
 from .pdf_processor import PDFTransactionProcessor
 from .kh_export import KHBankExporter
-from .permissions import IsCompanyMember, IsCompanyAdmin, IsCompanyAdminOrReadOnly, RequireBeneficiaryManagement, RequireTransferManagement, RequireBatchManagement, RequireNavSync, RequireExportFeatures, require_feature_api
+from .permissions import IsCompanyMember, IsCompanyAdmin, IsCompanyAdminOrReadOnly, RequireBeneficiaryManagement, RequireTransferManagement, RequireBatchManagement, RequireNavSync, RequireExportFeatures, RequireBankStatementImport, require_feature_api
 from .services.bank_account_service import BankAccountService
 from .services.beneficiary_service import BeneficiaryService
 from .services.template_service import TemplateService
@@ -1848,15 +1848,20 @@ class ExchangeRateViewSet(viewsets.ReadOnlyModelViewSet):
 class BankStatementViewSet(viewsets.ModelViewSet):
     """
     Bank kivonatok kezelése - PDF feltöltés és tranzakciók listázása
-    
+
     Endpoints:
     - GET /api/bank-statements/ - Kivonatok listázása
     - GET /api/bank-statements/{id}/ - Kivonat részletei tranzakciókkal
     - POST /api/bank-statements/upload/ - PDF feltöltés
     - GET /api/bank-statements/supported_banks/ - Támogatott bankok listája
     - DELETE /api/bank-statements/{id}/ - Kivonat törlése
+
+    Permissions:
+    - Requires BANK_STATEMENT_IMPORT feature to be enabled
+    - ADMIN/FINANCIAL: Full access (upload, view, delete)
+    - ACCOUNTANT/USER: View only
     """
-    permission_classes = [IsAuthenticated, IsCompanyMember]
+    permission_classes = [IsAuthenticated, IsCompanyMember, RequireBankStatementImport]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['bank_name', 'account_number', 'statement_number']
     ordering_fields = ['uploaded_at', 'statement_period_from', 'statement_period_to', 'total_transactions']
@@ -1974,12 +1979,16 @@ class BankStatementViewSet(viewsets.ModelViewSet):
 class BankTransactionViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Bank tranzakciók kezelése (csak olvasás)
-    
+
     A tranzakciók automatikusan jönnek létre a kivonat feldolgozásakor.
     Csak lekérdezés és szűrés lehetséges.
+
+    Permissions:
+    - Requires BANK_STATEMENT_IMPORT feature to be enabled
+    - All roles (ADMIN/FINANCIAL/ACCOUNTANT/USER): View only
     """
     serializer_class = BankTransactionSerializer
-    permission_classes = [IsAuthenticated, IsCompanyMember]
+    permission_classes = [IsAuthenticated, IsCompanyMember, RequireBankStatementImport]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['description', 'payer_name', 'beneficiary_name', 'reference', 'payment_id']
     ordering_fields = ['booking_date', 'value_date', 'amount']

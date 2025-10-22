@@ -57,14 +57,15 @@ The system implements a sophisticated **two-layer permission architecture**:
 | **Templates** | Full CRUD | Full CRUD | View only | View only |
 | **Batches** | Full CRUD | View only | View only | View only |
 | **NAV Invoices** | Full CRUD | View only | Full CRUD | View only |
+| **Bank Statements** | Full CRUD | Full CRUD | View only | View only |
 | **Exports** | All formats | SEPA XML | None | None |
 | **User Management** | Full | None | None | None |
 
-### Active Features (15 Total)
+### Active Features (16 Total)
 
 #### 1. Export Features (3)
 - **EXPORT_XML_SEPA**: Generate SEPA-compatible XML files
-- **EXPORT_CSV_KH**: Generate KH Bank specific CSV format  
+- **EXPORT_CSV_KH**: Generate KH Bank specific CSV format
 - **EXPORT_CSV_CUSTOM**: Custom CSV format exports
 
 #### 2. Sync Features (1)
@@ -82,9 +83,10 @@ The system implements a sophisticated **two-layer permission architecture**:
 - **REPORTING_DASHBOARD**: Access to dashboard views
 - **REPORTING_ANALYTICS**: Advanced analytics features
 
-#### 5. Integration Features (2)
+#### 5. Integration Features (3)
 - **API_ACCESS**: REST API access for external integrations
 - **WEBHOOK_NOTIFICATIONS**: Webhook notification system
+- **BANK_STATEMENT_IMPORT**: Import and parse bank statement PDFs/CSVs/XMLs, match transactions to NAV invoices
 
 #### 6. General Features (1)
 - **BULK_OPERATIONS**: Bulk import/export operations
