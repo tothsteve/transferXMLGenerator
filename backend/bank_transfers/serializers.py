@@ -1018,8 +1018,8 @@ class BankTransactionSerializer(serializers.ModelSerializer):
                 'id': obj.bank_statement.id,
                 'bank_name': obj.bank_statement.bank_name,
                 'account_number': obj.bank_statement.account_number,
-                'period_from': obj.bank_statement.statement_period_from,
-                'period_to': obj.bank_statement.statement_period_to,
+                'period_from': obj.bank_statement.statement_period_from.isoformat() if obj.bank_statement.statement_period_from else None,
+                'period_to': obj.bank_statement.statement_period_to.isoformat() if obj.bank_statement.statement_period_to else None,
             }
         return None
     
@@ -1031,8 +1031,8 @@ class BankTransactionSerializer(serializers.ModelSerializer):
                 'invoice_number': obj.matched_invoice.nav_invoice_number,
                 'supplier_name': obj.matched_invoice.supplier_name,
                 'supplier_tax_number': obj.matched_invoice.supplier_tax_number,
-                'gross_amount': obj.matched_invoice.invoice_gross_amount,
-                'payment_due_date': obj.matched_invoice.payment_due_date,
+                'gross_amount': str(obj.matched_invoice.invoice_gross_amount) if obj.matched_invoice.invoice_gross_amount else None,
+                'payment_due_date': obj.matched_invoice.payment_due_date.isoformat() if obj.matched_invoice.payment_due_date else None,
                 'payment_status': obj.matched_invoice.payment_status,
             }
         return None
@@ -1090,6 +1090,7 @@ class BankStatementDetailSerializer(serializers.ModelSerializer):
     transactions = BankTransactionSerializer(many=True, read_only=True)
     uploaded_by_name = serializers.SerializerMethodField()
     matched_percentage = serializers.SerializerMethodField()
+    raw_metadata_json = serializers.SerializerMethodField()
 
     class Meta:
         model = BankStatement
@@ -1104,7 +1105,7 @@ class BankStatementDetailSerializer(serializers.ModelSerializer):
             'total_transactions', 'credit_count', 'debit_count',
             'total_credits', 'total_debits', 'matched_count', 'matched_percentage',
             'transactions',
-            'raw_metadata',
+            'raw_metadata_json',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at', 'company']
@@ -1121,6 +1122,29 @@ class BankStatementDetailSerializer(serializers.ModelSerializer):
             return round((obj.matched_count / obj.total_transactions) * 100, 1)
         return 0.0
 
+    def get_raw_metadata_json(self, obj):
+        """Convert raw_metadata to JSON-serializable format"""
+        import json
+        from datetime import date, datetime
+        from decimal import Decimal
+
+        def convert_to_serializable(data):
+            """Recursively convert non-serializable objects"""
+            if isinstance(data, dict):
+                return {k: convert_to_serializable(v) for k, v in data.items()}
+            elif isinstance(data, list):
+                return [convert_to_serializable(item) for item in data]
+            elif isinstance(data, (date, datetime)):
+                return data.isoformat()
+            elif isinstance(data, Decimal):
+                return str(data)
+            else:
+                return data
+
+        if obj.raw_metadata:
+            return convert_to_serializable(obj.raw_metadata)
+        return None
+
 
 class BankStatementUploadSerializer(serializers.Serializer):
     """
@@ -1134,18 +1158,23 @@ class BankStatementUploadSerializer(serializers.Serializer):
     )
     
     def validate_file(self, value):
-        """Validate uploaded file"""
-        # Check file extension
-        if not value.name.lower().endswith('.pdf'):
-            raise serializers.ValidationError("Csak PDF fájlok tölthetők fel")
-        
+        """Validate uploaded file - accepts PDF, CSV, and XML formats"""
+        # Check file extension - support multiple bank statement formats
+        allowed_extensions = ('.pdf', '.csv', '.xml')
+        filename_lower = value.name.lower()
+
+        if not filename_lower.endswith(allowed_extensions):
+            raise serializers.ValidationError(
+                "Csak PDF, CSV vagy XML fájlok tölthetők fel (banki kivonathoz)"
+            )
+
         # Check file size (max 10MB)
         max_size = 10 * 1024 * 1024  # 10MB
         if value.size > max_size:
             raise serializers.ValidationError(
                 f"A fájl mérete nem lehet nagyobb mint {max_size // (1024*1024)}MB"
             )
-        
+
         return value
 
 

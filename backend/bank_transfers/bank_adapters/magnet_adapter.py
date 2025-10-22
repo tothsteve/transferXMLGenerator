@@ -12,7 +12,7 @@ import re
 import logging
 import xml.etree.ElementTree as ET
 from io import BytesIO
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from decimal import Decimal
 from datetime import date, datetime
 
@@ -108,64 +108,71 @@ class MagnetBankAdapter(BankStatementAdapter):
 
     def _parse_metadata(self, root: ET.Element) -> StatementMetadata:
         """Parse statement header metadata."""
-
-        # Get FEJLEC (header)
-        fejlec = root.find('FEJLEC')
-        if fejlec is None:
-            raise BankStatementParseError("Missing FEJLEC element")
-
-        # Bank information
+        # Extract components
+        fejlec = self._get_required_element(root, 'FEJLEC')
         kibocsato = fejlec.find('KIBOCSATO')
-        bank_name = self._get_text(kibocsato, 'Nev', 'Unknown Bank')
-
-        # Document information
         doc_info = fejlec.find('DokumentumInfo')
+
+        szamla_info = self._get_required_element(root, 'SzamlaInfo')
+        egyenleg_info = self._get_required_element(root, 'EgyenlegInfo')
+
+        # Parse components
         statement_id = self._get_text(doc_info, 'SzamlaID', '')
-        period_str = self._get_text(doc_info, 'AlCim', '')  # e.g., "2025-09"
-
-        # Account information
-        szamla_info = root.find('SzamlaInfo')
-        if szamla_info is None:
-            raise BankStatementParseError("Missing SzamlaInfo element")
-
+        period_str = self._get_text(doc_info, 'AlCim', '')
         account_number = self._get_text(szamla_info, 'Szamlaszam', '')
-        account_iban = self._build_iban(account_number)  # Convert to IBAN format
-
-        # Balance information
-        egyenleg_info = root.find('EgyenlegInfo')
-        if egyenleg_info is None:
-            raise BankStatementParseError("Missing EgyenlegInfo element")
-
-        opening_balance_elem = egyenleg_info.find('NyitoEgyenleg')
-        opening_balance = self._parse_decimal(opening_balance_elem.text if opening_balance_elem is not None else '0')
-
-        closing_balance_elem = egyenleg_info.find('ZaroEgyenleg')
-        closing_balance = self._parse_decimal(closing_balance_elem.text if closing_balance_elem is not None else '0')
-
-        # Parse period dates from AlCim (e.g., "2025-09")
         period_from, period_to = self._parse_period(period_str)
 
+        # Parse balances
+        opening_balance, closing_balance = self._extract_balances(egyenleg_info)
+
+        # Build metadata object
         return StatementMetadata(
             bank_code=self.BANK_CODE,
             bank_name=self.BANK_NAME,
             bank_bic=self.BANK_BIC,
             account_number=account_number,
-            account_iban=account_iban,
+            account_iban=self._build_iban(account_number),
             period_from=period_from,
             period_to=period_to,
             statement_number=statement_id,
             opening_balance=opening_balance,
             closing_balance=closing_balance,
-            raw_metadata={
-                'bank_tax_id': self._get_text(kibocsato, 'AdoigazgatasiSzam', ''),
-                'bank_address': self._get_text(kibocsato, 'Cim', ''),
-                'account_holder': self._get_text(szamla_info, 'Nev', ''),
-                'total_debit': self._get_text(egyenleg_info, 'Terheles', '0'),
-                'total_credit': self._get_text(egyenleg_info, 'Jovairas', '0'),
-                'debit_count': self._get_text(egyenleg_info, 'TerhelesDB', '0'),
-                'credit_count': self._get_text(egyenleg_info, 'JovairasDB', '0'),
-            }
+            raw_metadata=self._build_raw_metadata(kibocsato, szamla_info, egyenleg_info)
         )
+
+    def _get_required_element(self, parent: ET.Element, tag: str) -> ET.Element:
+        """Get required XML element or raise error."""
+        element = parent.find(tag)
+        if element is None:
+            raise BankStatementParseError(f"Missing {tag} element")
+        return element
+
+    def _extract_balances(self, egyenleg_info: ET.Element) -> Tuple[Decimal, Decimal]:
+        """Extract opening and closing balances from EgyenlegInfo."""
+        opening_elem = egyenleg_info.find('NyitoEgyenleg')
+        opening = self._parse_decimal(opening_elem.text if opening_elem is not None else '0')
+
+        closing_elem = egyenleg_info.find('ZaroEgyenleg')
+        closing = self._parse_decimal(closing_elem.text if closing_elem is not None else '0')
+
+        return opening, closing
+
+    def _build_raw_metadata(
+        self,
+        kibocsato: Optional[ET.Element],
+        szamla_info: ET.Element,
+        egyenleg_info: ET.Element
+    ) -> Dict[str, str]:
+        """Build raw metadata dictionary from XML elements."""
+        return {
+            'bank_tax_id': self._get_text(kibocsato, 'AdoigazgatasiSzam', ''),
+            'bank_address': self._get_text(kibocsato, 'Cim', ''),
+            'account_holder': self._get_text(szamla_info, 'Nev', ''),
+            'total_debit': self._get_text(egyenleg_info, 'Terheles', '0'),
+            'total_credit': self._get_text(egyenleg_info, 'Jovairas', '0'),
+            'debit_count': self._get_text(egyenleg_info, 'TerhelesDB', '0'),
+            'credit_count': self._get_text(egyenleg_info, 'JovairasDB', '0'),
+        }
 
     def _parse_transactions(self, root: ET.Element) -> List[NormalizedTransaction]:
         """Parse all transaction elements."""
@@ -184,99 +191,152 @@ class MagnetBankAdapter(BankStatementAdapter):
 
     def _parse_transaction(self, trans: ET.Element) -> Optional[NormalizedTransaction]:
         """Parse a single transaction element."""
+        # Extract basic transaction data
+        basic_data = self._extract_basic_transaction_data(trans)
+        if not basic_data:
+            return None
 
-        # Basic fields
-        nbid = trans.get('NBID', '')
+        # Build base transaction object
+        transaction = self._build_magnet_transaction(basic_data)
+
+        # Add optional elements
+        self._add_fees_and_taxes(trans, transaction, basic_data['fee_amount_base'])
+        self._parse_supplementary_data(trans, transaction, basic_data['reference'])
+        self._set_payer_beneficiary(trans, transaction, basic_data)
+
+        # Store raw XML data
+        transaction.raw_data['nbid'] = basic_data['nbid']
+        transaction.raw_data['xml_type'] = basic_data['magnet_type']
+
+        return transaction
+
+    def _extract_basic_transaction_data(self, trans: ET.Element) -> Optional[Dict[str, Any]]:
+        """Extract basic transaction fields from XML element."""
         trans_num = self._get_text(trans, 'Tranzakcioszam', '')
-        counterparty = self._get_text(trans, 'Ellenpartner', '')
-        counter_iban = self._get_text(trans, 'Ellenszamla', '')
 
-        # Amount and currency
+        # Parse amount
         osszeg_elem = trans.find('Osszeg')
         if osszeg_elem is None:
             logger.warning(f"Transaction {trans_num} missing Osszeg element")
             return None
 
-        amount = self._parse_decimal(osszeg_elem.text or '0')
-        currency = osszeg_elem.get('Devizanem', 'HUF')
-
-        # Reference/Közlemény
-        reference = self._get_text(trans, 'Kozlemeny', '')
-
-        # Dates
+        # Parse dates
         booking_date_str = self._get_text(trans, 'Terhelesnap', '')
-        value_date_str = self._get_text(trans, 'Esedekessegnap', '')
-
         booking_date = self._parse_magnet_date(booking_date_str)
-        value_date = self._parse_magnet_date(value_date_str) or booking_date
-
         if not booking_date:
             logger.warning(f"Transaction {trans_num} missing date")
             return None
 
-        # Transaction type
-        magnet_type = self._get_text(trans, 'Tipus', '')
-        transaction_type = self._map_transaction_type(magnet_type)
+        value_date_str = self._get_text(trans, 'Esedekessegnap', '')
+        value_date = self._parse_magnet_date(value_date_str) or booking_date
 
-        # Fee
+        # Extract fee
         fee_elem = trans.find('Jutalekosszeg')
         fee_amount_base = self._parse_decimal(fee_elem.text if fee_elem is not None else '0')
 
-        # Build description
-        description = self._build_description(counterparty, reference, magnet_type)
-        short_description = f"{magnet_type}: {counterparty}"
+        return {
+            'nbid': trans.get('NBID', ''),
+            'trans_num': trans_num,
+            'counterparty': self._get_text(trans, 'Ellenpartner', ''),
+            'counter_iban': self._get_text(trans, 'Ellenszamla', ''),
+            'amount': self._parse_decimal(osszeg_elem.text or '0'),
+            'currency': osszeg_elem.get('Devizanem', 'HUF'),
+            'reference': self._get_text(trans, 'Kozlemeny', ''),
+            'booking_date': booking_date,
+            'value_date': value_date,
+            'magnet_type': self._get_text(trans, 'Tipus', ''),
+            'fee_amount_base': fee_amount_base,
+        }
 
-        # Initialize transaction
-        transaction = NormalizedTransaction(
+    def _build_magnet_transaction(self, data: Dict[str, Any]) -> NormalizedTransaction:
+        """Build base NormalizedTransaction from extracted data."""
+        transaction_type = self._map_transaction_type(data['magnet_type'])
+        description = self._build_description(
+            data['counterparty'],
+            data['reference'],
+            data['magnet_type']
+        )
+        short_description = f"{data['magnet_type']}: {data['counterparty']}"
+
+        return NormalizedTransaction(
             transaction_type=transaction_type,
-            booking_date=booking_date,
-            value_date=value_date,
-            amount=amount,
-            currency=currency,
+            booking_date=data['booking_date'],
+            value_date=data['value_date'],
+            amount=data['amount'],
+            currency=data['currency'],
             description=description,
             short_description=short_description,
-            transaction_id=trans_num,
-            reference=reference,
-            transaction_type_code=magnet_type,
+            transaction_id=data['trans_num'],
+            reference=data['reference'],
+            transaction_type_code=data['magnet_type'],
         )
 
-        # Parse fees from TranzakcioKiegeszito
+    def _add_fees_and_taxes(
+        self,
+        trans: ET.Element,
+        transaction: NormalizedTransaction,
+        fee_amount_base: Decimal
+    ) -> None:
+        """Add fee and tax information to transaction."""
         kiegeszito = trans.find('TranzakcioKiegeszito')
-        if kiegeszito is not None:
-            # Check for JutalekKiegeszito (detailed fee)
-            jutalek_elem = kiegeszito.find('JutalekKiegeszito')
-            if jutalek_elem is not None and jutalek_elem.text:
-                detailed_fee = self._parse_decimal(jutalek_elem.text)
-                if detailed_fee != Decimal('0'):
-                    transaction.fee_amount = abs(detailed_fee)
-            elif fee_amount_base != Decimal('0'):
+        if kiegeszito is None:
+            if fee_amount_base != Decimal('0'):
                 transaction.fee_amount = abs(fee_amount_base)
+            return
 
-            # Store illeték (transaction tax) in raw_data
-            illetek_elem = kiegeszito.find('TranzIlletekKiegeszito')
-            if illetek_elem is not None and illetek_elem.text:
-                transaction.raw_data['transaction_tax'] = illetek_elem.text
+        # Check for detailed fee
+        jutalek_elem = kiegeszito.find('JutalekKiegeszito')
+        if jutalek_elem is not None and jutalek_elem.text:
+            detailed_fee = self._parse_decimal(jutalek_elem.text)
+            if detailed_fee != Decimal('0'):
+                transaction.fee_amount = abs(detailed_fee)
+        elif fee_amount_base != Decimal('0'):
+            transaction.fee_amount = abs(fee_amount_base)
 
-            # Parse card transaction details
-            kartya_elem = kiegeszito.find('KartyaKiegeszito')
-            if kartya_elem is not None:
-                self._parse_card_details(kartya_elem, transaction, reference)
+        # Store transaction tax
+        illetek_elem = kiegeszito.find('TranzIlletekKiegeszito')
+        if illetek_elem is not None and illetek_elem.text:
+            transaction.raw_data['transaction_tax'] = illetek_elem.text
 
-            # Parse cost breakdown
-            koltseg_elem = kiegeszito.find('KoltsegKiegeszito')
-            if koltseg_elem is not None:
-                costs = []
-                for koltseg in koltseg_elem.findall('Koltseg'):
-                    cost_type = koltseg.get('Koltsegnem', '')
-                    cost_amount = koltseg.text or '0'
-                    costs.append({
-                        'type': cost_type,
-                        'amount': cost_amount
-                    })
-                if costs:
-                    transaction.raw_data['cost_breakdown'] = costs
+    def _parse_supplementary_data(
+        self,
+        trans: ET.Element,
+        transaction: NormalizedTransaction,
+        reference: str
+    ) -> None:
+        """Parse supplementary transaction data (card details, costs)."""
+        kiegeszito = trans.find('TranzakcioKiegeszito')
+        if kiegeszito is None:
+            return
 
-        # Determine payer/beneficiary based on amount sign
+        # Parse card details
+        kartya_elem = kiegeszito.find('KartyaKiegeszito')
+        if kartya_elem is not None:
+            self._parse_card_details(kartya_elem, transaction, reference)
+
+        # Parse cost breakdown
+        koltseg_elem = kiegeszito.find('KoltsegKiegeszito')
+        if koltseg_elem is not None:
+            costs = []
+            for koltseg in koltseg_elem.findall('Koltseg'):
+                costs.append({
+                    'type': koltseg.get('Koltsegnem', ''),
+                    'amount': koltseg.text or '0'
+                })
+            if costs:
+                transaction.raw_data['cost_breakdown'] = costs
+
+    def _set_payer_beneficiary(
+        self,
+        trans: ET.Element,
+        transaction: NormalizedTransaction,
+        data: Dict[str, Any]
+    ) -> None:
+        """Set payer and beneficiary based on amount sign."""
+        amount = data['amount']
+        counterparty = data['counterparty']
+        counter_iban = data['counter_iban']
+
         if amount < 0:
             # Debit - we are payer
             transaction.payer_name = self._get_text(trans, 'Nev', '')
@@ -293,12 +353,6 @@ class MagnetBankAdapter(BankStatementAdapter):
                 transaction.payer_account_number = self._iban_to_account(counter_iban)
             transaction.beneficiary_name = self._get_text(trans, 'Nev', '')
             transaction.beneficiary_account_number = self._get_text(trans, 'Szamlaszam', '')
-
-        # Store raw XML data
-        transaction.raw_data['nbid'] = nbid
-        transaction.raw_data['xml_type'] = magnet_type
-
-        return transaction
 
     def _parse_card_details(self, kartya_elem: ET.Element, transaction: NormalizedTransaction, reference: str):
         """Parse card transaction details from KartyaKiegeszito."""

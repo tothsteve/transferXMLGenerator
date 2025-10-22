@@ -13,7 +13,7 @@ import hashlib
 import logging
 from typing import Dict, Any, Optional
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, date
 from django.db import transaction as db_transaction
 from django.utils import timezone
 from django.core.files.uploadedfile import UploadedFile
@@ -22,6 +22,38 @@ from ..models import BankStatement, BankTransaction, Company
 from ..bank_adapters import BankAdapterFactory, BankStatementParseError
 
 logger = logging.getLogger(__name__)
+
+
+def sanitize_raw_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert raw_data to JSON-serializable format.
+
+    Handles date, datetime, and Decimal objects that can't be directly
+    serialized to JSON for PostgreSQL JSONField storage.
+    """
+    if not isinstance(data, dict):
+        return {}
+
+    sanitized = {}
+    for key, value in data.items():
+        if isinstance(value, (date, datetime)):
+            sanitized[key] = value.isoformat()
+        elif isinstance(value, Decimal):
+            sanitized[key] = str(value)
+        elif isinstance(value, dict):
+            sanitized[key] = sanitize_raw_data(value)
+        elif isinstance(value, list):
+            sanitized[key] = [
+                sanitize_raw_data(item) if isinstance(item, dict)
+                else item.isoformat() if isinstance(item, (date, datetime))
+                else str(item) if isinstance(item, Decimal)
+                else item
+                for item in value
+            ]
+        else:
+            sanitized[key] = value
+
+    return sanitized
 
 
 class BankStatementParserService:
@@ -251,8 +283,8 @@ class BankStatementParserService:
             match_confidence=Decimal('0.00'),
             match_method='',
 
-            # Raw data from adapter
-            raw_data=trans_data.raw_data or {},
+            # Raw data from adapter - sanitize for JSON storage
+            raw_data=sanitize_raw_data(trans_data.raw_data or {}),
         )
 
         transaction.save()

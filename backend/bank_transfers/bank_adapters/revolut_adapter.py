@@ -15,7 +15,7 @@ Supported transaction types:
 import csv
 import logging
 from io import BytesIO, StringIO
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from decimal import Decimal
 from datetime import date, datetime
 
@@ -124,41 +124,24 @@ class RevolutAdapter(BankStatementAdapter):
         if not rows:
             raise BankStatementParseError("No transactions to extract metadata from")
 
-        # Get period from first and last transaction
-        # Note: Revolut CSV is ordered newest-to-oldest, so first row is the latest date
-        latest_date = self._parse_revolut_date(rows[0].get('Date completed (UTC)', ''))
-        earliest_date = self._parse_revolut_date(rows[-1].get('Date completed (UTC)', ''))
-
-        # Get account from first transaction
+        # Extract period and account
+        earliest_date, latest_date = self._extract_date_range(rows)
         account_name = rows[0].get('Account', 'Unknown Account')
+        currency = self._extract_currency_from_account(account_name)
 
-        # Extract currency from account name (e.g., "USD Main", "HUF Main")
-        currency = 'HUF'  # Default
-        if account_name:
-            parts = account_name.split()
-            if parts:
-                potential_currency = parts[0].upper()
-                if len(potential_currency) == 3:  # Currency codes are 3 letters
-                    currency = potential_currency
+        # Calculate balances
+        opening_balance, closing_balance = self._calculate_balances(rows)
 
-        # Get opening and closing balances
-        # CSV is ordered newest-to-oldest, so:
-        # - Last row balance = opening balance (earliest date)
-        # - First row balance = closing balance (latest date)
-        closing_balance = self._parse_amount(rows[0].get('Balance', '0'))
-
-        last_balance = self._parse_amount(rows[-1].get('Balance', '0'))
-        last_amount = self._parse_amount(rows[-1].get('Amount', '0'))
-        opening_balance = last_balance - last_amount
-
-        # Generate statement number from period (earliest to latest)
-        statement_number = f"REVOLUT_{earliest_date.strftime('%Y%m%d')}_{latest_date.strftime('%Y%m%d')}"
+        # Generate statement number
+        statement_number = (
+            f"REVOLUT_{earliest_date.strftime('%Y%m%d')}_{latest_date.strftime('%Y%m%d')}"
+        )
 
         return StatementMetadata(
             bank_code=self.BANK_CODE,
             bank_name=self.BANK_NAME,
             bank_bic=self.BANK_BIC,
-            account_number=account_name,  # Revolut doesn't provide traditional account numbers in CSV
+            account_number=account_name,
             account_iban='',  # Will be filled from account settings if needed
             period_from=earliest_date,
             period_to=latest_date,
@@ -171,6 +154,37 @@ class RevolutAdapter(BankStatementAdapter):
                 'total_transactions': len(rows),
             }
         )
+
+    def _extract_date_range(self, rows: List[Dict]) -> Tuple[date, date]:
+        """Extract earliest and latest transaction dates from rows."""
+        # Note: Revolut CSV is ordered newest-to-oldest
+        latest_date = self._parse_revolut_date(rows[0].get('Date completed (UTC)', ''))
+        earliest_date = self._parse_revolut_date(rows[-1].get('Date completed (UTC)', ''))
+        return earliest_date, latest_date
+
+    def _extract_currency_from_account(self, account_name: str) -> str:
+        """Extract currency code from account name (e.g., 'USD Main' -> 'USD')."""
+        currency = 'HUF'  # Default
+        if account_name:
+            parts = account_name.split()
+            if parts:
+                potential_currency = parts[0].upper()
+                if len(potential_currency) == 3:  # Currency codes are 3 letters
+                    currency = potential_currency
+        return currency
+
+    def _calculate_balances(self, rows: List[Dict]) -> Tuple[Decimal, Decimal]:
+        """Calculate opening and closing balances from transaction rows."""
+        # CSV is ordered newest-to-oldest:
+        # - First row balance = closing balance (latest date)
+        # - Last row balance = opening balance (earliest date)
+        closing_balance = self._parse_amount(rows[0].get('Balance', '0'))
+
+        last_balance = self._parse_amount(rows[-1].get('Balance', '0'))
+        last_amount = self._parse_amount(rows[-1].get('Amount', '0'))
+        opening_balance = last_balance - last_amount
+
+        return opening_balance, closing_balance
 
     def _parse_transaction(self, row: Dict[str, str]) -> Optional[NormalizedTransaction]:
         """
@@ -185,25 +199,54 @@ class RevolutAdapter(BankStatementAdapter):
         - Beneficiary IBAN, Beneficiary BIC, MCC, Related transaction id, Spend program
         """
         # Only process completed transactions
-        state = row.get('State', '').upper()
-        if state != 'COMPLETED':
-            logger.debug(f"Skipping non-completed transaction: {state}")
+        if not self._is_completed_transaction(row):
             return None
 
         # Parse dates
-        booking_date = self._parse_revolut_date(row.get('Date completed (UTC)', ''))
-        value_date = booking_date  # Revolut doesn't distinguish booking vs value date
-
+        booking_date = self._extract_transaction_date(row)
         if not booking_date:
-            logger.warning(f"Transaction missing date: {row}")
             return None
 
+        # Parse amounts and build base transaction
+        transaction = self._build_base_transaction(row, booking_date)
+
+        # Add optional fields
+        self._add_fee_if_present(row, transaction)
+        self._add_original_currency(row, transaction)
+        self._add_exchange_rate(row, transaction)
+
+        # Type-specific parsing
+        self._parse_type_specific_fields(row, transaction)
+
+        # Store raw data
+        transaction.raw_data = dict(row)
+
+        return transaction
+
+    def _is_completed_transaction(self, row: Dict[str, str]) -> bool:
+        """Check if transaction is in COMPLETED state."""
+        state = row.get('State', '').upper()
+        if state != 'COMPLETED':
+            logger.debug(f"Skipping non-completed transaction: {state}")
+            return False
+        return True
+
+    def _extract_transaction_date(self, row: Dict[str, str]) -> Optional[date]:
+        """Extract and validate transaction date."""
+        booking_date = self._parse_revolut_date(row.get('Date completed (UTC)', ''))
+        if not booking_date:
+            logger.warning(f"Transaction missing date: {row}")
+        return booking_date
+
+    def _build_base_transaction(
+        self,
+        row: Dict[str, str],
+        booking_date: date
+    ) -> NormalizedTransaction:
+        """Build base transaction object with core fields."""
         # Parse amounts and currency
         # CRITICAL: Use "Total amount" which includes fees, not "Amount"
-        # Amount = transaction only
-        # Total amount = transaction + fee (actual account impact)
         total_amount = self._parse_amount(row.get('Total amount', '0'))
-        base_amount = self._parse_amount(row.get('Amount', '0'))
         currency = row.get('Payment currency', 'HUF').upper()
 
         # Get transaction type
@@ -213,16 +256,13 @@ class RevolutAdapter(BankStatementAdapter):
         # Extract description
         description = row.get('Description', '').strip()
         reference = row.get('Reference', '').strip()
-
-        # Build short description
         short_description = f"{revolut_type}: {description}"
 
-        # Initialize transaction with TOTAL AMOUNT (includes fees)
-        transaction = NormalizedTransaction(
+        return NormalizedTransaction(
             transaction_type=transaction_type,
             booking_date=booking_date,
-            value_date=value_date,
-            amount=total_amount,  # Use total amount, not base amount
+            value_date=booking_date,  # Revolut doesn't distinguish booking vs value
+            amount=total_amount,  # Use total amount (includes fees)
             currency=currency,
             description=description,
             short_description=short_description,
@@ -231,52 +271,67 @@ class RevolutAdapter(BankStatementAdapter):
             transaction_type_code=revolut_type,
         )
 
-        # Parse fee
+    def _add_fee_if_present(
+        self,
+        row: Dict[str, str],
+        transaction: NormalizedTransaction
+    ) -> None:
+        """Add fee amount if present in row."""
         fee = self._parse_amount(row.get('Fee', '0'))
         if fee and fee != Decimal('0'):
             transaction.fee_amount = abs(fee)  # Fees are always positive
 
-        # Parse original currency/amount - ALWAYS populate from CSV
-        # Revolut ALWAYS provides Orig currency and Orig amount for ALL transactions
-        # This is the "transaction currency" before any fees or conversions
+    def _add_original_currency(
+        self,
+        row: Dict[str, str],
+        transaction: NormalizedTransaction
+    ) -> None:
+        """Add original currency and amount (always present in Revolut CSV)."""
         orig_currency = row.get('Orig currency', '').strip().upper()
         orig_amount_str = row.get('Orig amount', '').strip()
 
         if orig_currency and orig_amount_str:
-            # Orig amount in CSV can be SIGNED (see EXCHANGE transactions) or UNSIGNED
             orig_amount = self._parse_amount(orig_amount_str)
-
-            # ALWAYS populate both fields - Revolut provides this for ALL transactions
+            # ALWAYS populate - Revolut provides this for ALL transactions
             transaction.original_currency = orig_currency
-            transaction.original_amount = orig_amount  # Use CSV value as-is (it's already signed correctly)
+            transaction.original_amount = orig_amount
 
-        # Store exchange rate - both in field and raw_data
+    def _add_exchange_rate(
+        self,
+        row: Dict[str, str],
+        transaction: NormalizedTransaction
+    ) -> None:
+        """Add exchange rate to transaction and raw_data."""
         exchange_rate_str = row.get('Exchange rate', '').strip()
-        if exchange_rate_str:
-            try:
-                exchange_rate = self._parse_amount(exchange_rate_str)
-                if exchange_rate and exchange_rate != Decimal('0'):
-                    transaction.exchange_rate = exchange_rate
-                    # Also keep in raw_data for debugging
-                    transaction.raw_data['exchange_rate'] = exchange_rate_str
-                    transaction.raw_data['base_amount_without_fee'] = str(base_amount)
-            except Exception as e:
-                logger.warning(f"Failed to parse exchange rate '{exchange_rate_str}': {e}")
-                # Keep in raw_data even if parsing failed
-                transaction.raw_data['exchange_rate'] = exchange_rate_str
+        if not exchange_rate_str:
+            return
 
-        # Type-specific parsing
+        try:
+            exchange_rate = self._parse_amount(exchange_rate_str)
+            if exchange_rate and exchange_rate != Decimal('0'):
+                transaction.exchange_rate = exchange_rate
+                # Keep in raw_data for debugging
+                base_amount = self._parse_amount(row.get('Amount', '0'))
+                transaction.raw_data['exchange_rate'] = exchange_rate_str
+                transaction.raw_data['base_amount_without_fee'] = str(base_amount)
+        except Exception as e:
+            logger.warning(f"Failed to parse exchange rate '{exchange_rate_str}': {e}")
+            transaction.raw_data['exchange_rate'] = exchange_rate_str
+
+    def _parse_type_specific_fields(
+        self,
+        row: Dict[str, str],
+        transaction: NormalizedTransaction
+    ) -> None:
+        """Parse type-specific fields based on transaction type."""
+        revolut_type = row.get('Type', '').upper()
+
         if revolut_type == 'CARD_PAYMENT':
             self._parse_card_payment(row, transaction)
         elif revolut_type == 'TRANSFER':
             self._parse_transfer(row, transaction)
         elif revolut_type == 'TOPUP':
             self._parse_topup(row, transaction)
-
-        # Store raw data
-        transaction.raw_data = dict(row)
-
-        return transaction
 
     def _parse_card_payment(self, row: Dict[str, str], transaction: NormalizedTransaction):
         """Parse card payment specific fields."""
