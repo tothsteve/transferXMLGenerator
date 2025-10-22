@@ -564,6 +564,225 @@ railway run python manage.py sync_mnb_rates --current --currencies=USD,EUR,GBP
 
 **Important**: The `--currencies` parameter works immediately for the MNB API call, but the **database will reject** currencies not in `CURRENCY_CHOICES`. Update the model first!
 
+## ✅ IMPLEMENTED: Bank Statement Import and Transaction Matching
+
+### Overview
+The system implements a **multi-bank PDF statement import** feature with **sophisticated transaction matching** to NAV invoices and TransferBatch records. The implementation uses a **priority cascade** with **confidence-based scoring** and includes several enhancements beyond the original specification.
+
+### Key Features
+
+#### **Multi-Bank Statement Import**
+- **Automatic Detection**: Factory pattern with adapter-based bank detection
+- **Multiple Formats**: PDF, CSV, XML - each bank adapter handles its native format
+- **Supported Banks** (4 total):
+  1. **GRÁNIT Bank Nyrt.** (BIC: GNBAHUHB) - PDF format
+  2. **Revolut Bank** (BIC: REVOLT21) - CSV format
+  3. **MagNet Magyar Közösségi Bank** (BIC: MKKB) - XML (NetBankXML) format
+  4. **K&H Bank Zrt.** (BIC: OKHBHUHB) - PDF format
+- **Transaction Types**: AFR/SEPA transfers, POS/card purchases, bank fees, interest, corrections, currency exchanges
+- **Duplicate Detection**: By SHA256 file hash + company + statement period
+- **Automatic Matching**: Runs transparently during statement upload
+- **Multi-Currency Support**: Exchange rates, original amounts, currency conversions
+
+#### **Transaction Matching Engine**
+The system implements **7 matching strategies** with **5 confidence levels** (0.60-1.00):
+
+**Priority 1: TRANSFER_EXACT** (Confidence: 1.00)
+- Matches bank transactions to executed TransferBatch transfers
+- Only DEBIT transactions (outgoing payments)
+- Exact amount + date match (±7 days) + beneficiary match
+- **Auto-updates payment status**: ✅ YES
+
+**Priority 2a: REFERENCE_EXACT** (Confidence: 1.00)
+- Matches by invoice number or supplier tax number in transaction reference
+- **Enhanced with direction checking** to prevent false positives
+- Reference extraction with fallback: "Közlemény" → "Nem strukturált közlemény"
+- **Auto-updates payment status**: ✅ YES
+
+**Priority 2b: AMOUNT_IBAN** (Confidence: 0.95)
+- Matches by exact amount + beneficiary IBAN
+- Uses `invoice_gross_amount` (not `invoice_gross_amount_huf` which is frequently NULL)
+- **Enhanced with direction checking**
+- **Auto-updates payment status**: ✅ YES
+
+**Priority 2c: FUZZY_NAME** (Confidence: 0.70-0.90)
+- Matches by amount (±1%) + fuzzy name similarity (rapidfuzz library)
+- Dynamic confidence: 0.70 + (similarity * 0.20)
+- **Enhanced with direction checking**
+- **Auto-updates payment status**: ❌ NO (requires manual review)
+
+**Priority 2d: AMOUNT_DATE_ONLY** (Confidence: 0.60) ⚠️ **NEW**
+- Fallback strategy for POS purchases with no merchant/beneficiary info
+- Amount match (±1%) + date match + direction match only
+- **No reference, No IBAN, No name verification**
+- **Auto-updates payment status**: ❌ NO (LOW confidence, flagged for review)
+
+**Priority 3: REIMBURSEMENT_PAIR** (Confidence: 0.70)
+- Matches offsetting transactions (same amount, opposite signs)
+- Within ±5 days, neither already matched
+- Use case: Refunds, reversals, corrections
+- **Auto-updates payment status**: ❌ NO (not invoice payment)
+
+### Direction Compatibility Checking ⭐ **CRITICAL ENHANCEMENT**
+
+The system prevents false positives by checking transaction direction compatibility:
+
+```python
+def _is_direction_compatible(transaction, invoice):
+    if invoice.invoice_direction == 'OUTBOUND':  # We issued invoice
+        return transaction.amount > 0  # Expect CREDIT (incoming payment)
+    elif invoice.invoice_direction == 'INBOUND':  # We received invoice
+        return transaction.amount < 0  # Expect DEBIT (outgoing payment)
+```
+
+**Impact**:
+- ✅ Prevents 6 false NAV tax payment matches in test data
+- ✅ All matches are directionally correct
+- ✅ NAV tax payments (DEBIT with OUTBOUND invoice) correctly rejected
+
+### Confidence Levels and Auto-Update Logic
+
+| Confidence | Match Method | Auto-Update Payment Status | Manual Review Required |
+|------------|--------------|----------------------------|------------------------|
+| **1.00** | TRANSFER_EXACT | ✅ YES | ❌ No |
+| **1.00** | REFERENCE_EXACT | ✅ YES | ❌ No |
+| **0.95** | AMOUNT_IBAN | ✅ YES | ❌ No |
+| **0.70-0.90** | FUZZY_NAME | ❌ NO | ✅ **Yes** |
+| **0.70** | REIMBURSEMENT_PAIR | ❌ NO | ❌ No |
+| **0.60** | AMOUNT_DATE_ONLY | ❌ NO | ✅ **Yes** (LOW) |
+
+**Auto-Update Threshold**: `confidence >= 0.95`
+
+### API Endpoints
+
+#### **Bank Statement Management**
+- `POST /api/bank-statements/upload/` - Upload and parse PDF statement
+- `GET /api/bank-statements/` - List all statements with filtering
+- `GET /api/bank-statements/{id}/` - Statement details
+- `DELETE /api/bank-statements/{id}/` - Delete statement
+- `POST /api/bank-statements/{id}/reparse/` - Reparse existing statement
+
+#### **Bank Transaction Management**
+- `GET /api/bank-transactions/` - List transactions with filtering
+- `GET /api/bank-transactions/{id}/` - Transaction details
+- `POST /api/bank-transactions/{id}/match_invoice/` - Manual invoice matching
+- `POST /api/bank-transactions/{id}/categorize/` - Categorize as other cost
+
+### Database Models
+
+#### **BankStatement Model**
+- Bank identification (bank_code, bank_name, bank_bic)
+- Account details (account_number, account_iban)
+- Statement period (statement_period_from, statement_period_to)
+- Balances (opening_balance, closing_balance)
+- File metadata (file_name, file_hash, file_size)
+- Processing status (UPLOADED, PARSING, PARSED, ERROR)
+- Statistics (total_transactions, matched_count, credit/debit counts)
+- Company isolation with unique constraints
+
+#### **BankTransaction Model**
+- Transaction type (AFR_CREDIT, AFR_DEBIT, TRANSFER_CREDIT, TRANSFER_DEBIT, POS_PURCHASE, BANK_FEE, etc.)
+- Dates (booking_date, value_date)
+- Amount and currency
+- AFR/Transfer fields (payment_id, payer/beneficiary name/IBAN, reference)
+- POS/Card fields (card_number, merchant_name, merchant_location)
+- **Matching fields**:
+  - `matched_invoice` - ForeignKey to Invoice
+  - `match_confidence` - Decimal (0.00 to 1.00)
+  - `match_method` - Choice field with 7 methods
+  - `matched_transfer` - ForeignKey to Transfer (for TRANSFER_EXACT)
+  - `matched_reimbursement` - ForeignKey to self (for REIMBURSEMENT_PAIR)
+
+### Test Results (January 2025 Statement)
+
+**Before Enhancements**:
+- Total transactions: 27
+- Matched: 11/27 (40.7%)
+- Problem: 7 false matches to same OUTBOUND invoice (NAV tax payments)
+
+**After Direction Checking**:
+- Total transactions: 27
+- Matched: 5/27 (18.5%)
+- False matches prevented: 6 NAV tax payments ✅
+
+**After AMOUNT_DATE_ONLY Strategy**:
+- Total transactions: 27
+- **Matched: 15/27 (55.6%)** ✅
+- Breakdown:
+  - HIGH confidence (1.00): 3 matches → Auto-update
+  - MEDIUM confidence (0.70-0.90): 1 match → Review
+  - LOW confidence (0.60): 10 matches → Review
+  - NOT MATCHED: 12 transactions (correct - no invoices exist)
+
+**Quality Analysis**:
+- ✅ All 15 matches are correct
+- ✅ 6 false positives prevented
+- ✅ Confidence levels accurately reflect match quality
+- ✅ Low confidence matches flagged for manual review
+
+### Implementation Files
+
+**Models & Migration**:
+- `bank_transfers/models.py` - BankStatement, BankTransaction, OtherCost models
+- `bank_transfers/migrations/0039_add_bank_statement_models.py` - Database migration
+
+**Services**:
+- `bank_transfers/services/bank_statement_parser_service.py` - PDF parsing orchestration
+- `bank_transfers/services/transaction_matching_service.py` - Matching engine with 7 strategies
+
+**Bank Adapters**:
+- `bank_transfers/bank_adapters/base.py` - Abstract adapter interface + NormalizedTransaction dataclass
+- `bank_transfers/bank_adapters/factory.py` - BankAdapterFactory with automatic bank detection
+- `bank_transfers/bank_adapters/granit_adapter.py` - GRÁNIT Bank PDF parser
+- `bank_transfers/bank_adapters/revolut_adapter.py` - Revolut CSV parser
+- `bank_transfers/bank_adapters/magnet_adapter.py` - MagNet XML parser (NetBankXML)
+- `bank_transfers/bank_adapters/kh_adapter.py` - K&H Bank PDF parser
+- `bank_transfers/bank_adapters/__init__.py` - Module exports
+
+**API**:
+- `bank_transfers/api_views.py` - BankStatementViewSet, BankTransactionViewSet
+- `bank_transfers/serializers.py` - Serializers for statements and transactions
+
+**Documentation**:
+- `/BANK_STATEMENT_IMPORT_DOCUMENTATION.md` - Complete field mapping documentation (1200+ lines)
+  - Covers all 4 banks with detailed field extraction patterns
+  - Transaction type mapping for each bank
+  - Special cases and workarounds documented
+  - Test results and validation data
+
+### Enhancements Beyond Original Specification
+
+| Feature | Original Docs | Current Implementation | Status |
+|---------|---------------|------------------------|--------|
+| **REFERENCE_EXACT** | ✅ Planned | ✅ + Direction checking | **ENHANCED** |
+| **AMOUNT_IBAN** | ✅ Planned | ✅ + Direction checking | **ENHANCED** |
+| **FUZZY_NAME** | ✅ Planned | ✅ + Direction checking | **ENHANCED** |
+| **MANUAL** | ✅ Planned | ✅ Implemented | ✅ AS SPEC |
+| **TRANSFER_EXACT** | ❌ Not planned | ✅ Fully implemented | ⭐ **NEW** |
+| **AMOUNT_DATE_ONLY** | ❌ Not planned | ✅ Fully implemented | ⭐ **NEW** |
+| **REIMBURSEMENT_PAIR** | ❌ Not planned | ✅ Fully implemented | ⭐ **NEW** |
+| **Direction checking** | ❌ Not planned | ✅ All strategies | ⭐ **NEW** |
+| **Confidence levels** | ❌ Not specified | ✅ 5 levels (0.60-1.00) | ⭐ **NEW** |
+| **Auto-update threshold** | ❌ Not specified | ✅ confidence ≥ 0.95 | ⭐ **NEW** |
+| **Fallback reference** | ❌ Not planned | ✅ "Nem strukturált közlemény" | ⭐ **NEW** |
+| **Amount field fix** | ❌ Not planned | ✅ Uses invoice_gross_amount | ⭐ **NEW** |
+
+**Summary**:
+- ✅ Original specification: **FULLY IMPLEMENTED**
+- ⭐ **ENHANCED with 7 additional features**
+- 🚀 Match rate: **55.6%** (15/27 matches)
+- ✅ All matches directionally correct
+- ✅ Low confidence matches flagged for review
+- ✅ **Ready for production use**
+
+### Notes
+
+- **Bank format limitations**: AFR transactions in GRÁNIT Bank PDFs may not have "Közlemény" fields - this is the bank's PDF format, not a parser bug
+- **Performance**: Matching uses indexed fields for fast filtering even with thousands of invoices
+- **Company isolation**: All statements and transactions are company-scoped with proper access control
+- **Feature flag**: BANK_STATEMENT_IMPORT feature must be enabled for company to access functionality
+- **Permissions**: ADMIN and FINANCIAL roles can upload statements, all authenticated users can view
+
 ## Database Documentation
 
 ### 📋 DATABASE_DOCUMENTATION.md

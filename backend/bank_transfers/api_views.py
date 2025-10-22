@@ -11,16 +11,21 @@ from django.db import transaction, models
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 import json
+import logging
 from datetime import date
 
-from .models import BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch, CompanyUser, Invoice, InvoiceLineItem, InvoiceSyncLog, TrustedPartner, ExchangeRate, ExchangeRateSyncLog
+logger = logging.getLogger(__name__)
+
+from .models import BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch, CompanyUser, Invoice, InvoiceLineItem, InvoiceSyncLog, TrustedPartner, ExchangeRate, ExchangeRateSyncLog, BankStatement, BankTransaction, OtherCost
 from .serializers import (
     BankAccountSerializer, BeneficiarySerializer, TransferTemplateSerializer,
     TemplateBeneficiarySerializer, TransferSerializer, TransferBatchSerializer,
     TransferCreateFromTemplateSerializer, BulkTransferSerializer,
     ExcelImportSerializer, XMLGenerateSerializer, InvoiceListSerializer,
     InvoiceDetailSerializer, InvoiceSyncLogSerializer, TrustedPartnerSerializer,
-    ExchangeRateSerializer, ExchangeRateSyncLogSerializer, CurrencyConversionSerializer
+    ExchangeRateSerializer, ExchangeRateSyncLogSerializer, CurrencyConversionSerializer,
+    BankStatementListSerializer, BankStatementDetailSerializer, BankStatementUploadSerializer,
+    BankTransactionSerializer, OtherCostSerializer, SupportedBanksSerializer
 )
 from .utils import generate_xml
 from .pdf_processor import PDFTransactionProcessor
@@ -1835,3 +1840,324 @@ class ExchangeRateViewSet(viewsets.ReadOnlyModelViewSet):
 
         history_data = ExchangeRateSyncService.get_rate_history(currency, days)
         return Response(history_data)
+
+# =============================================================================
+# Bank Statement Import ViewSets
+# =============================================================================
+
+class BankStatementViewSet(viewsets.ModelViewSet):
+    """
+    Bank kivonatok kezelése - PDF feltöltés és tranzakciók listázása
+    
+    Endpoints:
+    - GET /api/bank-statements/ - Kivonatok listázása
+    - GET /api/bank-statements/{id}/ - Kivonat részletei tranzakciókkal
+    - POST /api/bank-statements/upload/ - PDF feltöltés
+    - GET /api/bank-statements/supported_banks/ - Támogatott bankok listája
+    - DELETE /api/bank-statements/{id}/ - Kivonat törlése
+    """
+    permission_classes = [IsAuthenticated, IsCompanyMember]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['bank_name', 'account_number', 'statement_number']
+    ordering_fields = ['uploaded_at', 'statement_period_from', 'statement_period_to', 'total_transactions']
+    ordering = ['-uploaded_at']
+    
+    def get_queryset(self):
+        """Csak a cég kivonatai"""
+        company = getattr(self.request, 'company', None)
+        if not company:
+            return BankStatement.objects.none()
+
+        queryset = BankStatement.objects.filter(company=company).select_related(
+            'uploaded_by'
+        ).prefetch_related(
+            'transactions'
+        )
+        
+        # Filter by status
+        status = self.request.query_params.get('status')
+        if status:
+            queryset = queryset.filter(status=status)
+        
+        # Filter by bank code
+        bank_code = self.request.query_params.get('bank_code')
+        if bank_code:
+            queryset = queryset.filter(bank_code=bank_code)
+        
+        # Filter by date range
+        from_date = self.request.query_params.get('from_date')
+        to_date = self.request.query_params.get('to_date')
+        if from_date:
+            queryset = queryset.filter(statement_period_from__gte=from_date)
+        if to_date:
+            queryset = queryset.filter(statement_period_to__lte=to_date)
+        
+        return queryset
+    
+    def get_serializer_class(self):
+        """Use different serializers for list vs detail"""
+        if self.action == 'retrieve':
+            return BankStatementDetailSerializer
+        elif self.action == 'upload':
+            return BankStatementUploadSerializer
+        return BankStatementListSerializer
+    
+    @swagger_auto_schema(
+        operation_description="PDF kivonat feltöltése és automatikus feldolgozás",
+        request_body=BankStatementUploadSerializer,
+        responses={
+            201: BankStatementDetailSerializer,
+            400: "Validation error"
+        }
+    )
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser])
+    def upload(self, request):
+        """
+        Bank statement PDF feltöltése
+        
+        Automatikusan:
+        - Felismeri a bankot
+        - Feldolgozza a PDF-et
+        - Létrehozza a tranzakciókat
+        - Ellenőrzi a duplikációt
+        """
+        from .services.bank_statement_parser_service import BankStatementParserService
+
+        company = getattr(request, 'company', None)
+        if not company:
+            return Response(
+                {'error': 'Nincs aktív cég kiválasztva'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate file
+        serializer = BankStatementUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        uploaded_file = serializer.validated_data['file']
+        
+        # Parse and save
+        try:
+            parser_service = BankStatementParserService(company, request.user)
+            statement = parser_service.parse_and_save(uploaded_file)
+            
+            # Return detailed response
+            response_serializer = BankStatementDetailSerializer(statement)
+            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+            
+        except ValueError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Upload failed: {e}", exc_info=True)
+            return Response(
+                {'error': f'Feldolgozási hiba: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @swagger_auto_schema(
+        operation_description="Támogatott bankok listája",
+        responses={200: SupportedBanksSerializer(many=True)}
+    )
+    @action(detail=False, methods=['get'])
+    def supported_banks(self, request):
+        """Támogatott bankok listája"""
+        from .services.bank_statement_parser_service import BankStatementParserService
+        
+        banks = BankStatementParserService.get_supported_banks()
+        serializer = SupportedBanksSerializer(banks, many=True)
+        return Response(serializer.data)
+
+
+class BankTransactionViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Bank tranzakciók kezelése (csak olvasás)
+    
+    A tranzakciók automatikusan jönnek létre a kivonat feldolgozásakor.
+    Csak lekérdezés és szűrés lehetséges.
+    """
+    serializer_class = BankTransactionSerializer
+    permission_classes = [IsAuthenticated, IsCompanyMember]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['description', 'payer_name', 'beneficiary_name', 'reference', 'payment_id']
+    ordering_fields = ['booking_date', 'value_date', 'amount']
+    ordering = ['-booking_date']
+    
+    def get_queryset(self):
+        """Csak a cég tranzakciói"""
+        company = getattr(self.request, 'company', None)
+        if not company:
+            return BankTransaction.objects.none()
+
+        queryset = BankTransaction.objects.filter(company=company).select_related(
+            'bank_statement',
+            'matched_invoice'
+        )
+        
+        # Filter by statement
+        statement_id = self.request.query_params.get('statement_id')
+        if statement_id:
+            queryset = queryset.filter(bank_statement_id=statement_id)
+        
+        # Filter by transaction type
+        transaction_type = self.request.query_params.get('transaction_type')
+        if transaction_type:
+            queryset = queryset.filter(transaction_type=transaction_type)
+        
+        # Filter by matched status
+        matched = self.request.query_params.get('matched')
+        if matched == 'true':
+            queryset = queryset.filter(matched_invoice__isnull=False)
+        elif matched == 'false':
+            queryset = queryset.filter(matched_invoice__isnull=True)
+        
+        # Filter by date range
+        from_date = self.request.query_params.get('from_date')
+        to_date = self.request.query_params.get('to_date')
+        if from_date:
+            queryset = queryset.filter(booking_date__gte=from_date)
+        if to_date:
+            queryset = queryset.filter(booking_date__lte=to_date)
+        
+        # Filter by amount range
+        min_amount = self.request.query_params.get('min_amount')
+        max_amount = self.request.query_params.get('max_amount')
+        if min_amount:
+            queryset = queryset.filter(amount__gte=min_amount)
+        if max_amount:
+            queryset = queryset.filter(amount__lte=max_amount)
+
+        return queryset
+
+    @action(detail=True, methods=['post'])
+    def match_invoice(self, request, pk=None):
+        """
+        Manually match transaction to invoice.
+
+        POST /api/bank-transactions/{id}/match_invoice/
+        Body: {"invoice_id": 123}
+        """
+        transaction = self.get_object()
+        invoice_id = request.data.get('invoice_id')
+
+        if not invoice_id:
+            return Response(
+                {'error': 'invoice_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            from .models import Invoice
+            invoice = Invoice.objects.get(id=invoice_id, company=transaction.company)
+        except Invoice.DoesNotExist:
+            return Response(
+                {'error': 'Invoice not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Manual match
+        transaction.matched_invoice = invoice
+        transaction.match_confidence = Decimal('1.00')
+        transaction.match_method = 'MANUAL'
+        transaction.save()
+
+        return Response({
+            'message': 'Transaction matched successfully',
+            'transaction_id': transaction.id,
+            'invoice_id': invoice.id,
+            'confidence': str(transaction.match_confidence),
+            'method': transaction.match_method
+        })
+
+    @action(detail=True, methods=['post'])
+    def unmatch(self, request, pk=None):
+        """
+        Remove invoice match from transaction.
+
+        POST /api/bank-transactions/{id}/unmatch/
+        """
+        transaction = self.get_object()
+
+        transaction.matched_invoice = None
+        transaction.match_confidence = Decimal('0.00')
+        transaction.match_method = ''
+        transaction.save()
+
+        return Response({'message': 'Transaction unmatched successfully'})
+
+    @action(detail=True, methods=['post'])
+    def rematch(self, request, pk=None):
+        """
+        Re-run automatic matching for single transaction.
+
+        POST /api/bank-transactions/{id}/rematch/
+        """
+        transaction = self.get_object()
+
+        from .services.transaction_matching_service import TransactionMatchingService
+
+        matching_service = TransactionMatchingService(transaction.company)
+        result = matching_service.match_transaction(transaction)
+
+        return Response({
+            'matched': result['matched'],
+            'invoice_id': result.get('invoice_id'),
+            'confidence': str(result.get('confidence')) if result.get('confidence') else None,
+            'method': result.get('method'),
+            'auto_paid': result.get('auto_paid', False)
+        })
+
+
+class OtherCostViewSet(viewsets.ModelViewSet):
+    """
+    Egyéb költségek kezelése
+    
+    Lehetővé teszi bank tranzakciók kategorizálását és címkézését
+    költségkövetés és elemzés céljából.
+    """
+    serializer_class = OtherCostSerializer
+    permission_classes = [IsAuthenticated, IsCompanyMember]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['description', 'notes']
+    ordering_fields = ['date', 'amount', 'category']
+    ordering = ['-date']
+    
+    def get_queryset(self):
+        """Csak a cég költségei"""
+        company = getattr(self.request, 'company', None)
+        if not company:
+            return OtherCost.objects.none()
+
+        queryset = OtherCost.objects.filter(company=company).select_related(
+            'bank_transaction',
+            'created_by'
+        )
+        
+        # Filter by category
+        category = self.request.query_params.get('category')
+        if category:
+            queryset = queryset.filter(category=category)
+        
+        # Filter by date range
+        from_date = self.request.query_params.get('from_date')
+        to_date = self.request.query_params.get('to_date')
+        if from_date:
+            queryset = queryset.filter(date__gte=from_date)
+        if to_date:
+            queryset = queryset.filter(date__lte=to_date)
+        
+        # Filter by tags
+        tags = self.request.query_params.get('tags')
+        if tags:
+            tag_list = [t.strip() for t in tags.split(',')]
+            for tag in tag_list:
+                queryset = queryset.filter(tags__contains=[tag])
+        
+        return queryset
+    
+    def perform_create(self, serializer):
+        """Set company and creator"""
+        company = getattr(self.request, 'company', None)
+        serializer.save(company=company, created_by=self.request.user)

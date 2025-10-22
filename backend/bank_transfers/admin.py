@@ -11,7 +11,8 @@ from .models import (
     BankAccount, Beneficiary, Transfer, TransferTemplate, TransferBatch,
     NavConfiguration, Invoice, InvoiceLineItem, InvoiceSyncLog,
     FeatureTemplate, CompanyFeature, Company, CompanyUser, UserProfile,
-    ExchangeRate, ExchangeRateSyncLog
+    ExchangeRate, ExchangeRateSyncLog,
+    BankStatement, BankTransaction, OtherCost
 )
 
 @admin.register(BankAccount)
@@ -559,3 +560,170 @@ class ExchangeRateSyncLogAdmin(admin.ModelAdmin):
     def has_change_permission(self, request, obj=None):
         """Make logs read-only"""
         return False
+
+# =============================================================================
+# Bank Statement Import Admin
+# =============================================================================
+
+@admin.register(BankStatement)
+class BankStatementAdmin(admin.ModelAdmin):
+    """
+    Admin interface for bank statements.
+    
+    Provides read-only view of uploaded PDF statements with filtering and search.
+    """
+    list_display = [
+        'id', 'company', 'bank_name', 'account_number', 'statement_period_display',
+        'total_transactions', 'matched_count', 'status', 'uploaded_at', 'uploaded_by'
+    ]
+    list_filter = ['status', 'bank_code', 'uploaded_at']
+    search_fields = ['account_number', 'account_iban', 'statement_number', 'file_name']
+    readonly_fields = [
+        'company', 'bank_code', 'bank_name', 'bank_bic',
+        'account_number', 'account_iban',
+        'statement_period_from', 'statement_period_to', 'statement_number',
+        'opening_balance', 'closing_balance',
+        'file_name', 'file_hash', 'file_size', 'file_path',
+        'uploaded_by', 'uploaded_at',
+        'status', 'parse_error', 'parse_warnings', 'raw_metadata',
+        'total_transactions', 'credit_count', 'debit_count', 'total_credits', 'total_debits', 'matched_count',
+        'created_at', 'updated_at'
+    ]
+    ordering = ['-uploaded_at']
+    date_hierarchy = 'uploaded_at'
+    
+    def statement_period_display(self, obj):
+        """Display statement period"""
+        return f"{obj.statement_period_from} - {obj.statement_period_to}"
+    statement_period_display.short_description = 'Időszak'
+    
+    def has_add_permission(self, request):
+        """Disable manual creation (only via PDF upload)"""
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        """Only superusers can delete statements"""
+        return request.user.is_superuser
+
+
+@admin.register(BankTransaction)
+class BankTransactionAdmin(admin.ModelAdmin):
+    """
+    Admin interface for bank transactions.
+    
+    Provides read-only view of parsed transactions with filtering and search.
+    """
+    list_display = [
+        'id', 'company', 'transaction_type', 'booking_date', 'amount_display',
+        'description_short', 'matched_invoice', 'match_confidence'
+    ]
+    list_filter = ['transaction_type', 'booking_date', 'currency', 'is_extra_cost', 'extra_cost_category']
+    search_fields = [
+        'description', 'payer_name', 'beneficiary_name', 'reference',
+        'payment_id', 'merchant_name'
+    ]
+    readonly_fields = [
+        'company', 'bank_statement',
+        'transaction_type', 'booking_date', 'value_date',
+        'amount', 'currency', 'description', 'short_description',
+        'payment_id', 'transaction_id',
+        'payer_name', 'payer_iban', 'payer_account_number', 'payer_bic',
+        'beneficiary_name', 'beneficiary_iban', 'beneficiary_account_number',
+        'reference',
+        'card_number', 'merchant_name', 'merchant_location',
+        'original_amount', 'original_currency',
+        'matched_invoice', 'match_confidence', 'match_method', 'match_notes', 'matched_by', 'matched_at',
+        'is_extra_cost', 'extra_cost_category', 'raw_data',
+        'created_at', 'updated_at'
+    ]
+    ordering = ['-booking_date']
+    date_hierarchy = 'booking_date'
+    
+    fieldsets = (
+        ('Alapadatok', {
+            'fields': ('company', 'bank_statement', 'transaction_type', 'booking_date', 'value_date')
+        }),
+        ('Összeg', {
+            'fields': ('amount', 'currency', 'original_amount', 'original_currency')
+        }),
+        ('Leírás', {
+            'fields': ('description', 'short_description', 'reference')
+        }),
+        ('Fizető fél', {
+            'fields': ('payer_name', 'payer_iban', 'payer_account_number', 'payer_bic')
+        }),
+        ('Kedvezményezett', {
+            'fields': ('beneficiary_name', 'beneficiary_iban', 'beneficiary_account_number')
+        }),
+        ('Tranzakció azonosítók', {
+            'fields': ('payment_id', 'transaction_id')
+        }),
+        ('Kártyás adatok', {
+            'fields': ('card_number', 'merchant_name', 'merchant_location')
+        }),
+        ('Számla párosítás', {
+            'fields': ('matched_invoice', 'match_confidence', 'match_method', 'match_notes', 'matched_by', 'matched_at')
+        }),
+        ('Egyéb költség', {
+            'fields': ('is_extra_cost', 'extra_cost_category')
+        }),
+        ('Nyers adat', {
+            'fields': ('raw_data',)
+        }),
+        ('Metaadatok', {
+            'fields': ('created_at', 'updated_at')
+        }),
+    )
+    
+    def amount_display(self, obj):
+        """Display amount with currency"""
+        return f"{obj.amount:,.2f} {obj.currency}"
+    amount_display.short_description = 'Összeg'
+    
+    def description_short(self, obj):
+        """Truncated description"""
+        return obj.description[:50] + '...' if len(obj.description) > 50 else obj.description
+    description_short.short_description = 'Leírás'
+    
+    def has_add_permission(self, request):
+        """Disable manual creation (only via PDF parsing)"""
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        """Only superusers can delete transactions"""
+        return request.user.is_superuser
+
+
+@admin.register(OtherCost)
+class OtherCostAdmin(admin.ModelAdmin):
+    """
+    Admin interface for other costs.
+    
+    Allows categorization and tagging of expenses for cost tracking.
+    """
+    list_display = [
+        'id', 'company', 'category', 'date', 'amount_display',
+        'description_short', 'bank_transaction', 'created_by'
+    ]
+    list_filter = ['category', 'date', 'currency']
+    search_fields = ['description', 'notes']
+    readonly_fields = ['company', 'created_at', 'updated_at']
+    ordering = ['-date']
+    date_hierarchy = 'date'
+    
+    fields = [
+        'company', 'bank_transaction', 'category',
+        'amount', 'currency', 'date',
+        'description', 'notes', 'tags',
+        'created_by', 'created_at', 'updated_at'
+    ]
+    
+    def amount_display(self, obj):
+        """Display amount with currency"""
+        return f"{obj.amount:,.2f} {obj.currency}"
+    amount_display.short_description = 'Összeg'
+    
+    def description_short(self, obj):
+        """Truncated description"""
+        return obj.description[:50] + '...' if len(obj.description) > 50 else obj.description
+    description_short.short_description = 'Leírás'

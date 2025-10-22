@@ -4,7 +4,9 @@
       "Bash(curl:*)",
       "Read(//Users/tothi/Workspace/ITCardigan/git/transferXMLGenerator/**)",
       "Bash(python manage.py shell:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(python manage.py makemigrations bank_transfers -n rename_extracost_to_othercost)",
+      "Bash(python manage.py migrate bank_transfers)"
     ],
     "deny": [],
     "ask": []

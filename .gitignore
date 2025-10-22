@@ -221,6 +221,7 @@ bank_statement_example/
 backend/test_transfer_validation.py
 backend/test_vat_api_endpoints.py
 backend/test_vat_api.py
+backend/test_bank_statement_import.py
 
 # Docker configuration - contains local paths and passwords
 docker-compose.yml
