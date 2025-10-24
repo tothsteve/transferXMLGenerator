@@ -280,6 +280,107 @@ COMMENT ON COLUMN bank_transfers_trustedpartner.created_at IS 'Partner registrat
 COMMENT ON COLUMN bank_transfers_trustedpartner.updated_at IS 'Last modification timestamp';
 
 -- =============================================================================
+-- BANK STATEMENT IMPORT SYSTEM
+-- =============================================================================
+
+-- Bank Statement Records
+COMMENT ON TABLE bank_transfers_bankstatement IS 'Company-scoped bank statement records from uploaded PDF/CSV/XML files. Represents a single uploaded bank statement with parsing status, transaction statistics, and error tracking.';
+COMMENT ON COLUMN bank_transfers_bankstatement.id IS 'Primary key - unique bank statement identifier';
+COMMENT ON COLUMN bank_transfers_bankstatement.company_id IS 'Foreign key to company - which company owns this statement';
+COMMENT ON COLUMN bank_transfers_bankstatement.bank_code IS 'Bank identifier code: GRANIT, MAGNET, REVOLUT, KH, OTP, CIB, ERSTE';
+COMMENT ON COLUMN bank_transfers_bankstatement.bank_name IS 'Full name of the bank';
+COMMENT ON COLUMN bank_transfers_bankstatement.bank_bic IS 'Bank Identifier Code (SWIFT code)';
+COMMENT ON COLUMN bank_transfers_bankstatement.account_number IS 'Hungarian bank account number (formatted with dashes)';
+COMMENT ON COLUMN bank_transfers_bankstatement.account_iban IS 'International Bank Account Number';
+COMMENT ON COLUMN bank_transfers_bankstatement.statement_period_from IS 'Start date of statement period';
+COMMENT ON COLUMN bank_transfers_bankstatement.statement_period_to IS 'End date of statement period';
+COMMENT ON COLUMN bank_transfers_bankstatement.statement_number IS 'Bank statement reference number';
+COMMENT ON COLUMN bank_transfers_bankstatement.opening_balance IS 'Account balance at statement period start';
+COMMENT ON COLUMN bank_transfers_bankstatement.closing_balance IS 'Account balance at statement period end (NULL if not available)';
+COMMENT ON COLUMN bank_transfers_bankstatement.file_name IS 'Original uploaded filename';
+COMMENT ON COLUMN bank_transfers_bankstatement.file_hash IS 'SHA256 hash of uploaded file for duplicate detection';
+COMMENT ON COLUMN bank_transfers_bankstatement.file_size IS 'File size in bytes';
+COMMENT ON COLUMN bank_transfers_bankstatement.file_path IS 'Storage path for uploaded file';
+COMMENT ON COLUMN bank_transfers_bankstatement.uploaded_by_id IS 'Foreign key to auth_user - user who uploaded this statement';
+COMMENT ON COLUMN bank_transfers_bankstatement.uploaded_at IS 'Timestamp when statement was uploaded';
+COMMENT ON COLUMN bank_transfers_bankstatement.status IS 'Processing status: UPLOADED, PARSING, PARSED, ERROR';
+COMMENT ON COLUMN bank_transfers_bankstatement.total_transactions IS 'Total number of transactions in statement';
+COMMENT ON COLUMN bank_transfers_bankstatement.credit_count IS 'Number of credit transactions (positive amounts)';
+COMMENT ON COLUMN bank_transfers_bankstatement.debit_count IS 'Number of debit transactions (negative amounts)';
+COMMENT ON COLUMN bank_transfers_bankstatement.total_credits IS 'Sum of all credit transactions';
+COMMENT ON COLUMN bank_transfers_bankstatement.total_debits IS 'Sum of all debit transactions (absolute value)';
+COMMENT ON COLUMN bank_transfers_bankstatement.matched_count IS 'Number of transactions matched to NAV invoices';
+COMMENT ON COLUMN bank_transfers_bankstatement.parse_error IS 'Error message if parsing failed (NULL if successful)';
+COMMENT ON COLUMN bank_transfers_bankstatement.parse_warnings IS 'JSON array of warning messages from parsing process';
+COMMENT ON COLUMN bank_transfers_bankstatement.parse_started_at IS 'Timestamp when parsing started';
+COMMENT ON COLUMN bank_transfers_bankstatement.parse_completed_at IS 'Timestamp when parsing completed';
+COMMENT ON COLUMN bank_transfers_bankstatement.raw_metadata IS 'JSON object with raw metadata extracted from statement file';
+COMMENT ON COLUMN bank_transfers_bankstatement.created_at IS 'Record creation timestamp';
+COMMENT ON COLUMN bank_transfers_bankstatement.updated_at IS 'Last modification timestamp';
+
+-- Bank Transaction Records
+COMMENT ON TABLE bank_transfers_banktransaction IS 'Individual transaction records extracted from bank statements. Supports all transaction types including AFR transfers, POS purchases, bank fees, interest, and other banking operations. Contains matching to NAV invoices, transfers, and reimbursement pairs.';
+COMMENT ON COLUMN bank_transfers_banktransaction.id IS 'Primary key - unique transaction identifier';
+COMMENT ON COLUMN bank_transfers_banktransaction.company_id IS 'Foreign key to company - which company owns this transaction';
+COMMENT ON COLUMN bank_transfers_banktransaction.bank_statement_id IS 'Foreign key to bank_transfers_bankstatement - parent statement';
+COMMENT ON COLUMN bank_transfers_banktransaction.transaction_type IS 'Transaction type code: AFR_CREDIT, AFR_DEBIT, TRANSFER_CREDIT, TRANSFER_DEBIT, POS_PURCHASE, ATM_WITHDRAWAL, BANK_FEE, INTEREST_CREDIT, INTEREST_DEBIT, CORRECTION, OTHER';
+COMMENT ON COLUMN bank_transfers_banktransaction.booking_date IS 'Date when transaction was booked to account';
+COMMENT ON COLUMN bank_transfers_banktransaction.value_date IS 'Value date (effective date) for interest calculation';
+COMMENT ON COLUMN bank_transfers_banktransaction.amount IS 'Transaction amount (negative for debit, positive for credit)';
+COMMENT ON COLUMN bank_transfers_banktransaction.currency IS 'ISO currency code (default: HUF)';
+COMMENT ON COLUMN bank_transfers_banktransaction.description IS 'Full transaction description from bank';
+COMMENT ON COLUMN bank_transfers_banktransaction.short_description IS 'Shortened or summarized description';
+COMMENT ON COLUMN bank_transfers_banktransaction.payment_id IS 'Payment identifier from bank system';
+COMMENT ON COLUMN bank_transfers_banktransaction.transaction_id IS 'Unique transaction identifier';
+COMMENT ON COLUMN bank_transfers_banktransaction.payer_name IS 'Name of payer (for incoming transfers)';
+COMMENT ON COLUMN bank_transfers_banktransaction.payer_iban IS 'IBAN of payer';
+COMMENT ON COLUMN bank_transfers_banktransaction.payer_account_number IS 'Account number of payer';
+COMMENT ON COLUMN bank_transfers_banktransaction.payer_bic IS 'BIC of payer''s bank';
+COMMENT ON COLUMN bank_transfers_banktransaction.beneficiary_name IS 'Name of beneficiary (for outgoing transfers)';
+COMMENT ON COLUMN bank_transfers_banktransaction.beneficiary_iban IS 'IBAN of beneficiary';
+COMMENT ON COLUMN bank_transfers_banktransaction.beneficiary_account_number IS 'Account number of beneficiary';
+COMMENT ON COLUMN bank_transfers_banktransaction.beneficiary_bic IS 'BIC of beneficiary''s bank';
+COMMENT ON COLUMN bank_transfers_banktransaction.reference IS 'Unstructured remittance information (közlemény) - critical for invoice matching';
+COMMENT ON COLUMN bank_transfers_banktransaction.partner_id IS 'End-to-end identifier between transaction partners';
+COMMENT ON COLUMN bank_transfers_banktransaction.transaction_type_code IS 'Bank-specific transaction type code (e.g., 001-00)';
+COMMENT ON COLUMN bank_transfers_banktransaction.fee_amount IS 'Transaction fee charged by bank';
+COMMENT ON COLUMN bank_transfers_banktransaction.card_number IS 'Masked card number for POS/ATM transactions';
+COMMENT ON COLUMN bank_transfers_banktransaction.merchant_name IS 'Merchant name for POS purchases';
+COMMENT ON COLUMN bank_transfers_banktransaction.merchant_location IS 'Merchant location for POS purchases';
+COMMENT ON COLUMN bank_transfers_banktransaction.original_amount IS 'Original amount in foreign currency (before conversion)';
+COMMENT ON COLUMN bank_transfers_banktransaction.original_currency IS 'Original currency code for FX transactions';
+COMMENT ON COLUMN bank_transfers_banktransaction.exchange_rate IS 'Exchange rate used for currency conversion (6 decimal precision)';
+COMMENT ON COLUMN bank_transfers_banktransaction.matched_invoice_id IS 'Foreign key to bank_transfers_invoice - NAV invoice matched to this transaction';
+COMMENT ON COLUMN bank_transfers_banktransaction.matched_transfer_id IS 'Foreign key to bank_transfers_transfer - Transfer from executed batch matched to this transaction';
+COMMENT ON COLUMN bank_transfers_banktransaction.matched_reimbursement_id IS 'Foreign key to self - Offsetting transaction (e.g., POS purchase + personal reimbursement transfer)';
+COMMENT ON COLUMN bank_transfers_banktransaction.match_confidence IS 'Matching confidence score (0.00 to 1.00)';
+COMMENT ON COLUMN bank_transfers_banktransaction.match_method IS 'Method used for matching: REFERENCE_EXACT, AMOUNT_IBAN, FUZZY_NAME, TRANSFER_EXACT, REIMBURSEMENT_PAIR, MANUAL';
+COMMENT ON COLUMN bank_transfers_banktransaction.match_notes IS 'Additional notes about matching process';
+COMMENT ON COLUMN bank_transfers_banktransaction.matched_at IS 'Timestamp when transaction was matched';
+COMMENT ON COLUMN bank_transfers_banktransaction.matched_by_id IS 'Foreign key to auth_user - User who performed matching (NULL for automatic)';
+COMMENT ON COLUMN bank_transfers_banktransaction.is_extra_cost IS 'Flag indicating if this is an extra cost (bank fee, interest, etc.)';
+COMMENT ON COLUMN bank_transfers_banktransaction.extra_cost_category IS 'Category for extra costs: BANK_FEE, CARD_PURCHASE, INTEREST, TAX_DUTY, CASH_WITHDRAWAL, OTHER';
+COMMENT ON COLUMN bank_transfers_banktransaction.raw_data IS 'JSON object with raw transaction data from bank statement (sanitized for JSON storage)';
+COMMENT ON COLUMN bank_transfers_banktransaction.created_at IS 'Record creation timestamp';
+COMMENT ON COLUMN bank_transfers_banktransaction.updated_at IS 'Last modification timestamp';
+
+-- Other Cost Records
+COMMENT ON TABLE bank_transfers_othercost IS 'Additional cost records derived from bank transactions. Allows enhanced categorization, detailed notes, and flexible tagging beyond standard BankTransaction fields. Used for expense tracking, cost analysis, and financial reporting.';
+COMMENT ON COLUMN bank_transfers_othercost.id IS 'Primary key - unique cost record identifier';
+COMMENT ON COLUMN bank_transfers_othercost.company_id IS 'Foreign key to company - which company owns this cost record';
+COMMENT ON COLUMN bank_transfers_othercost.bank_transaction_id IS 'Foreign key to bank_transfers_banktransaction - optional reference to originating bank transaction (one-to-one)';
+COMMENT ON COLUMN bank_transfers_othercost.category IS 'Cost category: BANK_FEE, CARD_PURCHASE, INTEREST, TAX_DUTY, CASH_WITHDRAWAL, SUBSCRIPTION, UTILITY, FUEL, TRAVEL, OFFICE, OTHER';
+COMMENT ON COLUMN bank_transfers_othercost.amount IS 'Cost amount (always positive for costs)';
+COMMENT ON COLUMN bank_transfers_othercost.currency IS 'ISO currency code (default: HUF)';
+COMMENT ON COLUMN bank_transfers_othercost.date IS 'Date of the cost';
+COMMENT ON COLUMN bank_transfers_othercost.description IS 'Detailed description of the cost';
+COMMENT ON COLUMN bank_transfers_othercost.notes IS 'Additional notes, context, or justification';
+COMMENT ON COLUMN bank_transfers_othercost.tags IS 'JSON array of tag strings for flexible categorization (e.g., ["fuel", "travel", "office"])';
+COMMENT ON COLUMN bank_transfers_othercost.created_by_id IS 'Foreign key to auth_user - User who created this cost record';
+COMMENT ON COLUMN bank_transfers_othercost.created_at IS 'Record creation timestamp';
+COMMENT ON COLUMN bank_transfers_othercost.updated_at IS 'Last modification timestamp';
+
+-- =============================================================================
 -- VERIFICATION QUERIES
 -- =============================================================================
 
