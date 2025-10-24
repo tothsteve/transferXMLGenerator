@@ -230,3 +230,5 @@ docker-compose.yml
 backup_*.json
 *.bak
 backups/
+backend/test_api_import.py
+backend/test_pdf_import.py
