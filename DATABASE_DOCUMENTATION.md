@@ -1054,8 +1054,6 @@ for sync in failed_syncs:
 | `matched_count` | INTEGER | DEFAULT 0 | Number of transactions matched to NAV invoices |
 | `parse_error` | TEXT | | Error message if parsing failed (NULL if successful) |
 | `parse_warnings` | JSON | DEFAULT [] | Array of warning messages from parsing process |
-| `parse_started_at` | TIMESTAMP | | Timestamp when parsing started |
-| `parse_completed_at` | TIMESTAMP | | Timestamp when parsing completed |
 | `raw_metadata` | JSON | DEFAULT {} | Raw metadata extracted from statement file |
 | `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Record creation timestamp |
 | `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |

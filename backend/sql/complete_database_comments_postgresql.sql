@@ -94,6 +94,7 @@ COMMENT ON COLUMN bank_transfers_beneficiary.company_id IS 'Foreign key to compa
 COMMENT ON COLUMN bank_transfers_beneficiary.name IS 'Full legal name of the beneficiary (person or organization)';
 COMMENT ON COLUMN bank_transfers_beneficiary.account_number IS 'Bank account number for receiving transfers (nullable - can use VAT number instead)';
 COMMENT ON COLUMN bank_transfers_beneficiary.vat_number IS 'Hungarian personal VAT number (személyi adóazonosító jel) - 10 digits (e.g. 8440961790). Nullable when account_number is provided.';
+COMMENT ON COLUMN bank_transfers_beneficiary.tax_number IS 'Hungarian company tax number - 8 digits (first 8 digits of full tax ID, e.g. 12345678). Used for NAV invoice integration fallback when bank account is missing.';
 COMMENT ON COLUMN bank_transfers_beneficiary.description IS 'Additional description or notes about this beneficiary';
 COMMENT ON COLUMN bank_transfers_beneficiary.is_frequent IS 'Whether this beneficiary is marked as frequently used for quick access';
 COMMENT ON COLUMN bank_transfers_beneficiary.is_active IS 'Whether this beneficiary is currently active and available for transfers';
@@ -128,6 +129,7 @@ COMMENT ON COLUMN bank_transfers_transfer.id IS 'Primary key - unique transfer i
 COMMENT ON COLUMN bank_transfers_transfer.beneficiary_id IS 'Foreign key to transfer recipient';
 COMMENT ON COLUMN bank_transfers_transfer.originator_account_id IS 'Foreign key to originating bank account';
 COMMENT ON COLUMN bank_transfers_transfer.template_id IS 'Foreign key to template used to create this transfer (if applicable)';
+COMMENT ON COLUMN bank_transfers_transfer.nav_invoice_id IS 'Foreign key to NAV invoice - links transfer to the invoice it pays (optional)';
 COMMENT ON COLUMN bank_transfers_transfer.amount IS 'Transfer amount in specified currency';
 COMMENT ON COLUMN bank_transfers_transfer.currency IS 'Currency code (HUF, EUR, USD)';
 COMMENT ON COLUMN bank_transfers_transfer.execution_date IS 'Requested execution date for the transfer';
@@ -263,6 +265,37 @@ COMMENT ON COLUMN bank_transfers_invoicesynclog.created_at IS 'Log entry creatio
 COMMENT ON COLUMN bank_transfers_invoicesynclog.updated_at IS 'Last modification timestamp';
 
 -- =============================================================================
+-- MNB EXCHANGE RATE INTEGRATION
+-- =============================================================================
+
+-- Exchange Rate Records
+COMMENT ON TABLE bank_transfers_exchangerate IS 'Official exchange rates from Magyar Nemzeti Bank (MNB) for USD and EUR currencies. Provides accurate, government-sourced exchange rates for currency conversion and financial calculations.';
+COMMENT ON COLUMN bank_transfers_exchangerate.id IS 'Primary key - unique exchange rate identifier';
+COMMENT ON COLUMN bank_transfers_exchangerate.rate_date IS 'Date for which this exchange rate is valid';
+COMMENT ON COLUMN bank_transfers_exchangerate.currency IS 'ISO currency code (USD or EUR)';
+COMMENT ON COLUMN bank_transfers_exchangerate.rate IS 'Exchange rate: 1 unit of currency = X HUF (6 decimal precision)';
+COMMENT ON COLUMN bank_transfers_exchangerate.unit IS 'Number of currency units this rate applies to (typically 1)';
+COMMENT ON COLUMN bank_transfers_exchangerate.sync_date IS 'Timestamp when this rate was fetched from MNB API';
+COMMENT ON COLUMN bank_transfers_exchangerate.source IS 'Data source identifier (always MNB for official rates)';
+COMMENT ON COLUMN bank_transfers_exchangerate.created_at IS 'Record creation timestamp';
+COMMENT ON COLUMN bank_transfers_exchangerate.updated_at IS 'Last modification timestamp';
+
+-- Exchange Rate Sync Log
+COMMENT ON TABLE bank_transfers_exchangeratesynclog IS 'Audit trail for MNB exchange rate synchronization operations. Tracks all sync attempts with statistics, errors, and performance metrics.';
+COMMENT ON COLUMN bank_transfers_exchangeratesynclog.id IS 'Primary key - unique sync log identifier';
+COMMENT ON COLUMN bank_transfers_exchangeratesynclog.sync_start_time IS 'Exact timestamp when sync operation started';
+COMMENT ON COLUMN bank_transfers_exchangeratesynclog.sync_end_time IS 'Timestamp when sync operation completed (NULL if still running)';
+COMMENT ON COLUMN bank_transfers_exchangeratesynclog.currencies_synced IS 'Comma-separated list of currency codes synced (e.g., USD,EUR)';
+COMMENT ON COLUMN bank_transfers_exchangeratesynclog.date_range_start IS 'Start date of the sync range (inclusive)';
+COMMENT ON COLUMN bank_transfers_exchangeratesynclog.date_range_end IS 'End date of the sync range (inclusive)';
+COMMENT ON COLUMN bank_transfers_exchangeratesynclog.rates_created IS 'Number of new exchange rate records created during sync';
+COMMENT ON COLUMN bank_transfers_exchangeratesynclog.rates_updated IS 'Number of existing exchange rate records updated during sync';
+COMMENT ON COLUMN bank_transfers_exchangeratesynclog.sync_status IS 'Sync operation status: RUNNING, SUCCESS, PARTIAL_SUCCESS, FAILED';
+COMMENT ON COLUMN bank_transfers_exchangeratesynclog.error_message IS 'Error details if sync failed (NULL if successful)';
+COMMENT ON COLUMN bank_transfers_exchangeratesynclog.created_at IS 'Log record creation timestamp';
+COMMENT ON COLUMN bank_transfers_exchangeratesynclog.updated_at IS 'Last modification timestamp';
+
+-- =============================================================================
 -- TRUSTED PARTNERS AUTO-PAYMENT SYSTEM
 -- =============================================================================
 
@@ -274,6 +307,7 @@ COMMENT ON COLUMN bank_transfers_trustedpartner.partner_name IS 'Full name of th
 COMMENT ON COLUMN bank_transfers_trustedpartner.tax_number IS 'Hungarian tax identification number of the partner (supports multiple formats)';
 COMMENT ON COLUMN bank_transfers_trustedpartner.is_active IS 'Active status - inactive partners are ignored during auto-processing';
 COMMENT ON COLUMN bank_transfers_trustedpartner.auto_pay IS 'Auto-payment enabled - when TRUE, invoices are automatically marked as PAID';
+COMMENT ON COLUMN bank_transfers_trustedpartner.notes IS 'Additional notes or comments about this trusted partner';
 COMMENT ON COLUMN bank_transfers_trustedpartner.invoice_count IS 'Statistics: Total number of invoices processed from this partner';
 COMMENT ON COLUMN bank_transfers_trustedpartner.last_invoice_date IS 'Statistics: Date of the most recent invoice from this partner';
 COMMENT ON COLUMN bank_transfers_trustedpartner.created_at IS 'Partner registration timestamp';
@@ -312,8 +346,6 @@ COMMENT ON COLUMN bank_transfers_bankstatement.total_debits IS 'Sum of all debit
 COMMENT ON COLUMN bank_transfers_bankstatement.matched_count IS 'Number of transactions matched to NAV invoices';
 COMMENT ON COLUMN bank_transfers_bankstatement.parse_error IS 'Error message if parsing failed (NULL if successful)';
 COMMENT ON COLUMN bank_transfers_bankstatement.parse_warnings IS 'JSON array of warning messages from parsing process';
-COMMENT ON COLUMN bank_transfers_bankstatement.parse_started_at IS 'Timestamp when parsing started';
-COMMENT ON COLUMN bank_transfers_bankstatement.parse_completed_at IS 'Timestamp when parsing completed';
 COMMENT ON COLUMN bank_transfers_bankstatement.raw_metadata IS 'JSON object with raw metadata extracted from statement file';
 COMMENT ON COLUMN bank_transfers_bankstatement.created_at IS 'Record creation timestamp';
 COMMENT ON COLUMN bank_transfers_bankstatement.updated_at IS 'Last modification timestamp';
