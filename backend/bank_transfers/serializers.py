@@ -394,36 +394,42 @@ class InvoiceListSerializer(serializers.ModelSerializer):
     invoice_vat_amount_formatted = serializers.SerializerMethodField()
     invoice_gross_amount_formatted = serializers.SerializerMethodField()
     
-    # Payment status (using new database fields) 
+    # Payment status (using new database fields)
     payment_status = serializers.SerializerMethodField()
     payment_status_date_formatted = serializers.SerializerMethodField()
     is_overdue = serializers.SerializerMethodField()
-    
+
+    # Transaction matching status
+    is_matched_to_transaction = serializers.SerializerMethodField()
+
     class Meta:
         model = Invoice
         fields = [
             # Basic info
             'id', 'company', 'company_name', 'nav_invoice_number', 'invoice_direction',
             'invoice_direction_display', 'partner_name', 'partner_tax_number',
-            
+
             # Dates
             'issue_date', 'issue_date_formatted',
             'fulfillment_date', 'fulfillment_date_formatted',
             'payment_due_date', 'payment_due_date_formatted',
             'payment_date', 'payment_date_formatted',
-            
+
             # Financial
-            'currency_code', 
+            'currency_code',
             'invoice_net_amount', 'invoice_net_amount_formatted',
             'invoice_vat_amount', 'invoice_vat_amount_formatted',
             'invoice_gross_amount', 'invoice_gross_amount_formatted',
-            
+
             # Business
             'invoice_operation', 'payment_method', 'original_invoice_number',
-            'payment_status', 'payment_status_date', 'payment_status_date_formatted', 
+            'payment_status', 'payment_status_date', 'payment_status_date_formatted',
             'auto_marked_paid', 'is_overdue', 'invoice_category',
             'supplier_bank_account_number', 'customer_bank_account_number',
-            
+
+            # Matching status
+            'is_matched_to_transaction',
+
             # System
             'sync_status', 'created_at'
         ]
@@ -563,6 +569,14 @@ class InvoiceListSerializer(serializers.ModelSerializer):
             'icon': 'help',
             'class': 'status-unknown'
         }
+
+    def get_is_matched_to_transaction(self, obj):
+        """Check if this invoice is matched to any bank transaction."""
+        from .models import BankTransaction
+        return BankTransaction.objects.filter(
+            matched_invoice=obj,
+            company=obj.company
+        ).exists()
 
 
 class InvoiceDetailSerializer(serializers.ModelSerializer):
@@ -986,13 +1000,15 @@ class CurrencyConversionSerializer(serializers.Serializer):
 class BankTransactionSerializer(serializers.ModelSerializer):
     """
     Serializer for bank transaction records.
-    
+
     Provides full transaction details with nested invoice match information.
     """
     statement_details = serializers.SerializerMethodField()
     matched_invoice_details = serializers.SerializerMethodField()
+    matched_transfer_batch = serializers.SerializerMethodField()
+    matched_reimbursement_details = serializers.SerializerMethodField()
     has_other_cost = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = BankTransaction
         fields = [
@@ -1006,6 +1022,8 @@ class BankTransactionSerializer(serializers.ModelSerializer):
             'card_number', 'merchant_name', 'merchant_location',
             'original_amount', 'original_currency',
             'matched_invoice', 'matched_invoice_details', 'match_confidence', 'match_method',
+            'matched_transfer', 'matched_transfer_batch',
+            'matched_reimbursement', 'matched_reimbursement_details',
             'has_other_cost',
             'created_at', 'updated_at'
         ]
@@ -1031,12 +1049,40 @@ class BankTransactionSerializer(serializers.ModelSerializer):
                 'invoice_number': obj.matched_invoice.nav_invoice_number,
                 'supplier_name': obj.matched_invoice.supplier_name,
                 'supplier_tax_number': obj.matched_invoice.supplier_tax_number,
+                'customer_name': obj.matched_invoice.customer_name,
+                'customer_tax_number': obj.matched_invoice.customer_tax_number,
                 'gross_amount': str(obj.matched_invoice.invoice_gross_amount) if obj.matched_invoice.invoice_gross_amount else None,
                 'payment_due_date': obj.matched_invoice.payment_due_date.isoformat() if obj.matched_invoice.payment_due_date else None,
                 'payment_status': obj.matched_invoice.payment_status,
             }
         return None
-    
+
+    def get_matched_transfer_batch(self, obj):
+        """Return batch ID for matched transfer"""
+        if obj.matched_transfer:
+            # Get the first batch that contains this transfer
+            # In most cases, a transfer belongs to only one batch
+            batch = obj.matched_transfer.transferbatch_set.first()
+            if batch:
+                return batch.id
+        return None
+
+    def get_matched_reimbursement_details(self, obj):
+        """Return paired reimbursement transaction summary"""
+        if obj.matched_reimbursement:
+            paired = obj.matched_reimbursement
+            return {
+                'id': paired.id,
+                'bank_statement': paired.bank_statement_id,
+                'transaction_type': paired.transaction_type,
+                'booking_date': paired.booking_date.isoformat(),
+                'amount': str(paired.amount),
+                'currency': paired.currency,
+                'description': paired.description or '',
+                'partner_name': paired.payer_name or paired.beneficiary_name or paired.merchant_name or '',
+            }
+        return None
+
     def get_has_other_cost(self, obj):
         """Check if transaction has associated other cost record"""
         return hasattr(obj, 'other_cost_detail') and obj.other_cost_detail is not None
