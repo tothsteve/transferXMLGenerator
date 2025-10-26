@@ -37,6 +37,7 @@ export interface UseInvoiceDetailsReturn {
   checkingTrustedStatus: boolean;
   addingTrustedPartner: boolean;
   handleViewInvoice: (invoice: Invoice) => Promise<void>;
+  handleViewInvoiceById: (invoiceId: number) => Promise<void>;
   handleCloseInvoiceDetails: () => void;
   handleAddTrustedPartner: () => Promise<void>;
 }
@@ -127,6 +128,12 @@ export const useInvoiceDetails = ({
   const handleViewInvoice = async (invoice: Invoice): Promise<void> => {
     setInvoiceDetailsOpen(true);
     await loadInvoiceDetails(invoice.id);
+  };
+
+  // Open invoice details modal by ID (for deep linking)
+  const handleViewInvoiceById = async (invoiceId: number): Promise<void> => {
+    setInvoiceDetailsOpen(true);
+    await loadInvoiceDetails(invoiceId);
   };
 
   // Close invoice details modal
@@ -269,6 +276,7 @@ export const useInvoiceDetails = ({
     checkingTrustedStatus,
     addingTrustedPartner,
     handleViewInvoice,
+    handleViewInvoiceById,
     handleCloseInvoiceDetails,
     handleAddTrustedPartner,
   };

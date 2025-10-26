@@ -180,7 +180,7 @@ const MatchDetailsCard: React.FC<MatchDetailsCardProps> = ({
                 <Typography variant="body2">
                   <strong>Számlaszám:</strong>{' '}
                   <MuiLink
-                    href={`/invoices/${transaction.matched_invoice_details.id}`}
+                    href={`/nav-invoices?invoiceId=${transaction.matched_invoice_details.id}`}
                     underline="hover"
                     color="primary"
                   >
