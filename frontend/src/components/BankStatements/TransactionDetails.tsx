@@ -8,6 +8,7 @@ import { Box, Typography, Stack } from '@mui/material';
 import { BankTransaction } from '../../schemas/bankStatement.schemas';
 import { format, parseISO } from 'date-fns';
 import { hu } from 'date-fns/locale';
+import MatchDetailsCard from './MatchDetailsCard';
 
 /**
  * Props for TransactionDetails component.
@@ -48,62 +49,56 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({
       <Typography variant="subtitle2" gutterBottom>
         Részletek
       </Typography>
-      <Stack spacing={1}>
-        {/* Description */}
-        {transaction.description && (
+      <Stack spacing={2}>
+        {/* Match Details Card (if matched) */}
+        <MatchDetailsCard transaction={transaction} />
+
+        {/* Transaction Details */}
+        <Stack spacing={1}>
+          {/* Description */}
+          {transaction.description && (
+            <Box>
+              <Typography variant="caption" color="text.secondary">
+                Leírás:
+              </Typography>
+              <Typography variant="body2">{transaction.description}</Typography>
+            </Box>
+          )}
+
+          {/* Reference/Remittance Info */}
+          {transaction.reference && (
+            <Box>
+              <Typography variant="caption" color="text.secondary">
+                Közlemény:
+              </Typography>
+              <Typography variant="body2">{transaction.reference}</Typography>
+            </Box>
+          )}
+
+          {/* Transaction ID */}
+          {transaction.transaction_id && (
+            <Box>
+              <Typography variant="caption" color="text.secondary">
+                Tranzakció azonosító:
+              </Typography>
+              <Typography variant="body2" fontFamily="monospace">
+                {transaction.transaction_id}
+              </Typography>
+            </Box>
+          )}
+
+          {/* Created At Timestamp */}
           <Box>
             <Typography variant="caption" color="text.secondary">
-              Leírás:
+              Létrehozva:
             </Typography>
-            <Typography variant="body2">{transaction.description}</Typography>
-          </Box>
-        )}
-
-        {/* Reference/Remittance Info */}
-        {transaction.reference && (
-          <Box>
-            <Typography variant="caption" color="text.secondary">
-              Közlemény:
-            </Typography>
-            <Typography variant="body2">{transaction.reference}</Typography>
-          </Box>
-        )}
-
-        {/* Matched Invoice */}
-        {transaction.matched_invoice !== null && (
-          <Box>
-            <Typography variant="caption" color="text.secondary">
-              Párosított számla ID:
-            </Typography>
-            <Typography variant="body2" color="success.main">
-              #{transaction.matched_invoice}
+            <Typography variant="body2">
+              {format(parseISO(transaction.created_at), 'yyyy. MM. dd. HH:mm', {
+                locale: hu,
+              })}
             </Typography>
           </Box>
-        )}
-
-        {/* Matched Transfer */}
-        {transaction.matched_transfer !== null && (
-          <Box>
-            <Typography variant="caption" color="text.secondary">
-              Párosított átutalás ID:
-            </Typography>
-            <Typography variant="body2" color="success.main">
-              #{transaction.matched_transfer}
-            </Typography>
-          </Box>
-        )}
-
-        {/* Created At Timestamp */}
-        <Box>
-          <Typography variant="caption" color="text.secondary">
-            Létrehozva:
-          </Typography>
-          <Typography variant="body2">
-            {format(parseISO(transaction.created_at), 'yyyy. MM. dd. HH:mm', {
-              locale: hu,
-            })}
-          </Typography>
-        </Box>
+        </Stack>
       </Stack>
     </Box>
   );

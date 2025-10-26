@@ -337,6 +337,26 @@ export const bankTransactionSchema = z.object({
   /** Who matched (user ID or null for auto) */
   matched_by: z.number().int().positive().nullable().optional(),
 
+  /** Matched invoice details (nested object) */
+  matched_invoice_details: z.object({
+    id: z.number().int().positive(),
+    invoice_number: z.string(),
+    supplier_name: z.string(),
+    supplier_tax_number: z.string(),
+    gross_amount: z.string().nullable(),
+    payment_due_date: z.string().nullable(),
+    payment_status: z.string(),
+  }).nullable().optional(),
+
+  /** Statement details (nested object) */
+  statement_details: z.object({
+    id: z.number().int().positive(),
+    bank_name: z.string(),
+    account_number: z.string(),
+    period_from: z.string(),
+    period_to: z.string(),
+  }).optional(),
+
   // Metadata
   /** Bank-specific extra data */
   raw_data: z.record(z.unknown()).optional(),
