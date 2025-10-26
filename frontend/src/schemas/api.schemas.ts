@@ -176,7 +176,6 @@ export const NAVInvoiceSchema = z.object({
   auto_marked_paid: z.boolean().default(false),
   is_overdue: z.boolean().default(false),
   is_paid: z.boolean().default(false),
-  is_matched_to_transaction: z.boolean().default(false),
 
   // System
   sync_status: z.string(),

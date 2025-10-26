@@ -30,7 +30,6 @@ import {
 } from '@mui/material';
 import {
   CheckCircle as CheckIcon,
-  Link as LinkIcon,
   ArrowUpward,
   ArrowDownward,
   Search,
@@ -450,25 +449,15 @@ const InvoiceMatchTab: React.FC<TabProps> = ({
                         </Typography>
                       </TableCell>
                       <TableCell align="center">
-                        {invoice.is_matched_to_transaction ? (
-                          <Chip
-                            icon={<LinkIcon />}
-                            label="Párosítva"
-                            size="small"
-                            color="info"
-                            variant="outlined"
-                          />
-                        ) : (
-                          <IconButton
-                            size="small"
-                            onClick={() => handleMatch(invoice.id)}
-                            disabled={!compatible || matchMutation.isPending}
-                            color="primary"
-                            title={!compatible ? 'A tranzakció iránya nem kompatibilis' : 'Párosítás'}
-                          >
-                            <CheckIcon />
-                          </IconButton>
-                        )}
+                        <IconButton
+                          size="small"
+                          onClick={() => handleMatch(invoice.id)}
+                          disabled={!compatible || matchMutation.isPending}
+                          color="primary"
+                          title={!compatible ? 'A tranzakció iránya nem kompatibilis' : 'Párosítás'}
+                        >
+                          <CheckIcon />
+                        </IconButton>
                       </TableCell>
                     </TableRow>
                   );

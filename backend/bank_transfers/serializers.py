@@ -399,9 +399,6 @@ class InvoiceListSerializer(serializers.ModelSerializer):
     payment_status_date_formatted = serializers.SerializerMethodField()
     is_overdue = serializers.SerializerMethodField()
 
-    # Transaction matching status
-    is_matched_to_transaction = serializers.SerializerMethodField()
-
     class Meta:
         model = Invoice
         fields = [
@@ -426,9 +423,6 @@ class InvoiceListSerializer(serializers.ModelSerializer):
             'payment_status', 'payment_status_date', 'payment_status_date_formatted',
             'auto_marked_paid', 'is_overdue', 'invoice_category',
             'supplier_bank_account_number', 'customer_bank_account_number',
-
-            # Matching status
-            'is_matched_to_transaction',
 
             # System
             'sync_status', 'created_at'
@@ -569,14 +563,6 @@ class InvoiceListSerializer(serializers.ModelSerializer):
             'icon': 'help',
             'class': 'status-unknown'
         }
-
-    def get_is_matched_to_transaction(self, obj):
-        """Check if this invoice is matched to any bank transaction."""
-        from .models import BankTransaction
-        return BankTransaction.objects.filter(
-            matched_invoice=obj,
-            company=obj.company
-        ).exists()
 
 
 class InvoiceDetailSerializer(serializers.ModelSerializer):
