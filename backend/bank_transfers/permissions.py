@@ -405,14 +405,27 @@ class RequireBankStatementImport(FeatureBasedPermission):
     required_features = ['BANK_STATEMENT_IMPORT']
 
     def has_permission(self, request, view):
-        # First check if feature is enabled for company
-        if not super().has_permission(request, view):
+        if not hasattr(request, 'company') or not request.company:
             return False
 
-        # Get user role from request context
-        user_role = getattr(request, 'user_role', None)
-        if not user_role:
-            logger.warning(f"User {request.user.username} has no role in company context")
+        # Get user's company membership and allowed features
+        try:
+            from .models import CompanyUser
+            company_user = CompanyUser.objects.get(
+                user=request.user,
+                company=request.company,
+                is_active=True
+            )
+            user_role = company_user.role
+            user_allowed_features = company_user.get_allowed_features()
+        except CompanyUser.DoesNotExist:
+            logger.warning(f"User {request.user.username} has no role in company {request.company}")
+            return False
+
+        # Check if BANK_STATEMENT_IMPORT feature is enabled for company AND user has permission
+        required_feature = 'BANK_STATEMENT_IMPORT'
+        if not (FeatureChecker.is_feature_enabled(request.company, required_feature) and
+                (required_feature in user_allowed_features or '*' in user_allowed_features)):
             return False
 
         # Read operations (GET, HEAD, OPTIONS) - all roles with feature enabled

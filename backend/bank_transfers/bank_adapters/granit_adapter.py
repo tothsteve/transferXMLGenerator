@@ -102,9 +102,13 @@ class GranitBankAdapter(BankStatementAdapter):
         if m := re.search(r'Számlaszám:\s*([\d\-]+)', text):
             metadata['account_number'] = m.group(1)
 
-        # IBAN
-        if m := re.search(r'IBAN\s+szám[:\s]+([A-Z]{2}[\d\s]+)', text):
-            metadata['account_iban'] = m.group(1).replace(' ', '')
+        # IBAN - capture HU + digits, then clean to exactly 28 chars
+        if m := re.search(r'IBAN\s+szám[:\s]+(HU[\d\s\n]+)', text):
+            # Extract only HU + 26 digits (28 chars total)
+            iban_raw = m.group(1)
+            iban_clean = ''.join(c for c in iban_raw if c.isalnum())  # Remove spaces/newlines
+            if len(iban_clean) == 28 and iban_clean.startswith('HU'):
+                metadata['account_iban'] = iban_clean
 
         # Statement period
         if m := re.search(r'Könyvelés dátuma:\s*([\d.]+)\s*-\s*([\d.]+)', text):
@@ -381,19 +385,16 @@ class GranitBankAdapter(BankStatementAdapter):
         if m := re.search(r'Előjegyzett jutalék:\s*([\d\s\-,]+)', block_text):
             fields['fee_amount'] = self._clean_amount(m.group(1))
 
-        # Payer name
-        if m := re.search(r'Fizető fél:\s*([A-Z0-9\s]+),?\s*([^\n]*)', block_text):
-            # Could be IBAN or name
-            payer_info = m.group(1).strip()
-            if payer_info.startswith('HU'):
-                fields['payer_iban'] = payer_info
-                if m.group(2):
-                    fields['payer_name'] = m.group(2).strip()
-            else:
-                fields['payer_name'] = payer_info
+        # Payer name - check for IBAN first (HU + exactly 26 digits)
+        if m := re.search(r'Fizető fél:\s*(HU\d{26})(?:[,\s\n]|$)', block_text):
+            # This is an IBAN
+            fields['payer_iban'] = m.group(1)
+        elif m := re.search(r'Fizető fél:\s*([A-Z][A-Za-z0-9\s]+?)(?:,|\n)', block_text):
+            # This is a name
+            fields['payer_name'] = m.group(1).strip()
 
-        # Payer IBAN (separate line)
-        if m := re.search(r'Fizető fél IBAN:\s*(HU[\d]+)', block_text):
+        # Payer IBAN (separate line) - HU + exactly 26 digits
+        if m := re.search(r'Fizető fél IBAN:\s*(HU\d{26})', block_text):
             fields['payer_iban'] = m.group(1)
 
         # Payer BIC
@@ -408,17 +409,17 @@ class GranitBankAdapter(BankStatementAdapter):
         if m := re.search(r'Kedvezményezett neve:\s*([^\n]+)', block_text):
             fields['beneficiary_name'] = m.group(1).strip()
 
-        # Beneficiary IBAN
-        if m := re.search(r'Kedvezményezett IBAN:\s*(HU[\d]+)', block_text):
+        # Beneficiary IBAN - HU + exactly 26 digits
+        if m := re.search(r'Kedvezményezett IBAN:\s*(HU\d{26})', block_text):
             fields['beneficiary_iban'] = m.group(1)
 
         # Beneficiary BIC
         if m := re.search(r'Kedvezményezett BIC:\s*([A-Z0-9]+)', block_text):
             fields['beneficiary_bic'] = m.group(1)
 
-        # Azonosító (could be beneficiary IBAN on separate line)
+        # Azonosító (could be beneficiary IBAN on separate line) - HU + exactly 26 digits
         if 'beneficiary_iban' not in fields:
-            if m := re.search(r'Azonosító:\s*(HU[\d]+)', block_text):
+            if m := re.search(r'Azonosító:\s*(HU\d{26})', block_text):
                 fields['beneficiary_iban'] = m.group(1)
 
         # Reference (Közlemény) - with fallback to Nem strukturált közlemény

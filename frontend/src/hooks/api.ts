@@ -13,6 +13,9 @@ import {
   batchesApi,
   uploadApi,
   navInvoicesApi,
+  bankStatementsApi,
+  bankTransactionsApi,
+  otherCostsApi,
 } from '../services/api';
 import {
   Beneficiary,
@@ -38,6 +41,19 @@ import {
   TransferBatchSchema,
   ApiResponseSchema,
 } from '../schemas/api.schemas';
+import {
+  BankStatement,
+  BankTransaction,
+  OtherCost,
+  BankStatementQueryParams,
+  BankTransactionQueryParams,
+  OtherCostQueryParams,
+  BankStatementListResponse,
+  BankTransactionListResponse,
+  OtherCostListResponse,
+  SupportedBanksResponse,
+  UploadResponse,
+} from '../schemas/bankStatement.schemas';
 
 // Query Keys
 export const queryKeys = {
@@ -49,6 +65,13 @@ export const queryKeys = {
   bankAccountDefault: ['bankAccount', 'default'] as const,
   batches: ['batches'] as const,
   navInvoices: ['navInvoices'] as const,
+  bankStatements: ['bankStatements'] as const,
+  bankStatement: (id: number) => ['bankStatements', id] as const,
+  bankTransactions: (statementId: number) => ['bankTransactions', statementId] as const,
+  bankTransaction: (id: number) => ['bankTransaction', id] as const,
+  supportedBanks: ['supportedBanks'] as const,
+  otherCosts: ['otherCosts'] as const,
+  otherCost: (id: number) => ['otherCosts', id] as const,
 };
 
 /**
@@ -599,6 +622,372 @@ export function useUploadExcel(): UseMutationResult<ExcelImportResponse, Error, 
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.beneficiaries });
       void queryClient.invalidateQueries({ queryKey: queryKeys.beneficiariesFrequent });
+    },
+  });
+}
+
+/**
+ * Bank Statements Hooks
+ *
+ * React Query hooks for managing bank statements with Zod validation.
+ * All external data is validated before use to ensure type safety.
+ */
+
+/**
+ * Hook for fetching paginated bank statements with filtering.
+ *
+ * Implements automatic caching, refetching, and Zod validation.
+ * All API responses are validated before use.
+ *
+ * @param params - Query parameters for filtering and pagination
+ * @returns Query result with validated bank statement data
+ *
+ * @example
+ * ```tsx
+ * const { data, isLoading, error } = useBankStatements({
+ *   page: 1,
+ *   page_size: 20,
+ *   bank_code: 'GRANIT',
+ *   status: 'COMPLETED'
+ * });
+ *
+ * if (isLoading) return <LoadingSpinner />;
+ * if (error) return <ErrorMessage error={error} />;
+ * if (!data) return <EmptyState />;
+ *
+ * return <BankStatementList statements={data.results} />;
+ * ```
+ */
+export function useBankStatements(
+  params?: BankStatementQueryParams
+): UseQueryResult<BankStatementListResponse, Error> {
+  return useQuery({
+    queryKey: [...queryKeys.bankStatements, params],
+    queryFn: () => bankStatementsApi.getAll(params),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 3,
+  });
+}
+
+/**
+ * Hook for fetching single bank statement by ID.
+ *
+ * @param id - Bank statement ID
+ * @returns Query result with validated bank statement
+ *
+ * @example
+ * ```tsx
+ * const { data: statement } = useBankStatement(123);
+ * ```
+ */
+export function useBankStatement(id: number): UseQueryResult<BankStatement, Error> {
+  return useQuery({
+    queryKey: queryKeys.bankStatement(id),
+    queryFn: () => bankStatementsApi.getById(id),
+    staleTime: 5 * 60 * 1000,
+    retry: 3,
+  });
+}
+
+/**
+ * Hook for fetching list of supported banks.
+ *
+ * Results are cached indefinitely as supported banks rarely change.
+ *
+ * @returns Query result with supported banks list
+ *
+ * @example
+ * ```tsx
+ * const { data: banks } = useSupportedBanks();
+ * ```
+ */
+export function useSupportedBanks(): UseQueryResult<SupportedBanksResponse, Error> {
+  return useQuery({
+    queryKey: queryKeys.supportedBanks,
+    queryFn: () => bankStatementsApi.getSupportedBanks(),
+    staleTime: Infinity, // Cache forever
+    gcTime: Infinity, // Garbage collection time (renamed from cacheTime in v5)
+    retry: 3,
+  });
+}
+
+/**
+ * Hook for uploading bank statement file.
+ *
+ * Invalidates bank statements list on success.
+ *
+ * @returns Mutation result for file upload
+ *
+ * @example
+ * ```tsx
+ * const uploadMutation = useUploadBankStatement();
+ *
+ * const handleUpload = async (file: File) => {
+ *   try {
+ *     const result = await uploadMutation.mutateAsync(file);
+ *     console.log('Uploaded:', result.statement.id);
+ *   } catch (error) {
+ *     console.error('Upload failed:', error);
+ *   }
+ * };
+ * ```
+ */
+export function useUploadBankStatement(): UseMutationResult<UploadResponse, Error, File> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (file: File) => bankStatementsApi.upload(file),
+    retry: false, // NEVER retry file uploads - prevents duplicates
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.bankStatements });
+    },
+  });
+}
+
+/**
+ * Hook for deleting bank statement.
+ *
+ * Invalidates bank statements list on success.
+ *
+ * @returns Mutation result for deletion
+ *
+ * @example
+ * ```tsx
+ * const deleteMutation = useDeleteBankStatement();
+ *
+ * const handleDelete = async (id: number) => {
+ *   if (window.confirm('Biztosan törölni szeretné?')) {
+ *     await deleteMutation.mutateAsync(id);
+ *   }
+ * };
+ * ```
+ */
+export function useDeleteBankStatement(): UseMutationResult<void, Error, number> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => bankStatementsApi.delete(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.bankStatements });
+    },
+  });
+}
+
+/**
+ * Bank Transactions Hooks
+ *
+ * React Query hooks for managing transactions within bank statements.
+ */
+
+/**
+ * Hook for fetching paginated transactions for a statement.
+ *
+ * @param statementId - Parent bank statement ID
+ * @param params - Query parameters for filtering and pagination
+ * @returns Query result with validated transaction data
+ *
+ * @example
+ * ```tsx
+ * const { data, isLoading } = useBankTransactions(123, {
+ *   page: 1,
+ *   transaction_type: 'TRANSFER',
+ *   is_matched: false
+ * });
+ * ```
+ */
+export function useBankTransactions(
+  statementId: number,
+  params?: BankTransactionQueryParams
+): UseQueryResult<BankTransactionListResponse, Error> {
+  return useQuery({
+    queryKey: [...queryKeys.bankTransactions(statementId), params],
+    queryFn: () => bankTransactionsApi.getAll(statementId, params),
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    retry: 3,
+  });
+}
+
+/**
+ * Hook for fetching single transaction by ID.
+ *
+ * @param id - Transaction ID
+ * @returns Query result with validated transaction
+ */
+export function useBankTransaction(id: number): UseQueryResult<BankTransaction, Error> {
+  return useQuery({
+    queryKey: queryKeys.bankTransaction(id),
+    queryFn: () => bankTransactionsApi.getById(id),
+    staleTime: 2 * 60 * 1000,
+    retry: 3,
+  });
+}
+
+/**
+ * Hook for manually matching transaction to invoice.
+ *
+ * Invalidates transactions list on success.
+ *
+ * @returns Mutation result for matching
+ *
+ * @example
+ * ```tsx
+ * const matchMutation = useMatchTransactionToInvoice();
+ *
+ * const handleMatch = async (transactionId: number, invoiceId: number) => {
+ *   await matchMutation.mutateAsync({ transactionId, invoiceId });
+ * };
+ * ```
+ */
+export function useMatchTransactionToInvoice(): UseMutationResult<
+  BankTransaction,
+  Error,
+  { transactionId: number; invoiceId: number }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ transactionId, invoiceId }) =>
+      bankTransactionsApi.matchInvoice(transactionId, invoiceId),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.bankTransactions(data.bank_statement),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.bankTransaction(data.id),
+      });
+    },
+  });
+}
+
+/**
+ * Hook for removing invoice match from transaction.
+ *
+ * Invalidates transactions list on success.
+ *
+ * @returns Mutation result for unmatching
+ */
+export function useUnmatchTransaction(): UseMutationResult<BankTransaction, Error, number> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (transactionId: number) => bankTransactionsApi.unmatch(transactionId),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.bankTransactions(data.bank_statement),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.bankTransaction(data.id),
+      });
+    },
+  });
+}
+
+/**
+ * Other Costs Hooks
+ *
+ * React Query hooks for managing categorized expense records.
+ */
+
+/**
+ * Hook for fetching paginated other costs with filtering.
+ *
+ * @param params - Query parameters for filtering and pagination
+ * @returns Query result with validated other costs data
+ *
+ * @example
+ * ```tsx
+ * const { data } = useOtherCosts({
+ *   page: 1,
+ *   category: 'BANK_FEE',
+ *   date_from: '2025-01-01'
+ * });
+ * ```
+ */
+export function useOtherCosts(
+  params?: OtherCostQueryParams
+): UseQueryResult<OtherCostListResponse, Error> {
+  return useQuery({
+    queryKey: [...queryKeys.otherCosts, params],
+    queryFn: () => otherCostsApi.getAll(params),
+    staleTime: 5 * 60 * 1000,
+    retry: 3,
+  });
+}
+
+/**
+ * Hook for fetching single other cost by ID.
+ *
+ * @param id - Other cost ID
+ * @returns Query result with validated other cost
+ */
+export function useOtherCost(id: number): UseQueryResult<OtherCost, Error> {
+  return useQuery({
+    queryKey: queryKeys.otherCost(id),
+    queryFn: () => otherCostsApi.getById(id),
+    staleTime: 5 * 60 * 1000,
+    retry: 3,
+  });
+}
+
+/**
+ * Hook for creating other cost record.
+ *
+ * Invalidates other costs list on success.
+ *
+ * @returns Mutation result for creation
+ */
+export function useCreateOtherCost(): UseMutationResult<
+  OtherCost,
+  Error,
+  Omit<OtherCost, 'id' | 'created_at' | 'updated_at'>
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data) => otherCostsApi.create(data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.otherCosts });
+    },
+  });
+}
+
+/**
+ * Hook for updating other cost record.
+ *
+ * Invalidates other costs list on success.
+ *
+ * @returns Mutation result for update
+ */
+export function useUpdateOtherCost(): UseMutationResult<
+  OtherCost,
+  Error,
+  { id: number; data: Partial<OtherCost> }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }) => otherCostsApi.update(id, data),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.otherCosts });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.otherCost(data.id) });
+    },
+  });
+}
+
+/**
+ * Hook for deleting other cost record.
+ *
+ * Invalidates other costs list on success.
+ *
+ * @returns Mutation result for deletion
+ */
+export function useDeleteOtherCost(): UseMutationResult<void, Error, number> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => otherCostsApi.delete(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.otherCosts });
     },
   });
 }

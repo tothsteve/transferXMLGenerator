@@ -1224,3 +1224,38 @@ The system generates Hungarian bank-compatible XML for transfer imports. Here's 
 The backend `/api/transfers/generate_xml/` and `/api/transfers/generate_csv/` endpoints return XML and CSV formats respectively, and the frontend should display them with appropriate formatting for preview before download.
 
 **Swagger documentation available at: http://localhost:8002/swagger/**
+
+## API Testing with curl
+
+When testing API endpoints with curl, use this pattern to avoid shell quoting issues:
+
+### Step 1: Login and Extract Token
+```bash
+# Login and save response
+curl -s -X POST http://localhost:8002/api/auth/login/ \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"tothi","password":"Almafa+123"}' \
+  -o /tmp/login.json
+
+# Extract token using grep and cut
+TOKEN=$(grep -o '"access":"[^"]*"' /tmp/login.json | cut -d'"' -f4)
+```
+
+### Step 2: Use Token for API Calls
+```bash
+# Example: Upload bank statement
+curl -s -X POST http://localhost:8002/api/bank-statements/upload/ \
+  -H "Authorization: Bearer $(cat /tmp/tok.txt)" \
+  -F 'file=@path/to/statement.pdf'
+
+# Example: GET request
+curl -s -X GET http://localhost:8002/api/bank-statements/ \
+  -H "Authorization: Bearer $(cat /tmp/tok.txt)"
+```
+
+### Key Points:
+- **Always use single quotes** around JSON data in `-d` parameter
+- **Save token to file** to avoid shell escaping issues with subshells
+- **Use `grep` and `cut`** instead of Python/jq for token extraction (more reliable in zsh)
+- **Save response to file** (`-o /tmp/file.json`) before processing
+- **Never pipe directly to Python** - it causes eval errors in zsh

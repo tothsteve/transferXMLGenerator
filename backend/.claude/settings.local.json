@@ -6,7 +6,8 @@
       "Bash(python manage.py shell:*)",
       "Bash(grep:*)",
       "Bash(python manage.py makemigrations bank_transfers -n rename_extracost_to_othercost)",
-      "Bash(python manage.py migrate bank_transfers)"
+      "Bash(python manage.py migrate bank_transfers)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []

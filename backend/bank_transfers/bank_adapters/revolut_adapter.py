@@ -249,9 +249,9 @@ class RevolutAdapter(BankStatementAdapter):
         total_amount = self._parse_amount(row.get('Total amount', '0'))
         currency = row.get('Payment currency', 'HUF').upper()
 
-        # Get transaction type
+        # Get transaction type (with direction based on amount)
         revolut_type = row.get('Type', '').upper()
-        transaction_type = self._map_transaction_type(revolut_type)
+        transaction_type = self._map_transaction_type(revolut_type, total_amount)
 
         # Extract description
         description = row.get('Description', '').strip()
@@ -372,28 +372,41 @@ class RevolutAdapter(BankStatementAdapter):
             payer = description.split('from')[-1].strip()
             transaction.payer_name = payer
 
-    def _map_transaction_type(self, revolut_type: str) -> str:
+    def _map_transaction_type(self, revolut_type: str, amount: Decimal) -> str:
         """
-        Map Revolut transaction types to our normalized types.
+        Map Revolut transaction types to detailed types with direction.
 
-        Our types (from BankTransaction model):
-        - TRANSFER: Bank transfers
-        - POS: Card payments
-        - FEE: Bank fees
-        - INTEREST: Interest
-        - CORRECTION: Corrections
-        - OTHER: Other
+        Uses amount sign to determine direction:
+        - Positive amount = CREDIT (incoming)
+        - Negative amount = DEBIT (outgoing)
+
+        Returns detailed types matching GRANIT format:
+        - TRANSFER_CREDIT / TRANSFER_DEBIT
+        - POS_PURCHASE
+        - BANK_FEE
+        - INTEREST_CREDIT / INTEREST_DEBIT
+        - OTHER
         """
-        mapping = {
-            'TRANSFER': 'TRANSFER',
-            'CARD_PAYMENT': 'POS',
-            'TOPUP': 'TRANSFER',  # Top-ups are incoming transfers
-            'EXCHANGE': 'OTHER',  # Currency exchanges
-            'FEE': 'FEE',
-            'ATM': 'POS',  # ATM withdrawals treated as POS
-        }
+        is_credit = amount > 0
 
-        return mapping.get(revolut_type, 'OTHER')
+        # Transfers
+        if revolut_type in ('TRANSFER', 'TOPUP'):
+            return 'TRANSFER_CREDIT' if is_credit else 'TRANSFER_DEBIT'
+
+        # Card payments (always debit for Revolut)
+        if revolut_type in ('CARD_PAYMENT', 'ATM'):
+            return 'POS_PURCHASE'
+
+        # Fees (always debit)
+        if revolut_type == 'FEE':
+            return 'BANK_FEE'
+
+        # Interest (rare but possible)
+        if revolut_type == 'INTEREST':
+            return 'INTEREST_CREDIT' if is_credit else 'INTEREST_DEBIT'
+
+        # Currency exchanges and other
+        return 'OTHER'
 
     def _parse_revolut_date(self, date_str: str) -> Optional[date]:
         """

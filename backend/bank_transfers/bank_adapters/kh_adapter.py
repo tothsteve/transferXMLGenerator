@@ -299,8 +299,8 @@ class KHBankAdapter(BankStatementAdapter):
                 # This is a multi-currency transaction
                 pass  # We'll handle this below
 
-        # Map transaction type
-        transaction_type = self._map_transaction_type(transaction_type_text)
+        # Map transaction type (with direction based on amount)
+        transaction_type = self._map_transaction_type(transaction_type_text, amount)
 
         # Build description
         description = transaction_type_text
@@ -414,33 +414,39 @@ class KHBankAdapter(BankStatementAdapter):
                 except:
                     pass
 
-    def _map_transaction_type(self, type_text: str) -> str:
+    def _map_transaction_type(self, type_text: str, amount: Decimal) -> str:
         """
-        Map K&H transaction types to normalized types.
+        Map K&H transaction types to detailed types with direction.
 
-        K&H types:
-        - "Forint átutalás..." → TRANSFER
-        - "Azonnali Forint átutalás..." → TRANSFER
-        - "SEPA átutalás..." → TRANSFER
-        - "Nemzetközi átutalás..." → TRANSFER
-        - "...díj..." → FEE
-        - "Kamat" → INTEREST
-        - "Számlavezetési díj" → FEE
-        - "Könyvelési díj" → FEE
+        Uses amount sign to determine direction:
+        - Positive amount = CREDIT (incoming)
+        - Negative amount = DEBIT (outgoing)
+
+        Returns detailed types matching GRANIT format:
+        - AFR_CREDIT / AFR_DEBIT (for instant transfers)
+        - TRANSFER_CREDIT / TRANSFER_DEBIT
+        - BANK_FEE
+        - INTEREST_CREDIT / INTEREST_DEBIT
+        - OTHER
         """
         type_lower = type_text.lower()
+        is_credit = amount > 0
 
-        # Fees
+        # Fees (always debit)
         if 'díj' in type_lower or 'költség' in type_lower:
-            return 'FEE'
+            return 'BANK_FEE'
 
         # Interest
         if 'kamat' in type_lower:
-            return 'INTEREST'
+            return 'INTEREST_CREDIT' if is_credit else 'INTEREST_DEBIT'
 
-        # Transfers
+        # Instant transfers (AFR = Azonnali Forint átutalás)
+        if 'azonnali' in type_lower:
+            return 'AFR_CREDIT' if is_credit else 'AFR_DEBIT'
+
+        # Regular transfers (SEPA, domestic, international)
         if 'átutalás' in type_lower or 'sepa' in type_lower or 'nemzetközi' in type_lower:
-            return 'TRANSFER'
+            return 'TRANSFER_CREDIT' if is_credit else 'TRANSFER_DEBIT'
 
         return 'OTHER'
 

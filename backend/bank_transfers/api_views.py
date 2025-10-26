@@ -1863,7 +1863,7 @@ class BankStatementViewSet(viewsets.ModelViewSet):
     """
     permission_classes = [IsAuthenticated, IsCompanyMember, RequireBankStatementImport]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['bank_name', 'account_number', 'statement_number']
+    search_fields = ['bank_name', 'account_number', 'statement_number', 'file_name']
     ordering_fields = ['uploaded_at', 'statement_period_from', 'statement_period_to', 'total_transactions']
     ordering = ['-uploaded_at']
     

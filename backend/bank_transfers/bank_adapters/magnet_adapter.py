@@ -250,7 +250,7 @@ class MagnetBankAdapter(BankStatementAdapter):
 
     def _build_magnet_transaction(self, data: Dict[str, Any]) -> NormalizedTransaction:
         """Build base NormalizedTransaction from extracted data."""
-        transaction_type = self._map_transaction_type(data['magnet_type'])
+        transaction_type = self._map_transaction_type(data['magnet_type'], data['amount'])
         description = self._build_description(
             data['counterparty'],
             data['reference'],
@@ -380,30 +380,39 @@ class MagnetBankAdapter(BankStatementAdapter):
             # Store full terminal info
             transaction.raw_data['terminal_id'] = terminal
 
-    def _map_transaction_type(self, magnet_type: str) -> str:
+    def _map_transaction_type(self, magnet_type: str, amount: Decimal) -> str:
         """
-        Map MagNet transaction types to our normalized types.
+        Map MagNet transaction types to detailed types with direction.
 
-        MagNet types:
-        - Átutalás (IB/IG2) - Outgoing transfer
-        - Átutalás (IG2) - Incoming transfer
-        - AFR jóváírás/terhelés - AFR credit/debit
-        - Érkezett bankkártya terhelés/jóváírás - Card debit/credit
-        - Költségelszámolás - Cost accounting (fees)
+        Uses amount sign to determine direction:
+        - Positive amount = CREDIT (incoming)
+        - Negative amount = DEBIT (outgoing)
+
+        Returns detailed types matching GRANIT format:
+        - AFR_CREDIT / AFR_DEBIT
+        - TRANSFER_CREDIT / TRANSFER_DEBIT
+        - POS_PURCHASE
+        - BANK_FEE
+        - OTHER
         """
         magnet_lower = magnet_type.lower()
+        is_credit = amount > 0
 
-        # Card transactions
+        # Card transactions (always purchase/debit for MagNet)
         if 'bankkártya' in magnet_lower:
-            return 'POS'
+            return 'POS_PURCHASE'
 
-        # Transfers
-        if 'átutalás' in magnet_lower or 'afr' in magnet_lower:
-            return 'TRANSFER'
+        # AFR transfers (check explicitly for AFR in type name)
+        if 'afr' in magnet_lower:
+            return 'AFR_CREDIT' if is_credit else 'AFR_DEBIT'
 
-        # Fees
+        # Regular transfers
+        if 'átutalás' in magnet_lower:
+            return 'TRANSFER_CREDIT' if is_credit else 'TRANSFER_DEBIT'
+
+        # Fees (always debit)
         if 'költség' in magnet_lower or 'díj' in magnet_lower:
-            return 'FEE'
+            return 'BANK_FEE'
 
         # Default
         return 'OTHER'

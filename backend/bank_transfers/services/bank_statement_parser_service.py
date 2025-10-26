@@ -193,8 +193,24 @@ class BankStatementParserService:
             self._create_transaction(statement, trans_data)
             created_count += 1
 
-        # Update statement
+        # Calculate credit/debit statistics
+        from django.db.models import Sum, Count, Q
+
+        transaction_stats = BankTransaction.objects.filter(
+            bank_statement=statement
+        ).aggregate(
+            credit_count=Count('id', filter=Q(amount__gt=0)),
+            debit_count=Count('id', filter=Q(amount__lt=0)),
+            total_credits=Sum('amount', filter=Q(amount__gt=0)),
+            total_debits=Sum('amount', filter=Q(amount__lt=0))
+        )
+
+        # Update statement with statistics
         statement.total_transactions = created_count
+        statement.credit_count = transaction_stats['credit_count'] or 0
+        statement.debit_count = transaction_stats['debit_count'] or 0
+        statement.total_credits = transaction_stats['total_credits'] or Decimal('0.00')
+        statement.total_debits = abs(transaction_stats['total_debits'] or Decimal('0.00'))
         statement.status = 'PARSED'
         statement.parse_completed_at = timezone.now()
         statement.save()
