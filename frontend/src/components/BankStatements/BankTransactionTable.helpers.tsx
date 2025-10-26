@@ -153,41 +153,60 @@ export const formatAmount = (amount: string): string => {
 };
 
 /**
- * Extract partner name from transaction with cascading fallback.
+ * Extract partner name from transaction based on direction with cascading fallback.
  *
- * Uses a priority-based fallback chain to always display meaningful partner information:
- * 1. If beneficiary_name is empty AND reference is empty → use description
- * 2. If beneficiary_name is empty → use reference
- * 3. Otherwise → use beneficiary_name
+ * Implements SQL logic:
+ * - **Debit (negative amount)**: Partner is BENEFICIARY
+ *   1. If beneficiary_name empty AND reference empty → description
+ *   2. If beneficiary_name empty → reference
+ *   3. Otherwise → beneficiary_name
  *
- * This logic matches the backend SQL query for consistent partner name display.
+ * - **Credit (positive amount)**: Partner is PAYER
+ *   1. If payer_name empty AND reference empty → description
+ *   2. If payer_name empty → reference
+ *   3. Otherwise → payer_name
  *
  * @param transaction - Bank transaction object
- * @returns Partner name using cascading fallback logic, or "-" if all fields are empty
+ * @returns Partner name using direction-aware cascading fallback, or "-" if all fields are empty
  *
  * @example
  * ```typescript
- * // Beneficiary name present
- * getPartnerName({ beneficiary_name: "ACME Corp", reference: "INV-123", ... });
- * // Returns: "ACME Corp"
+ * // Credit transaction (incoming payment)
+ * getPartnerName({ amount: "1000", payer_name: "ACME Corp", beneficiary_name: "IT Cardigan", ... });
+ * // Returns: "ACME Corp" (payer is the partner)
  *
- * // No beneficiary, has reference
- * getPartnerName({ beneficiary_name: "", reference: "INV-123", ... });
+ * // Debit transaction (outgoing payment)
+ * getPartnerName({ amount: "-500", payer_name: "IT Cardigan", beneficiary_name: "Supplier Ltd", ... });
+ * // Returns: "Supplier Ltd" (beneficiary is the partner)
+ *
+ * // Credit with no payer name, fallback to reference
+ * getPartnerName({ amount: "1000", payer_name: "", reference: "INV-123", ... });
  * // Returns: "INV-123"
- *
- * // No beneficiary, no reference
- * getPartnerName({ beneficiary_name: "", reference: "", description: "POS payment" });
- * // Returns: "POS payment"
  * ```
  */
 export const getPartnerName = (transaction: BankTransaction): string => {
-  // Cascading fallback: beneficiary_name -> reference -> description -> '-'
-  if (transaction.beneficiary_name === '' && transaction.reference === '') {
-    return transaction.description || '-';
-  } else if (transaction.beneficiary_name === '') {
-    return transaction.reference;
-  } else {
-    return transaction.beneficiary_name;
+  const amount = parseFloat(transaction.amount);
+
+  // DEBIT (negative amount): partner is beneficiary
+  if (amount < 0) {
+    if (transaction.beneficiary_name === '' && transaction.reference === '') {
+      return transaction.description || '-';
+    } else if (transaction.beneficiary_name === '') {
+      return transaction.reference || '-';
+    } else {
+      return transaction.beneficiary_name;
+    }
+  }
+
+  // CREDIT (positive/zero amount): partner is payer
+  else {
+    if (transaction.payer_name === '' && transaction.reference === '') {
+      return transaction.description || '-';
+    } else if (transaction.payer_name === '') {
+      return transaction.reference || '-';
+    } else {
+      return transaction.payer_name;
+    }
   }
 };
 

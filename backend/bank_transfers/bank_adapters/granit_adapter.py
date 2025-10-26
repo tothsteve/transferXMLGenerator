@@ -271,8 +271,12 @@ class GranitBankAdapter(BankStatementAdapter):
             merchant_name=fields.get('merchant_name', ''),
             merchant_location=fields.get('merchant_location', ''),
 
-            # Raw data for debugging
-            raw_data={'block_text': block_text, **fields}
+            # Raw data for debugging (always include block_text)
+            raw_data={
+                'block_text': block_text,
+                'main_desc': main_desc,
+                **fields
+            }
         )
 
     def _classify_and_extract(self, main_desc: str, block_text: str, amount: Decimal) -> Tuple[str, Dict[str, Any]]:
@@ -341,7 +345,7 @@ class GranitBankAdapter(BankStatementAdapter):
                 return 'TRANSFER_DEBIT', fields
 
         # === Bank Fee ===
-        elif 'jutalék' in main_desc.lower() or 'költség' in main_desc.lower():
+        elif 'jutalék' in main_desc.lower() or 'költség' in main_desc.lower() or 'díj' in main_desc.lower():
             fields['short_description'] = 'Banki költség'
             return 'BANK_FEE', fields
 
@@ -385,13 +389,91 @@ class GranitBankAdapter(BankStatementAdapter):
         if m := re.search(r'Előjegyzett jutalék:\s*([\d\s\-,]+)', block_text):
             fields['fee_amount'] = self._clean_amount(m.group(1))
 
-        # Payer name - check for IBAN first (HU + exactly 26 digits)
-        if m := re.search(r'Fizető fél:\s*(HU\d{26})(?:[,\s\n]|$)', block_text):
-            # This is an IBAN
+        # Payer extraction - handles multiple formats:
+        # Format 1: "Fizető fél: Uri-Zanyi Gázkészülék- és Klímaszerelő..." (may wrap across lines)
+        # Format 2: "Fizető fél: HU62116000060000000078175381, DANUBIUS EXPERT ZRT."
+        # Format 3: "Fizető fél: HU12304000010000000071947848\nUri-Zanyi Gáz..." (IBAN on line 1, name on line 2+)
+
+        # Check for Format 2: IBAN followed by comma and name on same line
+        if m := re.search(r'Fizető fél:\s*(HU\d{26})\s*,\s*([^\n]+)', block_text):
             fields['payer_iban'] = m.group(1)
-        elif m := re.search(r'Fizető fél:\s*([A-Z][A-Za-z0-9\s]+?)(?:,|\n)', block_text):
-            # This is a name
-            fields['payer_name'] = m.group(1).strip()
+            fields['payer_name'] = m.group(2).strip()
+        # Check for Format 3: IBAN on line 1, name on subsequent lines
+        elif m := re.search(r'Fizető fél:\s*(HU\d{26})\s*\n(.+?)(?:,\s*Fizető fél BIC:|\nFizető fél BIC:|$)', block_text, re.DOTALL):
+            fields['payer_iban'] = m.group(1)
+            # Extract and clean multi-line name
+            name_text = m.group(2).strip()
+
+            # Handle case where name is on one line followed by ", Fizető fél BIC:"
+            # Example: "ALLIANZ HUNGÁRIA ÖNKÉNTES KÖLCSÖNÖS, Fizető fél BIC: UBRTHUHB"
+            if ', Fizető fél BIC:' in name_text:
+                # Extract everything before the comma
+                payer_name = name_text.split(', Fizető fél BIC:')[0].strip()
+                fields['payer_name'] = payer_name
+            else:
+                # Multi-line name - original logic
+                lines = name_text.split('\n')
+                name_lines = []
+                for line in lines:
+                    line = line.strip()
+                    # Stop if we hit another field
+                    if any(keyword in line for keyword in ['Fizető fél BIC:', 'Kedvezményezett', 'Azonosító:', 'Tranzakció', 'Közlemény', 'BIC:', 'Értéknap']):
+                        break
+                    if line:
+                        name_lines.append(line)
+                # Join lines - handle words split across lines
+                payer_name = ''
+                for i, line in enumerate(name_lines):
+                    if i == 0:
+                        payer_name = line
+                    else:
+                        # Check if word is split mid-word (next line starts with lowercase)
+                        if line and line[0].islower():
+                            # Mid-word split: join without space (e.g., "Tár" + "saság" -> "Társaság")
+                            payer_name = payer_name + line
+                        else:
+                            # Normal multi-word name: join with space
+                            payer_name = payer_name + ' ' + line
+                fields['payer_name'] = payer_name
+        # Check for Format 1: Name only (no IBAN) - may span multiple lines
+        elif m := re.search(r'Fizető fél:\s*(.+?)(?:\nFizető fél IBAN:|$)', block_text, re.DOTALL):
+            potential_payer = m.group(1).strip()
+            # Only treat as name if it's NOT an IBAN (already handled by Format 3 above)
+            if not re.match(r'^HU\d{26}', potential_payer):
+                # Stop at any other field that might follow
+                if '\n' in potential_payer:
+                    # Take only lines that are part of the name (before next field)
+                    lines = potential_payer.split('\n')
+                    name_lines = []
+                    for line in lines:
+                        line = line.strip()
+                        # Stop if we hit another field
+                        if any(keyword in line for keyword in ['Kedvezményezett', 'Azonosító:', 'Tranzakció', 'Közlemény', 'BIC:', 'Értéknap']):
+                            break
+                        if line:
+                            name_lines.append(line)
+                    # Join lines - handle words split across lines
+                    payer_name = ''
+                    for i, line in enumerate(name_lines):
+                        if i == 0:
+                            payer_name = line
+                        else:
+                            # Check if word is split mid-word (next line starts with lowercase)
+                            # or if previous line ends with hyphen (hyphenated word split)
+                            if payer_name.endswith('-'):
+                                # Hyphenated split: remove hyphen and join
+                                payer_name = payer_name[:-1] + line
+                            elif line and line[0].islower():
+                                # Mid-word split: join without space
+                                # e.g., "Fel" + "elősségű" -> "Felelősségű"
+                                payer_name = payer_name + line
+                            else:
+                                # Normal multi-word name: join with space
+                                payer_name = payer_name + ' ' + line
+                else:
+                    payer_name = potential_payer
+
+                fields['payer_name'] = payer_name
 
         # Payer IBAN (separate line) - HU + exactly 26 digits
         if m := re.search(r'Fizető fél IBAN:\s*(HU\d{26})', block_text):
