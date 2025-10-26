@@ -146,14 +146,14 @@ export const NAVInvoiceSchema = z.object({
   // Dates
   issue_date: z.string(),
   issue_date_formatted: z.string(),
-  fulfillment_date: z.string().nullish(),
-  fulfillment_date_formatted: z.string().nullish(),
-  payment_due_date: z.string().nullish(),
-  payment_due_date_formatted: z.string().nullish(),
-  payment_date: z.string().nullish(),
-  payment_date_formatted: z.string().nullish(),
-  completion_date: z.string().nullish(),
-  last_modified_date: z.string().nullish(),
+  fulfillment_date: z.string().nullable(),
+  fulfillment_date_formatted: z.string().nullable(),
+  payment_due_date: z.string().nullable(),
+  payment_due_date_formatted: z.string().nullable(),
+  payment_date: z.string().nullable(),
+  payment_date_formatted: z.string().nullable(),
+  completion_date: z.string().nullable(),
+  last_modified_date: z.string().nullable(),
 
   // Financial - accept both string and number, coerce to number
   currency_code: z.string(),
@@ -165,14 +165,14 @@ export const NAVInvoiceSchema = z.object({
   invoice_gross_amount_formatted: z.string(),
 
   // Business
-  invoice_operation: z.string().nullish(),
-  invoice_category: z.string().nullish(),
-  invoice_appearance: z.string().nullish(),
-  payment_method: z.string().nullish(),
-  original_invoice_number: z.string().nullish(),
+  invoice_operation: z.string().nullable(),
+  invoice_category: z.string().nullable(),
+  invoice_appearance: z.string().nullable(),
+  payment_method: z.string().nullable(),
+  original_invoice_number: z.string().nullable(),
   payment_status: PaymentStatusSchema,
-  payment_status_date: z.string().nullish(),
-  payment_status_date_formatted: z.string().nullish(),
+  payment_status_date: z.string().nullable(),
+  payment_status_date_formatted: z.string().nullable(),
   auto_marked_paid: z.boolean().default(false),
   is_overdue: z.boolean().default(false),
   is_paid: z.boolean().default(false),
@@ -182,16 +182,16 @@ export const NAVInvoiceSchema = z.object({
   created_at: z.string(),
 
   // NAV metadata (available in detail view)
-  nav_source: z.string().nullish(),
-  original_request_version: z.string().nullish(),
+  nav_source: z.string().nullable(),
+  original_request_version: z.string().nullable(),
 
   // Partners (available in detail view)
-  supplier_name: z.string().nullish(),
-  customer_name: z.string().nullish(),
-  supplier_tax_number: z.string().nullish(),
-  customer_tax_number: z.string().nullish(),
-  supplier_bank_account_number: z.string().nullish(),
-  customer_bank_account_number: z.string().nullish(),
+  supplier_name: z.string().nullable(),
+  customer_name: z.string().nullable(),
+  supplier_tax_number: z.string().nullable(),
+  customer_tax_number: z.string().nullable(),
+  supplier_bank_account_number: z.string().nullable(),
+  customer_bank_account_number: z.string().nullable(),
 });
 
 export type NAVInvoiceSchemaType = z.infer<typeof NAVInvoiceSchema>;

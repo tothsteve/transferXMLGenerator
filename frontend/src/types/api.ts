@@ -159,7 +159,7 @@ export interface AvailablePartner {
 export interface NAVInvoice {
   id: number;
   nav_invoice_number: string;
-  invoice_direction: string; // 'INBOUND' | 'OUTBOUND' - using string for Zod v4 compatibility
+  invoice_direction: 'INBOUND' | 'OUTBOUND';
   invoice_direction_display: string;
   partner_name: string;
   partner_tax_number: string;

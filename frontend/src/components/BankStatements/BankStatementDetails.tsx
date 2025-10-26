@@ -23,8 +23,8 @@ import {
   HourglassEmpty as HourglassIcon,
   Upload as UploadIcon,
 } from '@mui/icons-material';
-import { useBankStatement } from '../../hooks/api';
-import { BankStatementIdSchema, BankStatement } from '../../schemas/bankStatement.schemas';
+import { useBankStatement, useBankTransactions } from '../../hooks/api';
+import { BankStatementIdSchema, BankStatement, BankTransaction } from '../../schemas/bankStatement.schemas';
 import { format, parseISO } from 'date-fns';
 import { hu } from 'date-fns/locale';
 import LoadingSpinner from '../UI/LoadingSpinner';
@@ -117,6 +117,11 @@ const BankStatementDetails = (): ReactElement => {
 
   // Fetch statement details
   const { data: statement, isLoading, error } = useBankStatement(
+    statementId.success ? statementId.data : 0
+  );
+
+  // Fetch transactions for finding selected transaction
+  const { data: transactionsData } = useBankTransactions(
     statementId.success ? statementId.data : 0
   );
 
@@ -381,13 +386,16 @@ const BankStatementDetails = (): ReactElement => {
       />
 
       {/* Manual Match Dialog */}
-      {selectedTransactionId !== null && (
-        <ManualMatchDialog
-          open={matchDialogOpen}
-          onClose={handleMatchDialogClose}
-          transactionId={selectedTransactionId}
-        />
-      )}
+      <ManualMatchDialog
+        open={matchDialogOpen}
+        onClose={handleMatchDialogClose}
+        transaction={
+          selectedTransactionId !== null && transactionsData?.results
+            ? transactionsData.results.find((t: BankTransaction) => t.id === selectedTransactionId) ?? null
+            : null
+        }
+        onMatchComplete={handleMatchDialogClose}
+      />
     </Box>
   );
 };

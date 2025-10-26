@@ -40,7 +40,7 @@ import { BankTransaction } from '../../schemas/bankStatement.schemas';
 import { NAVInvoiceSchemaType } from '../../schemas/api.schemas';
 import { Transfer } from '../../types/api';
 import { useNAVInvoices, useTransfers } from '../../hooks/api';
-import { useMatchTransactionToInvoice, useMatchTransactionToTransfer } from '../../hooks/api';
+import { useMatchTransactionToInvoice } from '../../hooks/api';
 import { useToast } from '../../hooks/useToast';
 
 /**
@@ -490,7 +490,7 @@ const TransferMatchTab: React.FC<TabProps> = ({
   transaction,
   searchTerm,
   onSearchChange,
-  onMatch,
+  onMatch: _onMatch,
 }): ReactElement => {
   const toast = useToast();
 
@@ -513,7 +513,8 @@ const TransferMatchTab: React.FC<TabProps> = ({
     ...(ordering && { ordering }),
   });
 
-  const matchMutation = useMatchTransactionToTransfer();
+  // TODO: Implement useMatchTransactionToTransfer hook for transfer matching
+  // const matchMutation = useMatchTransactionToTransfer();
 
   // Filter transfers by search term and amount range (client-side)
   const filteredTransfers = useMemo(() => {
@@ -550,19 +551,21 @@ const TransferMatchTab: React.FC<TabProps> = ({
 
   const totalCount = transfersData?.count ?? 0;
 
-  const handleMatch = (transferId: number): void => {
-    matchMutation.mutate(
-      { transactionId: transaction.id, transferId },
-      {
-        onSuccess: () => {
-          toast.success('Tranzakció sikeresen párosítva átutaláshoz');
-          onMatch();
-        },
-        onError: (error) => {
-          toast.error(`Párosítás sikertelen: ${error.message}`);
-        },
-      }
-    );
+  const handleMatch = (_transferId: number): void => {
+    // TODO: Implement transfer matching when backend endpoint is ready
+    toast.error('Átutalás párosítás még nem implementált');
+    // matchMutation.mutate(
+    //   { transactionId: transaction.id, transferId },
+    //   {
+    //     onSuccess: () => {
+    //       toast.success('Tranzakció sikeresen párosítva átutaláshoz');
+    //       onMatch();
+    //     },
+    //     onError: (error: Error) => {
+    //       toast.error(`Párosítás sikertelen: ${error.message}`);
+    //     },
+    //   }
+    // );
   };
 
   const isCompatible = (_transfer: Transfer): boolean => {
@@ -763,9 +766,9 @@ const TransferMatchTab: React.FC<TabProps> = ({
                         <IconButton
                           size="small"
                           onClick={() => handleMatch(transfer.id!)}
-                          disabled={!compatible || matchMutation.isPending}
+                          disabled={!compatible}
                           color="primary"
-                          title={!compatible ? 'A tranzakció iránya nem kompatibilis' : 'Párosítás'}
+                          title={!compatible ? 'A tranzakció iránya nem kompatibilis' : 'Párosítás (még nem implementált)'}
                         >
                           <CheckIcon />
                         </IconButton>
