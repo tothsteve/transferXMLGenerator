@@ -24,6 +24,7 @@ import {
   AdminPanelSettings as AdminIcon,
   Settings as SettingsIcon,
   Receipt as ReceiptIcon,
+  AccountBalance as AccountBalanceIcon,
 } from '@mui/icons-material';
 import { useIsCompanyAdmin } from '../../hooks/useAuth';
 
@@ -50,6 +51,7 @@ const navigation = [
   { name: 'Átutalások', href: '/transfers', icon: SwapHorizIcon },
   { name: 'Kötegek kezelése', href: '/batches', icon: FolderIcon },
   { name: 'NAV Számlák', href: '/nav-invoices', icon: ReceiptIcon },
+  { name: 'Bankkivonatok', href: '/bank-statements', icon: AccountBalanceIcon },
   { name: 'Beállítások', href: '/settings', icon: SettingsIcon },
 ];
 

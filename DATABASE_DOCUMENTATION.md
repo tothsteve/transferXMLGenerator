@@ -1,9 +1,9 @@
 # Database Schema Documentation
 ## Transfer XML Generator - Hungarian Banking System
 
-**Last Updated:** 2025-09-14  
-**Database:** PostgreSQL (Production on Railway) / SQL Server (Local Development)  
-**Schema Version:** Multi-Company Architecture with Feature Flags, NAV Invoice Payment Status Tracking, Trusted Partners Auto-Payment System, VAT Number and Tax Number Beneficiary Support (Migration 0037)  
+**Last Updated:** 2025-10-24
+**Database:** PostgreSQL (Production on Railway) / SQL Server (Local Development)
+**Schema Version:** Multi-Company Architecture with Feature Flags, NAV Invoice Payment Status Tracking, Trusted Partners Auto-Payment System, VAT Number and Tax Number Beneficiary Support, Bank Statement Import System (Migration 0039)  
 
 > **Note:** This documentation is the **single source of truth** for database schema. All database comment scripts should be generated from this document.
 
@@ -1022,6 +1022,296 @@ for sync in failed_syncs:
 
 ---
 
+## 20. **bank_transfers_bankstatement**
+**Table Comment:** *Company-scoped bank statement records from uploaded PDF/CSV/XML files. Represents a single uploaded bank statement with parsing status, transaction statistics, and error tracking.*
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for bank statement record |
+| `company_id` | INTEGER | NOT NULL, FK(bank_transfers_company.id) | Company owner of this statement |
+| `bank_code` | VARCHAR(20) | NOT NULL, INDEX | Bank identifier code: GRANIT, MAGNET, REVOLUT, KH, OTP, CIB, ERSTE |
+| `bank_name` | VARCHAR(100) | NOT NULL | Full name of the bank |
+| `bank_bic` | VARCHAR(11) | | Bank Identifier Code (SWIFT code) |
+| `account_number` | VARCHAR(50) | NOT NULL, INDEX | Hungarian bank account number (formatted with dashes) |
+| `account_iban` | VARCHAR(34) | | International Bank Account Number |
+| `statement_period_from` | DATE | NOT NULL | Start date of statement period |
+| `statement_period_to` | DATE | NOT NULL, INDEX | End date of statement period |
+| `statement_number` | VARCHAR(50) | | Bank statement reference number |
+| `opening_balance` | DECIMAL(15,2) | NOT NULL | Account balance at statement period start |
+| `closing_balance` | DECIMAL(15,2) | | Account balance at statement period end (NULL if not available) |
+| `file_name` | VARCHAR(255) | NOT NULL | Original uploaded filename |
+| `file_hash` | VARCHAR(64) | NOT NULL, INDEX | SHA256 hash of uploaded file for duplicate detection |
+| `file_size` | INTEGER | NOT NULL | File size in bytes |
+| `file_path` | VARCHAR(500) | NOT NULL | Storage path for uploaded file |
+| `uploaded_by_id` | INTEGER | FK(auth_user.id), SET_NULL | User who uploaded this statement |
+| `uploaded_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD, INDEX | Timestamp when statement was uploaded |
+| `status` | VARCHAR(20) | NOT NULL, CHECK, INDEX, DEFAULT 'UPLOADED' | Processing status: UPLOADED, PARSING, PARSED, ERROR |
+| `total_transactions` | INTEGER | DEFAULT 0 | Total number of transactions in statement |
+| `credit_count` | INTEGER | DEFAULT 0 | Number of credit transactions (positive amounts) |
+| `debit_count` | INTEGER | DEFAULT 0 | Number of debit transactions (negative amounts) |
+| `total_credits` | DECIMAL(15,2) | DEFAULT 0.00 | Sum of all credit transactions |
+| `total_debits` | DECIMAL(15,2) | DEFAULT 0.00 | Sum of all debit transactions (absolute value) |
+| `matched_count` | INTEGER | DEFAULT 0 | Number of transactions matched to NAV invoices |
+| `parse_error` | TEXT | | Error message if parsing failed (NULL if successful) |
+| `parse_warnings` | JSON | DEFAULT [] | Array of warning messages from parsing process |
+| `raw_metadata` | JSON | DEFAULT {} | Raw metadata extracted from statement file |
+| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Record creation timestamp |
+| `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
+
+**Indexes:**
+- Primary key on `id`
+- Index on `company_id` for company-scoped queries
+- Index on `bank_code` for bank filtering
+- Index on `account_number` for account-based queries
+- Index on `file_hash` for duplicate detection
+- Index on `status` for status filtering
+- Index on `uploaded_at` for chronological sorting
+- Composite index on `(company_id, bank_code, account_number)` for statement lookup
+- Composite index on `(company_id, status)` for processing status queries
+- Composite index on `(company_id, statement_period_to)` for date-based filtering
+
+**Unique Constraints:**
+- `(company_id, file_hash)` - Prevents uploading the same file twice for a company
+- `(company_id, bank_code, account_number, statement_period_from, statement_period_to)` - Prevents duplicate statements for same period
+
+**CHECK Constraints:**
+- `status` CHECK constraint: VALUES ('UPLOADED', 'PARSING', 'PARSED', 'ERROR')
+
+**Business Rules:**
+- **Duplicate Prevention**: File hash prevents re-uploading identical files
+- **Period Uniqueness**: One statement per bank account per period
+- **Multi-Bank Support**: Supports Granit, Magnet Bank, Revolut, KH Bank, and other Hungarian banks
+- **Multi-Format Support**: Accepts PDF, CSV, and XML file formats
+- **Automatic Parsing**: Status workflow: UPLOADED → PARSING → PARSED (or ERROR)
+- **Transaction Matching**: Automatically matches transactions to NAV invoices during parsing
+- **Statistics Tracking**: Real-time calculation of transaction counts and totals
+- **Error Handling**: Parse errors captured with detailed error messages and warnings
+
+**Integration Points:**
+- **Bank Adapters**: Uses factory pattern to detect and parse different bank formats
+- **Transaction Matching**: Integrates with `TransactionMatchingService` for NAV invoice matching
+- **Company Isolation**: All statements are company-scoped for data security
+
+**API Access:**
+- `GET /api/bank-statements/` - List statements with filtering and pagination
+- `POST /api/bank-statements/upload/` - Upload new statement file (PDF/CSV/XML)
+- `GET /api/bank-statements/{id}/` - Statement details with transaction list
+- `DELETE /api/bank-statements/{id}/` - Delete statement and all transactions
+- `GET /api/bank-statements/{id}/transactions/` - List all transactions for statement
+
+---
+
+## 21. **bank_transfers_banktransaction**
+**Table Comment:** *Individual transaction records extracted from bank statements. Supports all transaction types including AFR transfers, POS purchases, bank fees, interest, and other banking operations. Contains matching to NAV invoices, transfers, and reimbursement pairs.*
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for transaction record |
+| `company_id` | INTEGER | NOT NULL, FK(bank_transfers_company.id) | Company owner of this transaction |
+| `bank_statement_id` | INTEGER | NOT NULL, FK(bank_transfers_bankstatement.id), CASCADE | Reference to parent bank statement |
+| `transaction_type` | VARCHAR(30) | NOT NULL, CHECK, INDEX | Transaction type code (see TRANSACTION_TYPES below) |
+| `booking_date` | DATE | NOT NULL, INDEX | Date when transaction was booked to account |
+| `value_date` | DATE | NOT NULL, INDEX | Value date (effective date) for interest calculation |
+| `amount` | DECIMAL(15,2) | NOT NULL, INDEX | Transaction amount (negative for debit, positive for credit) |
+| `currency` | VARCHAR(3) | NOT NULL, DEFAULT 'HUF' | ISO currency code |
+| `description` | TEXT | NOT NULL | Full transaction description from bank |
+| `short_description` | VARCHAR(200) | | Shortened or summarized description |
+| `payment_id` | VARCHAR(100) | INDEX | Payment identifier from bank system |
+| `transaction_id` | VARCHAR(100) | | Unique transaction identifier |
+| `payer_name` | VARCHAR(200) | INDEX | Name of payer (for incoming transfers) |
+| `payer_iban` | VARCHAR(34) | | IBAN of payer |
+| `payer_account_number` | VARCHAR(50) | | Account number of payer |
+| `payer_bic` | VARCHAR(11) | | BIC of payer's bank |
+| `beneficiary_name` | VARCHAR(200) | INDEX | Name of beneficiary (for outgoing transfers) |
+| `beneficiary_iban` | VARCHAR(34) | | IBAN of beneficiary |
+| `beneficiary_account_number` | VARCHAR(50) | | Account number of beneficiary |
+| `beneficiary_bic` | VARCHAR(11) | | BIC of beneficiary's bank |
+| `reference` | VARCHAR(500) | INDEX | Unstructured remittance information (közlemény) - critical for invoice matching |
+| `partner_id` | VARCHAR(100) | | End-to-end identifier between transaction partners |
+| `transaction_type_code` | VARCHAR(100) | | Bank-specific transaction type code (e.g., "001-00") |
+| `fee_amount` | DECIMAL(15,2) | | Transaction fee charged by bank |
+| `card_number` | VARCHAR(20) | | Masked card number for POS/ATM transactions |
+| `merchant_name` | VARCHAR(200) | | Merchant name for POS purchases |
+| `merchant_location` | VARCHAR(200) | | Merchant location for POS purchases |
+| `original_amount` | DECIMAL(15,2) | | Original amount in foreign currency (before conversion) |
+| `original_currency` | VARCHAR(3) | | Original currency code for FX transactions |
+| `exchange_rate` | DECIMAL(15,6) | | Exchange rate used for currency conversion (6 decimal precision) |
+| `matched_invoice_id` | INTEGER | FK(bank_transfers_invoice.id), SET_NULL | NAV invoice matched to this transaction |
+| `matched_transfer_id` | INTEGER | FK(bank_transfers_transfer.id), SET_NULL | Transfer from executed batch matched to this transaction |
+| `matched_reimbursement_id` | INTEGER | FK(bank_transfers_banktransaction.id), SET_NULL | Offsetting transaction (e.g., POS purchase + personal reimbursement transfer) |
+| `match_confidence` | DECIMAL(3,2) | DEFAULT 0.00 | Matching confidence score (0.00 to 1.00) |
+| `match_method` | VARCHAR(50) | CHECK | Method used for matching (see MATCH_METHOD_CHOICES below) |
+| `match_notes` | TEXT | | Additional notes about matching process |
+| `matched_at` | TIMESTAMP | | Timestamp when transaction was matched |
+| `matched_by_id` | INTEGER | FK(auth_user.id), SET_NULL | User who performed matching (NULL for automatic) |
+| `is_extra_cost` | BOOLEAN | DEFAULT FALSE, INDEX | Flag indicating if this is an extra cost (bank fee, interest, etc.) |
+| `extra_cost_category` | VARCHAR(50) | CHECK | Category for extra costs (see EXTRA_COST_CATEGORIES below) |
+| `raw_data` | JSON | DEFAULT {} | Raw transaction data from bank statement (sanitized for JSON storage) |
+| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Record creation timestamp |
+| `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
+
+**Transaction Types (TRANSACTION_TYPES):**
+- `AFR_CREDIT` - AFR jóváírás (Incoming instant payment)
+- `AFR_DEBIT` - AFR terhelés (Outgoing instant payment)
+- `TRANSFER_CREDIT` - Átutalás jóváírás (Incoming transfer)
+- `TRANSFER_DEBIT` - Átutalás terhelés (Outgoing transfer)
+- `POS_PURCHASE` - POS vásárlás (Card purchase)
+- `ATM_WITHDRAWAL` - ATM készpénzfelvétel (Cash withdrawal)
+- `BANK_FEE` - Banki jutalék/költség (Bank fee)
+- `INTEREST_CREDIT` - Kamatjóváírás (Interest credit)
+- `INTEREST_DEBIT` - Kamatköltség (Interest charge)
+- `CORRECTION` - Helyesbítés/Sztornó (Correction)
+- `OTHER` - Egyéb tranzakció (Other)
+
+**Match Methods (MATCH_METHOD_CHOICES):**
+- `REFERENCE_EXACT` - Közlemény alapján (pontos) - Exact reference match
+- `AMOUNT_IBAN` - Összeg + IBAN alapján - Amount and IBAN match
+- `FUZZY_NAME` - Összeg + név hasonlóság alapján - Amount and fuzzy name match
+- `TRANSFER_EXACT` - Átutalási köteg alapján - Transfer batch match
+- `REIMBURSEMENT_PAIR` - Ellentételezés (személyes visszafizetés) - Reimbursement offsetting
+- `MANUAL` - Manuális párosítás - Manual matching by user
+
+**Extra Cost Categories (EXTRA_COST_CATEGORIES):**
+- `BANK_FEE` - Banki költség
+- `CARD_PURCHASE` - Kártyás vásárlás
+- `INTEREST` - Kamat
+- `TAX_DUTY` - Adó/illeték
+- `CASH_WITHDRAWAL` - Készpénzfelvétel
+- `OTHER` - Egyéb költség
+
+**Indexes:**
+- Primary key on `id`
+- Index on `company_id` for company-scoped queries
+- Index on `bank_statement_id` for statement transaction lookup
+- Index on `transaction_type` for type filtering
+- Index on `booking_date` for date-based queries
+- Index on `value_date` for value date filtering
+- Index on `amount` for amount-based queries
+- Index on `payment_id` for payment ID lookup
+- Index on `reference` for reference-based matching
+- Index on `payer_name` for payer search
+- Index on `beneficiary_name` for beneficiary search
+- Index on `matched_invoice_id` for invoice matching queries
+- Index on `is_extra_cost` and `extra_cost_category` for cost analysis
+- Composite index on `(bank_statement_id, booking_date)` for statement timeline
+- Composite index on `(company_id, booking_date)` for company transaction history
+- Composite index on `(company_id, transaction_type, booking_date)` for type-based reporting
+- Composite index on `(amount, currency)` for amount-based matching
+
+**CHECK Constraints:**
+- `transaction_type` CHECK constraint: Must be one of TRANSACTION_TYPES
+- `match_method` CHECK constraint: Must be one of MATCH_METHOD_CHOICES
+- `extra_cost_category` CHECK constraint: Must be one of EXTRA_COST_CATEGORIES
+
+**Business Rules:**
+- **Negative for Debit**: Negative amounts indicate money leaving account (debit)
+- **Positive for Credit**: Positive amounts indicate money entering account (credit)
+- **Multi-Type Support**: Single model handles all transaction types (transfers, POS, fees, etc.)
+- **NAV Invoice Matching**: Automatic matching to invoices using 7 matching strategies
+- **Transfer Matching**: Links to executed transfers from TransferBatch (used_in_bank=True)
+- **Reimbursement Pairs**: Self-referencing FK for offsetting transactions (e.g., POS purchase + personal reimbursement)
+- **Confidence Scoring**: Match confidence from 0.00 (no match) to 1.00 (perfect match)
+- **Extra Cost Tracking**: Special flag and categorization for non-invoice costs
+- **Raw Data Storage**: Complete transaction data preserved in JSON for audit trail
+- **FX Support**: Original amount and exchange rate stored for foreign currency transactions
+
+**Transaction Matching Engine:**
+The system uses a sophisticated matching engine with 7 strategies:
+1. **Invoice Reference Match**: Exact invoice number in reference field
+2. **Amount + IBAN Match**: Amount and supplier IBAN match
+3. **Amount + Date Match**: Amount and payment due date match
+4. **Fuzzy Name Match**: Amount and fuzzy name similarity (>80%)
+5. **Amount + Tax Number Match**: Amount and supplier tax number match
+6. **Amount Range Match**: Amount within ±2% tolerance
+7. **Transfer Batch Match**: Matches executed transfers from batches
+
+**API Access:**
+- `GET /api/bank-transactions/` - List transactions with filtering and pagination
+- `GET /api/bank-transactions/{id}/` - Transaction details
+- `POST /api/bank-transactions/{id}/match_invoice/` - Manually match to invoice
+- `POST /api/bank-transactions/{id}/unmatch_invoice/` - Remove invoice match
+- `POST /api/bank-transactions/{id}/categorize_cost/` - Categorize as extra cost
+- `GET /api/bank-transactions/statistics/` - Transaction statistics and summaries
+
+---
+
+## 22. **bank_transfers_othercost**
+**Table Comment:** *Additional cost records derived from bank transactions. Allows enhanced categorization, detailed notes, and flexible tagging beyond standard BankTransaction fields. Used for expense tracking, cost analysis, and financial reporting.*
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | SERIAL | PRIMARY KEY | Unique identifier for other cost record |
+| `company_id` | INTEGER | NOT NULL, FK(bank_transfers_company.id) | Company owner of this cost record |
+| `bank_transaction_id` | INTEGER | FK(bank_transfers_banktransaction.id), CASCADE, ONE_TO_ONE | Optional reference to originating bank transaction |
+| `category` | VARCHAR(50) | NOT NULL, CHECK | Cost category code (see CATEGORY_CHOICES below) |
+| `amount` | DECIMAL(15,2) | NOT NULL | Cost amount (always positive for costs) |
+| `currency` | VARCHAR(3) | NOT NULL, DEFAULT 'HUF' | ISO currency code |
+| `date` | DATE | NOT NULL | Date of the cost |
+| `description` | TEXT | NOT NULL | Detailed description of the cost |
+| `notes` | TEXT | | Additional notes, context, or justification |
+| `tags` | JSON | DEFAULT [] | Array of tag strings for flexible categorization (e.g., ["fuel", "travel", "office"]) |
+| `created_by_id` | INTEGER | FK(auth_user.id), SET_NULL | User who created this cost record |
+| `created_at` | TIMESTAMP | NOT NULL, AUTO_NOW_ADD | Record creation timestamp |
+| `updated_at` | TIMESTAMP | NOT NULL, AUTO_NOW | Last modification timestamp |
+
+**Cost Categories (CATEGORY_CHOICES):**
+- `BANK_FEE` - Banki költség (Bank charges, account fees)
+- `CARD_PURCHASE` - Kártyás vásárlás (Card purchases)
+- `INTEREST` - Kamat (Interest charges)
+- `TAX_DUTY` - Adó/illeték (Taxes and duties)
+- `CASH_WITHDRAWAL` - Készpénzfelvétel (Cash withdrawals)
+- `SUBSCRIPTION` - Előfizetés (Recurring subscriptions)
+- `UTILITY` - Közüzem (Utilities: electricity, water, gas)
+- `FUEL` - Üzemanyag (Fuel expenses)
+- `TRAVEL` - Utazás (Travel and transportation)
+- `OFFICE` - Iroda/irodaszer (Office supplies and equipment)
+- `OTHER` - Egyéb (Other miscellaneous costs)
+
+**Indexes:**
+- Primary key on `id`
+- Index on `company_id` for company-scoped queries
+- Index on `bank_transaction_id` for transaction linkage (one-to-one)
+- Index on `category` for category-based filtering
+- Index on `date` for date-based queries
+- Index on `created_by_id` for user-based filtering
+- Composite index on `(company_id, category, date)` for cost analysis reports
+- Composite index on `(company_id, date)` for timeline analysis
+
+**CHECK Constraints:**
+- `category` CHECK constraint: Must be one of CATEGORY_CHOICES
+
+**Business Rules:**
+- **Optional Bank Transaction Link**: Can be linked to a BankTransaction (one-to-one) or standalone
+- **Standalone Costs**: Allows recording costs not derived from bank statements (manual entry)
+- **Enhanced Categorization**: More granular categories than BankTransaction.extra_cost_category
+- **Flexible Tagging**: JSON tags array supports unlimited categorization dimensions
+- **Positive Amounts**: Always stores positive amounts (costs are debits by nature)
+- **Company Isolation**: All cost records are company-scoped
+- **Audit Trail**: Tracks who created the cost record and when
+
+**Use Cases:**
+1. **Bank Transaction Enhancement**: Link to BankTransaction to add richer categorization
+2. **Manual Cost Entry**: Record costs not appearing on bank statements (cash purchases, etc.)
+3. **Expense Tracking**: Track and analyze business expenses by category
+4. **Cost Analysis**: Generate reports by category, date, tags, or custom dimensions
+5. **Budget Monitoring**: Compare actual costs against budgeted amounts
+6. **Tax Preparation**: Organize deductible expenses for tax reporting
+
+**Integration Points:**
+- **BankTransaction Link**: One-to-one relationship with BankTransaction (optional)
+- **Tag System**: Flexible JSON array allows unlimited categorization (e.g., project codes, cost centers)
+- **Reporting**: Used by financial reporting and analytics features
+
+**API Access:**
+- `GET /api/other-costs/` - List costs with filtering and pagination
+- `POST /api/other-costs/` - Create new cost record
+- `GET /api/other-costs/{id}/` - Cost details
+- `PUT /api/other-costs/{id}/` - Update cost record
+- `DELETE /api/other-costs/{id}/` - Delete cost record
+- `GET /api/other-costs/statistics/` - Cost statistics by category/date/tags
+
+---
+
 ## Migration History
 
 - **0008**: Added multi-company architecture (`Company`, `CompanyUser`, `UserProfile`)
@@ -1037,7 +1327,9 @@ for sync in failed_syncs:
 - **0021**: Enhanced CompanyUser with role-based permissions (`role`, `custom_permissions`, `permission_restrictions`)
 - **0033**: Added trusted partners auto-payment system (`TrustedPartner` table) with NAV integration
 - **0037**: Added tax number support to beneficiaries with NAV integration fallback and mutual exclusivity validation
-- **Current**: Full multi-tenant isolation with feature flags, role-based access control, complete NAV integration, trusted partners auto-payment system, and tax number beneficiary matching
+- **0038**: Added MNB exchange rate integration (`ExchangeRate`, `ExchangeRateSyncLog` tables)
+- **0039**: Added bank statement import system (`BankStatement`, `BankTransaction`, `OtherCost` tables) with multi-bank parser support, automatic NAV invoice matching, and transaction categorization
+- **Current**: Full multi-tenant isolation with feature flags, role-based access control, complete NAV integration, trusted partners auto-payment system, tax number beneficiary matching, MNB exchange rate integration, and bank statement import with automatic transaction matching
 
 ---
 
@@ -1061,11 +1353,13 @@ for sync in failed_syncs:
 - **SQL Server (Local)**: `/backend/sql/complete_database_comments_sqlserver.sql`
 - **PostgreSQL (Production)**: `/backend/sql/complete_database_comments_postgresql.sql`
 
-Both scripts provide complete table and column comments for all 17 tables and their columns, including:
+Both scripts provide complete table and column comments for all 22 tables and their columns, including:
 - Multi-company architecture tables (Company, CompanyUser, UserProfile)
 - Core transfer system (BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch)
 - NAV integration system (NavConfiguration, Invoice, InvoiceLineItem, InvoiceSyncLog)
 - Trusted partners auto-payment system (TrustedPartner)
+- MNB exchange rate integration (ExchangeRate, ExchangeRateSyncLog)
+- Bank statement import system (BankStatement, BankTransaction, OtherCost)
 - Feature flag system (FeatureTemplate, CompanyFeature)
 
 ### Script Features:

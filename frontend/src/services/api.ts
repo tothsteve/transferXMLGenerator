@@ -16,6 +16,27 @@ import {
   AvailablePartner,
   NAVInvoice,
 } from '../types/api';
+import {
+  BankStatement,
+  BankTransaction,
+  OtherCost,
+  BankStatementQueryParams,
+  BankTransactionQueryParams,
+  OtherCostQueryParams,
+  BankStatementListResponse,
+  BankTransactionListResponse,
+  OtherCostListResponse,
+  SupportedBanksResponse,
+  UploadResponse,
+  bankStatementListResponseSchema,
+  bankTransactionListResponseSchema,
+  otherCostListResponseSchema,
+  supportedBanksResponseSchema,
+  uploadResponseSchema,
+  bankStatementSchema,
+  bankTransactionSchema,
+  otherCostSchema,
+} from '../schemas/bankStatement.schemas';
 
 const API_BASE_URL =
   process.env.NODE_ENV === 'production'
@@ -296,6 +317,200 @@ export const trustedPartnersApi = {
     apiClient.get<ApiResponse<AvailablePartner>>('/trusted-partners/available_partners/', {
       params,
     }),
+};
+
+/**
+ * Bank Statements API
+ *
+ * Endpoints for managing bank statement uploads, parsing, and transactions.
+ * All responses are validated with Zod schemas for type safety.
+ */
+export const bankStatementsApi = {
+  /**
+   * Get paginated list of bank statements with filtering.
+   *
+   * @param params - Query parameters for filtering and pagination
+   * @returns Promise resolving to validated bank statement list
+   */
+  getAll: async (params?: BankStatementQueryParams): Promise<BankStatementListResponse> => {
+    const response = await apiClient.get('/bank-statements/', { params });
+    return bankStatementListResponseSchema.parse(response.data);
+  },
+
+  /**
+   * Get single bank statement by ID.
+   *
+   * @param id - Bank statement ID
+   * @returns Promise resolving to validated bank statement
+   */
+  getById: async (id: number): Promise<BankStatement> => {
+    const response = await apiClient.get(`/bank-statements/${id}/`);
+    return bankStatementSchema.parse(response.data);
+  },
+
+  /**
+   * Upload bank statement file (PDF/CSV/XML).
+   *
+   * @param file - File to upload
+   * @returns Promise resolving to upload response with created statement
+   */
+  upload: async (file: File): Promise<UploadResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await apiClient.post('/bank-statements/upload/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    return uploadResponseSchema.parse(response.data);
+  },
+
+  /**
+   * Get list of supported banks and their file formats.
+   *
+   * @returns Promise resolving to array of supported banks
+   */
+  getSupportedBanks: async (): Promise<SupportedBanksResponse> => {
+    const response = await apiClient.get('/bank-statements/supported_banks/');
+    return supportedBanksResponseSchema.parse(response.data);
+  },
+
+  /**
+   * Delete bank statement and all its transactions.
+   *
+   * @param id - Bank statement ID to delete
+   * @returns Promise resolving when deletion is complete
+   */
+  delete: async (id: number): Promise<void> => {
+    await apiClient.delete(`/bank-statements/${id}/`);
+  },
+};
+
+/**
+ * Bank Transactions API
+ *
+ * Endpoints for managing transactions within bank statements.
+ */
+export const bankTransactionsApi = {
+  /**
+   * Get paginated list of transactions for a statement.
+   *
+   * @param statementId - Parent bank statement ID
+   * @param params - Query parameters for filtering and pagination
+   * @returns Promise resolving to validated transaction list
+   */
+  getAll: async (
+    statementId: number,
+    params?: BankTransactionQueryParams
+  ): Promise<BankTransactionListResponse> => {
+    const response = await apiClient.get(`/bank-transactions/`, {
+      params: {
+        ...params,
+        statement_id: statementId,
+      },
+    });
+    return bankTransactionListResponseSchema.parse(response.data);
+  },
+
+  /**
+   * Get single transaction by ID.
+   *
+   * @param id - Transaction ID
+   * @returns Promise resolving to validated transaction
+   */
+  getById: async (id: number): Promise<BankTransaction> => {
+    const response = await apiClient.get(`/bank-transactions/${id}/`);
+    return bankTransactionSchema.parse(response.data);
+  },
+
+  /**
+   * Manually match transaction to invoice.
+   *
+   * @param transactionId - Transaction ID
+   * @param invoiceId - Invoice ID to match
+   * @returns Promise resolving to updated transaction
+   */
+  matchInvoice: async (transactionId: number, invoiceId: number): Promise<BankTransaction> => {
+    const response = await apiClient.post(`/bank-transactions/${transactionId}/match_invoice/`, {
+      invoice_id: invoiceId,
+    });
+    return bankTransactionSchema.parse(response.data);
+  },
+
+  /**
+   * Remove invoice match from transaction.
+   *
+   * @param transactionId - Transaction ID
+   * @returns Promise resolving to updated transaction
+   */
+  unmatch: async (transactionId: number): Promise<BankTransaction> => {
+    const response = await apiClient.post(`/bank-transactions/${transactionId}/unmatch/`);
+    return bankTransactionSchema.parse(response.data);
+  },
+};
+
+/**
+ * Other Costs API
+ *
+ * Endpoints for managing categorized expense records.
+ */
+export const otherCostsApi = {
+  /**
+   * Get paginated list of other costs with filtering.
+   *
+   * @param params - Query parameters for filtering and pagination
+   * @returns Promise resolving to validated other costs list
+   */
+  getAll: async (params?: OtherCostQueryParams): Promise<OtherCostListResponse> => {
+    const response = await apiClient.get('/other-costs/', { params });
+    return otherCostListResponseSchema.parse(response.data);
+  },
+
+  /**
+   * Get single other cost by ID.
+   *
+   * @param id - Other cost ID
+   * @returns Promise resolving to validated other cost
+   */
+  getById: async (id: number): Promise<OtherCost> => {
+    const response = await apiClient.get(`/other-costs/${id}/`);
+    return otherCostSchema.parse(response.data);
+  },
+
+  /**
+   * Create new other cost record.
+   *
+   * @param data - Other cost data (without ID)
+   * @returns Promise resolving to created other cost
+   */
+  create: async (data: Omit<OtherCost, 'id' | 'created_at' | 'updated_at'>): Promise<OtherCost> => {
+    const response = await apiClient.post('/other-costs/', data);
+    return otherCostSchema.parse(response.data);
+  },
+
+  /**
+   * Update existing other cost.
+   *
+   * @param id - Other cost ID
+   * @param data - Partial other cost data to update
+   * @returns Promise resolving to updated other cost
+   */
+  update: async (id: number, data: Partial<OtherCost>): Promise<OtherCost> => {
+    const response = await apiClient.patch(`/other-costs/${id}/`, data);
+    return otherCostSchema.parse(response.data);
+  },
+
+  /**
+   * Delete other cost record.
+   *
+   * @param id - Other cost ID to delete
+   * @returns Promise resolving when deletion is complete
+   */
+  delete: async (id: number): Promise<void> => {
+    await apiClient.delete(`/other-costs/${id}/`);
+  },
 };
 
 export default apiClient;

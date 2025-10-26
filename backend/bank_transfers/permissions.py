@@ -364,28 +364,86 @@ class RequireExportFeatures(FeatureBasedPermission):
     def has_permission(self, request, view):
         if not hasattr(request, 'company') or not request.company:
             return False
-        
+
         # Get user's company membership and allowed features
         try:
             from .models import CompanyUser
             company_user = CompanyUser.objects.get(
-                user=request.user, 
+                user=request.user,
                 company=request.company,
                 is_active=True
             )
             user_allowed_features = company_user.get_allowed_features()
         except CompanyUser.DoesNotExist:
             return False
-        
+
         # For export endpoints, require at least one export feature
         export_features = ['EXPORT_XML_SEPA', 'EXPORT_CSV_KH', 'EXPORT_CSV_CUSTOM']
-        
+
         for feature in export_features:
             # Check both company feature enablement AND user role permission
             if (FeatureChecker.is_feature_enabled(request.company, feature) and
                 (feature in user_allowed_features or '*' in user_allowed_features)):
                 return True
-        
+
+        return False
+
+
+class RequireBankStatementImport(FeatureBasedPermission):
+    """
+    Permission class for bank statement import functionality.
+
+    Requires BANK_STATEMENT_IMPORT feature to be enabled for the company.
+
+    Access levels by role:
+    - ADMIN: Full access (upload, view, delete, match/unmatch, categorize)
+    - FINANCIAL: Full access (same as ADMIN)
+    - ACCOUNTANT: View only (cannot upload, delete, or modify)
+    - USER: View only (cannot upload, delete, or modify)
+    """
+
+    required_features = ['BANK_STATEMENT_IMPORT']
+
+    def has_permission(self, request, view):
+        if not hasattr(request, 'company') or not request.company:
+            return False
+
+        # Get user's company membership and allowed features
+        try:
+            from .models import CompanyUser
+            company_user = CompanyUser.objects.get(
+                user=request.user,
+                company=request.company,
+                is_active=True
+            )
+            user_role = company_user.role
+            user_allowed_features = company_user.get_allowed_features()
+        except CompanyUser.DoesNotExist:
+            logger.warning(f"User {request.user.username} has no role in company {request.company}")
+            return False
+
+        # Check if BANK_STATEMENT_IMPORT feature is enabled for company AND user has permission
+        required_feature = 'BANK_STATEMENT_IMPORT'
+        if not (FeatureChecker.is_feature_enabled(request.company, required_feature) and
+                (required_feature in user_allowed_features or '*' in user_allowed_features)):
+            return False
+
+        # Read operations (GET, HEAD, OPTIONS) - all roles with feature enabled
+        if request.method in permissions.SAFE_METHODS:
+            return user_role in ['ADMIN', 'FINANCIAL', 'ACCOUNTANT', 'USER']
+
+        # Write operations - check view action and role
+        action = getattr(view, 'action', None)
+
+        # Upload, delete, match, unmatch, categorize - ADMIN and FINANCIAL only
+        if action in ['create', 'upload', 'destroy', 'match_invoice', 'unmatch_invoice', 'categorize_cost']:
+            return user_role in ['ADMIN', 'FINANCIAL']
+
+        # Update operations - ADMIN and FINANCIAL only
+        if request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+            return user_role in ['ADMIN', 'FINANCIAL']
+
+        # Default deny
         return False
 
 

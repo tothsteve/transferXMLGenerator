@@ -3,7 +3,8 @@ from decimal import Decimal
 from .models import (
     BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch, Company,
     NavConfiguration, Invoice, InvoiceLineItem, InvoiceSyncLog, TrustedPartner,
-    ExchangeRate, ExchangeRateSyncLog
+    ExchangeRate, ExchangeRateSyncLog,
+    BankStatement, BankTransaction, OtherCost
 )
 from .hungarian_account_validator import validate_and_format_hungarian_account_number
 from .string_validation import validate_beneficiary_name, validate_remittance_info, normalize_whitespace, sanitize_export_string
@@ -393,36 +394,36 @@ class InvoiceListSerializer(serializers.ModelSerializer):
     invoice_vat_amount_formatted = serializers.SerializerMethodField()
     invoice_gross_amount_formatted = serializers.SerializerMethodField()
     
-    # Payment status (using new database fields) 
+    # Payment status (using new database fields)
     payment_status = serializers.SerializerMethodField()
     payment_status_date_formatted = serializers.SerializerMethodField()
     is_overdue = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Invoice
         fields = [
             # Basic info
             'id', 'company', 'company_name', 'nav_invoice_number', 'invoice_direction',
             'invoice_direction_display', 'partner_name', 'partner_tax_number',
-            
+
             # Dates
             'issue_date', 'issue_date_formatted',
             'fulfillment_date', 'fulfillment_date_formatted',
             'payment_due_date', 'payment_due_date_formatted',
             'payment_date', 'payment_date_formatted',
-            
+
             # Financial
-            'currency_code', 
+            'currency_code',
             'invoice_net_amount', 'invoice_net_amount_formatted',
             'invoice_vat_amount', 'invoice_vat_amount_formatted',
             'invoice_gross_amount', 'invoice_gross_amount_formatted',
-            
+
             # Business
             'invoice_operation', 'payment_method', 'original_invoice_number',
-            'payment_status', 'payment_status_date', 'payment_status_date_formatted', 
+            'payment_status', 'payment_status_date', 'payment_status_date_formatted',
             'auto_marked_paid', 'is_overdue', 'invoice_category',
             'supplier_bank_account_number', 'customer_bank_account_number',
-            
+
             # System
             'sync_status', 'created_at'
         ]
@@ -977,3 +978,292 @@ class CurrencyConversionSerializer(serializers.Serializer):
     huf_amount = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
     exchange_rate = serializers.DecimalField(max_digits=12, decimal_places=6, read_only=True)
     rate_date = serializers.DateField(read_only=True)
+
+# =============================================================================
+# Bank Statement Import Serializers
+# =============================================================================
+
+class BankTransactionSerializer(serializers.ModelSerializer):
+    """
+    Serializer for bank transaction records.
+
+    Provides full transaction details with nested invoice match information.
+    """
+    statement_details = serializers.SerializerMethodField()
+    matched_invoice_details = serializers.SerializerMethodField()
+    matched_transfer_batch = serializers.SerializerMethodField()
+    matched_reimbursement_details = serializers.SerializerMethodField()
+    has_other_cost = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BankTransaction
+        fields = [
+            'id', 'bank_statement', 'statement_details',
+            'transaction_type', 'booking_date', 'value_date',
+            'amount', 'currency', 'description', 'short_description',
+            'payment_id', 'transaction_id',
+            'payer_name', 'payer_iban', 'payer_account_number', 'payer_bic',
+            'beneficiary_name', 'beneficiary_iban', 'beneficiary_account_number', 'beneficiary_bic',
+            'reference', 'partner_id', 'transaction_type_code', 'fee_amount',
+            'card_number', 'merchant_name', 'merchant_location',
+            'original_amount', 'original_currency',
+            'matched_invoice', 'matched_invoice_details', 'match_confidence', 'match_method',
+            'matched_transfer', 'matched_transfer_batch',
+            'matched_reimbursement', 'matched_reimbursement_details',
+            'has_other_cost',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+    
+    def get_statement_details(self, obj):
+        """Return basic statement info"""
+        if obj.bank_statement:
+            return {
+                'id': obj.bank_statement.id,
+                'bank_name': obj.bank_statement.bank_name,
+                'account_number': obj.bank_statement.account_number,
+                'period_from': obj.bank_statement.statement_period_from.isoformat() if obj.bank_statement.statement_period_from else None,
+                'period_to': obj.bank_statement.statement_period_to.isoformat() if obj.bank_statement.statement_period_to else None,
+            }
+        return None
+    
+    def get_matched_invoice_details(self, obj):
+        """Return matched invoice summary"""
+        if obj.matched_invoice:
+            return {
+                'id': obj.matched_invoice.id,
+                'invoice_number': obj.matched_invoice.nav_invoice_number,
+                'supplier_name': obj.matched_invoice.supplier_name,
+                'supplier_tax_number': obj.matched_invoice.supplier_tax_number,
+                'customer_name': obj.matched_invoice.customer_name,
+                'customer_tax_number': obj.matched_invoice.customer_tax_number,
+                'gross_amount': str(obj.matched_invoice.invoice_gross_amount) if obj.matched_invoice.invoice_gross_amount else None,
+                'payment_due_date': obj.matched_invoice.payment_due_date.isoformat() if obj.matched_invoice.payment_due_date else None,
+                'payment_status': obj.matched_invoice.payment_status,
+            }
+        return None
+
+    def get_matched_transfer_batch(self, obj):
+        """Return batch ID for matched transfer"""
+        if obj.matched_transfer:
+            # Get the first batch that contains this transfer
+            # In most cases, a transfer belongs to only one batch
+            batch = obj.matched_transfer.transferbatch_set.first()
+            if batch:
+                return batch.id
+        return None
+
+    def get_matched_reimbursement_details(self, obj):
+        """Return paired reimbursement transaction summary"""
+        if obj.matched_reimbursement:
+            paired = obj.matched_reimbursement
+            return {
+                'id': paired.id,
+                'bank_statement': paired.bank_statement_id,
+                'transaction_type': paired.transaction_type,
+                'booking_date': paired.booking_date.isoformat(),
+                'amount': str(paired.amount),
+                'currency': paired.currency,
+                'description': paired.description or '',
+                'partner_name': paired.payer_name or paired.beneficiary_name or paired.merchant_name or '',
+            }
+        return None
+
+    def get_has_other_cost(self, obj):
+        """Check if transaction has associated other cost record"""
+        return hasattr(obj, 'other_cost_detail') and obj.other_cost_detail is not None
+
+
+class BankStatementListSerializer(serializers.ModelSerializer):
+    """
+    Serializer for bank statement list view.
+    
+    Provides summary information without nested transactions.
+    """
+    bank_name = serializers.CharField(read_only=True)
+    uploaded_by_name = serializers.SerializerMethodField()
+    matched_percentage = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = BankStatement
+        fields = [
+            'id', 'bank_code', 'bank_name', 'bank_bic',
+            'account_number', 'account_iban',
+            'statement_period_from', 'statement_period_to', 'statement_number',
+            'opening_balance', 'closing_balance',
+            'file_name', 'file_size', 'file_hash',
+            'uploaded_by', 'uploaded_by_name', 'uploaded_at',
+            'status', 'parse_error',
+            'total_transactions', 'credit_count', 'debit_count',
+            'total_credits', 'total_debits', 'matched_count', 'matched_percentage',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'company']
+    
+    def get_uploaded_by_name(self, obj):
+        """Return uploader's full name"""
+        if obj.uploaded_by:
+            return f"{obj.uploaded_by.first_name} {obj.uploaded_by.last_name}".strip() or obj.uploaded_by.username
+        return None
+    
+    def get_matched_percentage(self, obj):
+        """Calculate percentage of matched transactions"""
+        if obj.total_transactions > 0:
+            return round((obj.matched_count / obj.total_transactions) * 100, 1)
+        return 0.0
+
+
+class BankStatementDetailSerializer(serializers.ModelSerializer):
+    """
+    Serializer for bank statement detail view.
+
+    Includes full transaction list and detailed metadata.
+    """
+    transactions = BankTransactionSerializer(many=True, read_only=True)
+    uploaded_by_name = serializers.SerializerMethodField()
+    matched_percentage = serializers.SerializerMethodField()
+    raw_metadata_json = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BankStatement
+        fields = [
+            'id', 'bank_code', 'bank_name', 'bank_bic',
+            'account_number', 'account_iban',
+            'statement_period_from', 'statement_period_to', 'statement_number',
+            'opening_balance', 'closing_balance',
+            'file_name', 'file_size', 'file_hash', 'file_path',
+            'uploaded_by', 'uploaded_by_name', 'uploaded_at',
+            'status', 'parse_error', 'parse_warnings',
+            'total_transactions', 'credit_count', 'debit_count',
+            'total_credits', 'total_debits', 'matched_count', 'matched_percentage',
+            'transactions',
+            'raw_metadata_json',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'company']
+
+    def get_uploaded_by_name(self, obj):
+        """Return uploader's full name"""
+        if obj.uploaded_by:
+            return f"{obj.uploaded_by.first_name} {obj.uploaded_by.last_name}".strip() or obj.uploaded_by.username
+        return None
+
+    def get_matched_percentage(self, obj):
+        """Calculate percentage of matched transactions"""
+        if obj.total_transactions > 0:
+            return round((obj.matched_count / obj.total_transactions) * 100, 1)
+        return 0.0
+
+    def get_raw_metadata_json(self, obj):
+        """Convert raw_metadata to JSON-serializable format"""
+        import json
+        from datetime import date, datetime
+        from decimal import Decimal
+
+        def convert_to_serializable(data):
+            """Recursively convert non-serializable objects"""
+            if isinstance(data, dict):
+                return {k: convert_to_serializable(v) for k, v in data.items()}
+            elif isinstance(data, list):
+                return [convert_to_serializable(item) for item in data]
+            elif isinstance(data, (date, datetime)):
+                return data.isoformat()
+            elif isinstance(data, Decimal):
+                return str(data)
+            else:
+                return data
+
+        if obj.raw_metadata:
+            return convert_to_serializable(obj.raw_metadata)
+        return None
+
+
+class BankStatementUploadSerializer(serializers.Serializer):
+    """
+    Serializer for bank statement file upload.
+    
+    Handles PDF file validation and upload metadata.
+    """
+    file = serializers.FileField(
+        required=True,
+        help_text="Bank statement PDF file"
+    )
+    
+    def validate_file(self, value):
+        """Validate uploaded file - accepts PDF, CSV, and XML formats"""
+        # Check file extension - support multiple bank statement formats
+        allowed_extensions = ('.pdf', '.csv', '.xml')
+        filename_lower = value.name.lower()
+
+        if not filename_lower.endswith(allowed_extensions):
+            raise serializers.ValidationError(
+                "Csak PDF, CSV vagy XML fájlok tölthetők fel (banki kivonathoz)"
+            )
+
+        # Check file size (max 10MB)
+        max_size = 10 * 1024 * 1024  # 10MB
+        if value.size > max_size:
+            raise serializers.ValidationError(
+                f"A fájl mérete nem lehet nagyobb mint {max_size // (1024*1024)}MB"
+            )
+
+        return value
+
+
+class OtherCostSerializer(serializers.ModelSerializer):
+    """
+    Serializer for other cost records.
+    
+    Provides expense categorization and tagging functionality.
+    """
+    transaction_details = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = OtherCost
+        fields = [
+            'id', 'bank_transaction', 'transaction_details',
+            'category', 'amount', 'currency', 'date',
+            'description', 'notes', 'tags',
+            'created_by', 'created_by_name',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'company']
+    
+    def get_transaction_details(self, obj):
+        """Return basic transaction info if linked"""
+        if obj.bank_transaction:
+            return {
+                'id': obj.bank_transaction.id,
+                'transaction_type': obj.bank_transaction.transaction_type,
+                'booking_date': obj.bank_transaction.booking_date,
+                'description': obj.bank_transaction.description,
+            }
+        return None
+    
+    def get_created_by_name(self, obj):
+        """Return creator's full name"""
+        if obj.created_by:
+            return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip() or obj.created_by.username
+        return None
+    
+    def validate_tags(self, value):
+        """Validate tags are list of strings"""
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Címkéknek listának kell lennie")
+        
+        if not all(isinstance(tag, str) for tag in value):
+            raise serializers.ValidationError("Minden címkének szövegnek kell lennie")
+        
+        return value
+
+
+class SupportedBanksSerializer(serializers.Serializer):
+    """
+    Serializer for supported banks list.
+    
+    Returns available bank adapters from factory.
+    """
+    code = serializers.CharField()
+    name = serializers.CharField()
+    bic = serializers.CharField()

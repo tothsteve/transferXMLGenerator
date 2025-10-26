@@ -217,9 +217,11 @@ Adoesjarulekbefizetesek*.pdf
 
 # Development temp files and examples
 temp/
+bank_statement_example/
 backend/test_transfer_validation.py
 backend/test_vat_api_endpoints.py
 backend/test_vat_api.py
+backend/test_bank_statement_import.py
 
 # Docker configuration - contains local paths and passwords
 docker-compose.yml
@@ -228,3 +230,5 @@ docker-compose.yml
 backup_*.json
 *.bak
 backups/
+backend/test_api_import.py
+backend/test_pdf_import.py

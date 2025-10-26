@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -19,7 +19,7 @@ import {
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { hu } from 'date-fns/locale';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search as SearchIcon,
   FilterList as FilterIcon,
@@ -66,6 +66,10 @@ const NAVInvoices: React.FC = () => {
   // Toast and navigation
   const { success: showSuccess, error: showError, addToast } = useToastContext();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Track if invoice modal was opened via URL parameter for back navigation
+  const openedViaUrlParam = useRef<boolean>(false);
 
   // Bulk payment status update mutations
   const bulkMarkUnpaidMutation = useBulkMarkUnpaid();
@@ -156,6 +160,7 @@ const NAVInvoices: React.FC = () => {
     checkingTrustedStatus,
     addingTrustedPartner,
     handleViewInvoice,
+    handleViewInvoiceById,
     handleCloseInvoiceDetails,
     handleAddTrustedPartner,
   } = useInvoiceDetails({
@@ -189,6 +194,34 @@ const NAVInvoices: React.FC = () => {
     bulkMarkPreparedMutation: adaptedBulkMarkPreparedMutation,
     bulkMarkPaidMutation: adaptedBulkMarkPaidMutation,
   });
+
+  // Handle deep linking: Check for invoiceId parameter in URL
+  useEffect(() => {
+    const invoiceIdParam = searchParams.get('invoiceId');
+    if (invoiceIdParam) {
+      const invoiceId = parseInt(invoiceIdParam, 10);
+      if (!isNaN(invoiceId)) {
+        // Mark that we opened via URL parameter for back navigation
+        openedViaUrlParam.current = true;
+        // Open invoice modal automatically
+        void handleViewInvoiceById(invoiceId);
+      }
+    }
+    // Only run on mount when URL parameter changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.get('invoiceId')]);
+
+  // Custom close handler that navigates back if opened via URL parameter
+  const handleCloseInvoiceDetailsWithNavigation = (): void => {
+    // Close the modal first
+    handleCloseInvoiceDetails();
+
+    // If modal was opened via URL parameter, navigate back to previous page
+    if (openedViaUrlParam.current) {
+      openedViaUrlParam.current = false; // Reset the flag
+      navigate(-1); // Go back to the previous page (bank transactions)
+    }
+  };
 
   // Local formatting and calculation functions
   const handleSort = (field: string, direction: 'asc' | 'desc'): void => {
@@ -691,7 +724,7 @@ const NAVInvoices: React.FC = () => {
       {/* Invoice Details Dialog */}
       <InvoiceDetailsModal
         open={invoiceDetailsOpen}
-        onClose={handleCloseInvoiceDetails}
+        onClose={handleCloseInvoiceDetailsWithNavigation}
         invoice={selectedInvoice}
         lineItems={invoiceLineItems}
         loading={invoiceDetailsLoading}
