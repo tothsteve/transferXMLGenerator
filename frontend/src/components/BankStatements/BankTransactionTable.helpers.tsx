@@ -153,32 +153,42 @@ export const formatAmount = (amount: string): string => {
 };
 
 /**
- * Extract partner name from transaction based on direction.
+ * Extract partner name from transaction with cascading fallback.
  *
- * Determines which party is the "partner" based on transaction direction:
- * - Credit (positive amount): Partner is the payer (who sent money)
- * - Debit (negative amount): Partner is the beneficiary (who received money)
+ * Uses a priority-based fallback chain to always display meaningful partner information:
+ * 1. If beneficiary_name is empty AND reference is empty → use description
+ * 2. If beneficiary_name is empty → use reference
+ * 3. Otherwise → use beneficiary_name
+ *
+ * This logic matches the backend SQL query for consistent partner name display.
  *
  * @param transaction - Bank transaction object
- * @returns Partner name or "-" if not available
+ * @returns Partner name using cascading fallback logic, or "-" if all fields are empty
  *
  * @example
  * ```typescript
- * // For incoming payment
- * getPartnerName({ amount: "1000.00", payer_name: "John Doe", ... });
- * // Returns: "John Doe"
- *
- * // For outgoing payment
- * getPartnerName({ amount: "-500.00", beneficiary_name: "ACME Corp", ... });
+ * // Beneficiary name present
+ * getPartnerName({ beneficiary_name: "ACME Corp", reference: "INV-123", ... });
  * // Returns: "ACME Corp"
+ *
+ * // No beneficiary, has reference
+ * getPartnerName({ beneficiary_name: "", reference: "INV-123", ... });
+ * // Returns: "INV-123"
+ *
+ * // No beneficiary, no reference
+ * getPartnerName({ beneficiary_name: "", reference: "", description: "POS payment" });
+ * // Returns: "POS payment"
  * ```
  */
 export const getPartnerName = (transaction: BankTransaction): string => {
-  const amount = parseFloat(transaction.amount);
-  // If credit (positive), partner is payer; if debit (negative), partner is beneficiary
-  return amount > 0
-    ? transaction.payer_name || '-'
-    : transaction.beneficiary_name || '-';
+  // Cascading fallback: beneficiary_name -> reference -> description -> '-'
+  if (transaction.beneficiary_name === '' && transaction.reference === '') {
+    return transaction.description || '-';
+  } else if (transaction.beneficiary_name === '') {
+    return transaction.reference;
+  } else {
+    return transaction.beneficiary_name;
+  }
 };
 
 /**
