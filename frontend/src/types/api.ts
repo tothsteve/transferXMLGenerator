@@ -219,3 +219,127 @@ export interface NAVInvoice {
   supplier_bank_account_number: string | null;
   customer_bank_account_number: string | null;
 }
+
+// ==================== Billingo Invoice Synchronization ====================
+
+export interface BillingoInvoiceItem {
+  id: number;
+  product_id: number;
+  name: string;
+  quantity: string;
+  unit: string;
+  net_unit_price: string;
+  net_amount: string;
+  gross_amount: string;
+  vat: string;
+  entitlement: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillingoInvoice {
+  id: number;
+  company: number;
+  company_name: string;
+  invoice_number: string;
+  type: string;
+  payment_status: string;
+  payment_method: string;
+  gross_total: string;
+  gross_total_formatted: string;
+  currency: string;
+  invoice_date: string;
+  invoice_date_formatted: string;
+  due_date: string;
+  paid_date: string;
+  partner_name: string;
+  partner_tax_number: string;
+  cancelled: boolean;
+  item_count?: number; // Optional: list view has this, detail view has items array instead
+  created_at: string;
+}
+
+export interface BillingoInvoiceDetail extends BillingoInvoice {
+  correction_type: string;
+  block_id: number;
+  conversion_rate: string;
+  fulfillment_date: string;
+  fulfillment_date_formatted: string;
+  due_date_formatted: string;
+  paid_date_formatted: string;
+  organization_name: string;
+  organization_tax_number: string;
+  organization_bank_account_number: string;
+  organization_bank_account_iban: string;
+  organization_swift: string;
+  partner_id: number;
+  partner_iban: string;
+  partner_swift: string;
+  partner_account_number: string;
+  comment: string;
+  online_szamla_status: string;
+  items: BillingoInvoiceItem[];
+  updated_at: string;
+  last_modified: string;
+}
+
+export interface CompanyBillingoSettings {
+  id: number;
+  company: number;
+  company_name: string;
+  has_api_key: boolean;
+  last_sync_time: string | null;
+  last_sync_time_formatted: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CompanyBillingoSettingsInput {
+  api_key_input?: string;
+  is_active: boolean;
+}
+
+export interface BillingoSyncLog {
+  id: number;
+  company: number;
+  company_name: string;
+  sync_type: 'MANUAL' | 'AUTOMATIC';
+  sync_type_display: string;
+  status: 'RUNNING' | 'COMPLETED' | 'FAILED' | 'PARTIAL';
+  status_display: string;
+  invoices_processed: number;
+  invoices_created: number;
+  invoices_updated: number;
+  invoices_skipped: number;
+  items_extracted: number;
+  api_calls_made: number;
+  sync_duration_seconds: number | null;
+  duration_formatted: string | null;
+  started_at: string;
+  started_at_formatted: string;
+  completed_at: string | null;
+  completed_at_formatted: string | null;
+  errors: string;
+  errors_parsed: Array<{
+    invoice_id: number;
+    invoice_number: string;
+    error: string;
+  }>;
+}
+
+export interface BillingoSyncTriggerResponse {
+  status: string;
+  invoices_processed: number;
+  invoices_created: number;
+  invoices_updated: number;
+  invoices_skipped: number;
+  items_extracted: number;
+  api_calls: number;
+  duration_seconds: number;
+  errors: Array<{
+    invoice_id: number;
+    invoice_number: string;
+    error: string;
+  }>;
+}

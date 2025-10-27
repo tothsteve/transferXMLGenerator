@@ -397,42 +397,38 @@ file: [Excel file]
 ```bash
 # Login and save response
 curl -s -X POST http://localhost:8002/api/auth/login/ \
-  -H 'Content-Type: application/json' \
-  -d '{"username":"tothi","password":"Almafa+123"}' \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"your_username\",\"password\":\"your_password\"}" \
   -o /tmp/login.json
 
-# Extract token using grep and cut
-TOKEN=$(grep -o '"access":"[^"]*"' /tmp/login.json | cut -d'"' -f4)
+# Extract token and remove whitespace
+grep -o '"access":"[^"]*"' /tmp/login.json | cut -d'"' -f4 | tr -d '\n' | tr -d ' ' > /tmp/clean_token.txt
 
-# Save token to file for reuse
-echo $TOKEN > /tmp/tok.txt
+# Verify token was extracted
+cat /tmp/clean_token.txt
 ```
 
 ### Step 2: Use Token for API Calls
 
-```bash
-# Example: Upload bank statement
-curl -s -X POST http://localhost:8002/api/bank-statements/upload/ \
-  -H "Authorization: Bearer $(cat /tmp/tok.txt)" \
-  -F 'file=@path/to/statement.pdf'
+**IMPORTANT**: Use `read TOKEN < /tmp/clean_token.txt;` prefix for each curl command.
 
+```bash
 # Example: GET request
-curl -s -X GET http://localhost:8002/api/bank-statements/ \
-  -H "Authorization: Bearer $(cat /tmp/tok.txt)"
+read TOKEN < /tmp/clean_token.txt; curl -s -X GET http://localhost:8002/api/bank-statements/ -H "Authorization: Bearer $TOKEN"
+
+# Example: Upload bank statement
+read TOKEN < /tmp/clean_token.txt; curl -s -X POST http://localhost:8002/api/bank-statements/upload/ -H "Authorization: Bearer $TOKEN" -F 'file=@path/to/statement.pdf'
 
 # Example: POST request with JSON
-curl -s -X POST http://localhost:8002/api/exchange-rates/convert/ \
-  -H "Authorization: Bearer $(cat /tmp/tok.txt)" \
-  -H 'Content-Type: application/json' \
-  -d '{"amount":"100.00","currency":"USD","conversion_date":"2025-10-01"}'
+read TOKEN < /tmp/clean_token.txt; curl -s -X POST http://localhost:8002/api/exchange-rates/convert/ -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d "{\"amount\":\"100.00\",\"currency\":\"USD\",\"conversion_date\":\"2025-10-01\"}"
 ```
 
 ### Key Points for curl Usage
-- **Always use single quotes** around JSON data in `-d` parameter
-- **Save token to file** to avoid shell escaping issues with subshells
-- **Use `grep` and `cut`** instead of Python/jq for token extraction (more reliable in zsh)
-- **Save response to file** (`-o /tmp/file.json`) before processing
-- **Never pipe directly to Python** - it causes eval errors in zsh
+- **Always use `read TOKEN < /tmp/clean_token.txt;`** before curl commands (handles token in same shell session)
+- **Use double quotes** for JSON data and escape inner quotes with backslashes
+- **Clean whitespace** from token file with `tr -d '\n' | tr -d ' '` to avoid authentication errors
+- **Save response first** (`-o /tmp/file.json`) then extract data - don't pipe directly
+- **This pattern works in both bash and zsh** without shell-specific issues
 
 ---
 

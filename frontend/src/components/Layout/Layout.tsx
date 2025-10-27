@@ -9,6 +9,8 @@ import TemplateBuilder from '../TemplateBuilder/TemplateBuilder';
 import TransferWorkflow from '../TransferWorkflow/TransferWorkflow';
 import BatchManager from '../BatchManager/BatchManager';
 import NAVInvoices from '../NAVInvoices/NAVInvoices';
+import BillingoInvoices from '../Billingo/BillingoInvoices';
+import BillingoSettings from '../Billingo/BillingoSettings';
 import BankStatements from '../BankStatements/BankStatements';
 import BankStatementDetails from '../BankStatements/BankStatementDetails';
 import { PDFImportWizard } from '../PDFImport';
@@ -69,6 +71,8 @@ const Layout: React.FC = () => {
             <Route path="/transfers" element={<TransferWorkflow />} />
             <Route path="/batches" element={<BatchManager />} />
             <Route path="/nav-invoices" element={<NAVInvoices />} />
+            <Route path="/billingo" element={<BillingoInvoices />} />
+            <Route path="/billingo/settings" element={<BillingoSettings />} />
             <Route path="/bank-statements/:id/transactions" element={<BankStatementDetails />} />
             <Route path="/bank-statements" element={<BankStatements />} />
             <Route path="/pdf-import" element={<PDFImportWizard />} />

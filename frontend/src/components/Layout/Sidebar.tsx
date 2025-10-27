@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -12,6 +12,7 @@ import {
   IconButton,
   Chip,
   Divider,
+  Collapse,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -24,7 +25,10 @@ import {
   AdminPanelSettings as AdminIcon,
   Settings as SettingsIcon,
   Receipt as ReceiptIcon,
+  RequestQuote as RequestQuoteIcon,
   AccountBalance as AccountBalanceIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import { useIsCompanyAdmin } from '../../hooks/useAuth';
 
@@ -35,15 +39,21 @@ interface SidebarProps {
   isMobile: boolean;
 }
 
-interface NavigationItem {
+interface SubMenuItem {
   name: string;
   href: string;
+}
+
+interface NavigationItem {
+  name: string;
+  href?: string;
   icon: React.ElementType;
   badge?: string;
   adminOnly?: boolean;
+  submenu?: SubMenuItem[];
 }
 
-const navigation = [
+const navigation: NavigationItem[] = [
   { name: 'Főoldal', href: '/', icon: HomeIcon },
   { name: 'Kedvezményezettek', href: '/beneficiaries', icon: PeopleIcon },
   { name: 'Sablonok', href: '/templates', icon: DescriptionIcon },
@@ -51,6 +61,14 @@ const navigation = [
   { name: 'Átutalások', href: '/transfers', icon: SwapHorizIcon },
   { name: 'Kötegek kezelése', href: '/batches', icon: FolderIcon },
   { name: 'NAV Számlák', href: '/nav-invoices', icon: ReceiptIcon },
+  {
+    name: 'Billingo',
+    icon: RequestQuoteIcon,
+    submenu: [
+      { name: 'Számlák', href: '/billingo' },
+      { name: 'Beállítások', href: '/billingo/settings' },
+    ],
+  },
   { name: 'Bankkivonatok', href: '/bank-statements', icon: AccountBalanceIcon },
   { name: 'Beállítások', href: '/settings', icon: SettingsIcon },
 ];
@@ -63,6 +81,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
   const isAdmin = useIsCompanyAdmin();
   const navigate = useNavigate();
   const location = useLocation();
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
 
   const handleTransferClick = (e: React.MouseEvent): void => {
     e.preventDefault();
@@ -78,6 +97,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
     }
 
     if (isMobile) onClose();
+  };
+
+  const toggleSubmenu = (itemName: string): void => {
+    setExpandedMenus((prev) => ({
+      ...prev,
+      [itemName]: !prev[itemName],
+    }));
+  };
+
+  const isSubmenuActive = (submenu?: SubMenuItem[]): boolean => {
+    if (!submenu) return false;
+    return submenu.some((subitem) => location.pathname === subitem.href);
   };
   const drawerContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -119,60 +150,131 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
       <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
         <List sx={{ p: 1 }}>
           {navigation.map((item: NavigationItem) => (
-            <ListItem key={item.name} disablePadding sx={{ mb: 0.5 }}>
-              <ListItemButton
-                component={item.href === '/transfers' ? 'div' : NavLink}
-                to={item.href === '/transfers' ? undefined : item.href}
-                onClick={
-                  item.href === '/transfers' ? handleTransferClick : isMobile ? onClose : undefined
-                }
-                sx={{
-                  borderRadius: 1,
-                  '&.active': {
-                    bgcolor: 'primary.50',
-                    color: 'primary.600',
-                    '& .MuiListItemIcon-root': {
-                      color: 'primary.600',
-                    },
-                  },
-                  '&:hover': {
-                    bgcolor: 'grey.50',
-                  },
-                  ...(item.href === '/transfers' &&
-                    location.pathname === '/transfers' && {
-                      bgcolor: 'primary.50',
-                      color: 'primary.600',
-                      '& .MuiListItemIcon-root': {
-                        color: 'primary.600',
-                      },
-                    }),
-                }}
-              >
-                <ListItemIcon sx={{ minWidth: 40 }}>
-                  <item.icon />
-                </ListItemIcon>
-                <ListItemText
-                  primary={item.name}
-                  primaryTypographyProps={{
-                    fontWeight: 600,
-                    fontSize: '0.875rem',
-                  }}
-                />
-                {item.badge !== null && item.badge !== undefined && item.badge !== '' && (
-                  <Chip
-                    label={item.badge}
-                    size="small"
-                    color="primary"
-                    variant="filled"
+            <React.Fragment key={item.name}>
+              {item.submenu ? (
+                <>
+                  {/* Parent item with submenu */}
+                  <ListItem disablePadding sx={{ mb: 0.5 }}>
+                    <ListItemButton
+                      onClick={() => toggleSubmenu(item.name)}
+                      sx={{
+                        borderRadius: 1,
+                        bgcolor: isSubmenuActive(item.submenu) ? 'primary.50' : 'transparent',
+                        color: isSubmenuActive(item.submenu) ? 'primary.600' : 'inherit',
+                        '&:hover': {
+                          bgcolor: 'grey.50',
+                        },
+                        '& .MuiListItemIcon-root': {
+                          color: isSubmenuActive(item.submenu) ? 'primary.600' : 'inherit',
+                        },
+                      }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 40 }}>
+                        <item.icon />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={item.name}
+                        primaryTypographyProps={{
+                          fontWeight: 600,
+                          fontSize: '0.875rem',
+                        }}
+                      />
+                      {expandedMenus[item.name] ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                    </ListItemButton>
+                  </ListItem>
+
+                  {/* Submenu items */}
+                  <Collapse in={expandedMenus[item.name] || false} timeout="auto" unmountOnExit>
+                    <List component="div" disablePadding>
+                      {item.submenu.map((subitem) => (
+                        <ListItem key={subitem.href} disablePadding sx={{ pl: 2, mb: 0.5 }}>
+                          <ListItemButton
+                            component={NavLink}
+                            to={subitem.href}
+                            onClick={isMobile ? onClose : undefined}
+                            sx={{
+                              borderRadius: 1,
+                              '&.active': {
+                                bgcolor: 'primary.50',
+                                color: 'primary.600',
+                              },
+                              '&:hover': {
+                                bgcolor: 'grey.50',
+                              },
+                            }}
+                          >
+                            <ListItemText
+                              primary={subitem.name}
+                              primaryTypographyProps={{
+                                fontWeight: 500,
+                                fontSize: '0.8125rem',
+                              }}
+                              sx={{ pl: 3 }}
+                            />
+                          </ListItemButton>
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Collapse>
+                </>
+              ) : (
+                /* Regular menu item without submenu */
+                <ListItem disablePadding sx={{ mb: 0.5 }}>
+                  <ListItemButton
+                    component={item.href === '/transfers' ? 'div' : NavLink}
+                    to={item.href === '/transfers' ? undefined : item.href}
+                    onClick={
+                      item.href === '/transfers' ? handleTransferClick : isMobile ? onClose : undefined
+                    }
                     sx={{
-                      height: 20,
-                      fontSize: '0.7rem',
-                      fontWeight: 'bold',
+                      borderRadius: 1,
+                      '&.active': {
+                        bgcolor: 'primary.50',
+                        color: 'primary.600',
+                        '& .MuiListItemIcon-root': {
+                          color: 'primary.600',
+                        },
+                      },
+                      '&:hover': {
+                        bgcolor: 'grey.50',
+                      },
+                      ...(item.href === '/transfers' &&
+                        location.pathname === '/transfers' && {
+                          bgcolor: 'primary.50',
+                          color: 'primary.600',
+                          '& .MuiListItemIcon-root': {
+                            color: 'primary.600',
+                          },
+                        }),
                     }}
-                  />
-                )}
-              </ListItemButton>
-            </ListItem>
+                  >
+                    <ListItemIcon sx={{ minWidth: 40 }}>
+                      <item.icon />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={item.name}
+                      primaryTypographyProps={{
+                        fontWeight: 600,
+                        fontSize: '0.875rem',
+                      }}
+                    />
+                    {item.badge !== null && item.badge !== undefined && item.badge !== '' && (
+                      <Chip
+                        label={item.badge}
+                        size="small"
+                        color="primary"
+                        variant="filled"
+                        sx={{
+                          height: 20,
+                          fontSize: '0.7rem',
+                          fontWeight: 'bold',
+                        }}
+                      />
+                    )}
+                  </ListItemButton>
+                </ListItem>
+              )}
+            </React.Fragment>
           ))}
 
           {/* Admin Navigation */}
@@ -190,7 +292,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
                 <ListItem key={item.name} disablePadding sx={{ mb: 0.5 }}>
                   <ListItemButton
                     component={NavLink}
-                    to={item.href}
+                    to={item.href!}
                     onClick={isMobile ? onClose : undefined}
                     sx={{
                       borderRadius: 1,

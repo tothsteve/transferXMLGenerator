@@ -16,7 +16,7 @@ from datetime import date
 
 logger = logging.getLogger(__name__)
 
-from .models import BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch, CompanyUser, Invoice, InvoiceLineItem, InvoiceSyncLog, TrustedPartner, ExchangeRate, ExchangeRateSyncLog, BankStatement, BankTransaction, OtherCost
+from .models import BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch, CompanyUser, Invoice, InvoiceLineItem, InvoiceSyncLog, TrustedPartner, ExchangeRate, ExchangeRateSyncLog, BankStatement, BankTransaction, OtherCost, CompanyBillingoSettings, BillingoInvoice, BillingoSyncLog
 from .serializers import (
     BankAccountSerializer, BeneficiarySerializer, TransferTemplateSerializer,
     TemplateBeneficiarySerializer, TransferSerializer, TransferBatchSerializer,
@@ -25,12 +25,14 @@ from .serializers import (
     InvoiceDetailSerializer, InvoiceSyncLogSerializer, TrustedPartnerSerializer,
     ExchangeRateSerializer, ExchangeRateSyncLogSerializer, CurrencyConversionSerializer,
     BankStatementListSerializer, BankStatementDetailSerializer, BankStatementUploadSerializer,
-    BankTransactionSerializer, OtherCostSerializer, SupportedBanksSerializer
+    BankTransactionSerializer, OtherCostSerializer, SupportedBanksSerializer,
+    CompanyBillingoSettingsSerializer, BillingoInvoiceSerializer, BillingoInvoiceListSerializer,
+    BillingoSyncLogSerializer, BillingoSyncTriggerSerializer
 )
 from .utils import generate_xml
 from .pdf_processor import PDFTransactionProcessor
 from .kh_export import KHBankExporter
-from .permissions import IsCompanyMember, IsCompanyAdmin, IsCompanyAdminOrReadOnly, RequireBeneficiaryManagement, RequireTransferManagement, RequireBatchManagement, RequireNavSync, RequireExportFeatures, RequireBankStatementImport, require_feature_api
+from .permissions import IsCompanyMember, IsCompanyAdmin, IsCompanyAdminOrReadOnly, RequireBeneficiaryManagement, RequireTransferManagement, RequireBatchManagement, RequireNavSync, RequireExportFeatures, RequireBankStatementImport, RequireBillingoSync, require_feature_api
 from .services.bank_account_service import BankAccountService
 from .services.beneficiary_service import BeneficiaryService
 from .services.template_service import TemplateService
@@ -2170,3 +2172,222 @@ class OtherCostViewSet(viewsets.ModelViewSet):
         """Set company and creator"""
         company = getattr(self.request, 'company', None)
         serializer.save(company=company, created_by=self.request.user)
+
+
+# ============================================================================
+# Billingo Integration ViewSets
+# ============================================================================
+
+class CompanyBillingoSettingsViewSet(viewsets.ModelViewSet):
+    """
+    Billingo API beállítások kezelése
+
+    Lehetővé teszi a Billingo API kulcs konfigurálását és
+    a szinkronizálás engedélyezését/tiltását cégenként.
+    """
+    serializer_class = CompanyBillingoSettingsSerializer
+    permission_classes = [IsAuthenticated, IsCompanyMember, RequireBillingoSync]
+
+    def get_queryset(self):
+        """Csak a cég beállítása"""
+        company = getattr(self.request, 'company', None)
+        if not company:
+            return CompanyBillingoSettings.objects.none()
+
+        return CompanyBillingoSettings.objects.filter(company=company)
+
+    def perform_create(self, serializer):
+        """Assign company on creation"""
+        serializer.save(company=self.request.company)
+
+    @swagger_auto_schema(
+        operation_description="Billingo szinkronizálás manuális indítása",
+        request_body=BillingoSyncTriggerSerializer,
+        responses={
+            200: openapi.Response(
+                description="Szinkronizálás sikeres",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'status': openapi.Schema(type=openapi.TYPE_STRING),
+                        'invoices_processed': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'invoices_created': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'invoices_updated': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'duration_seconds': openapi.Schema(type=openapi.TYPE_INTEGER),
+                    }
+                )
+            ),
+            400: 'Érvénytelen kérés',
+            404: 'Nincs Billingo beállítás',
+            500: 'Szinkronizálási hiba'
+        }
+    )
+    @action(detail=False, methods=['post'])
+    def trigger_sync(self, request):
+        """
+        Trigger manual Billingo sync for current company.
+
+        POST /api/billingo-settings/trigger_sync/
+        """
+        from .services.billingo_sync_service import BillingoSyncService, BillingoAPIError
+
+        company = request.company
+
+        # Check if Billingo settings exist
+        try:
+            settings = CompanyBillingoSettings.objects.get(company=company)
+        except CompanyBillingoSettings.DoesNotExist:
+            return Response(
+                {'error': 'Nincs Billingo beállítás konfigurálva ennél a cégnél'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if not settings.is_active:
+            return Response(
+                {'error': 'Billingo szinkronizálás le van tiltva ennél a cégnél'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Trigger sync
+        try:
+            service = BillingoSyncService()
+            result = service.sync_company(company, sync_type='MANUAL')
+
+            return Response({
+                'status': 'success',
+                'invoices_processed': result['invoices_processed'],
+                'invoices_created': result['invoices_created'],
+                'invoices_updated': result['invoices_updated'],
+                'invoices_skipped': result['invoices_skipped'],
+                'items_extracted': result['items_extracted'],
+                'api_calls': result['api_calls'],
+                'duration_seconds': result['duration_seconds'],
+                'errors': result.get('errors', [])
+            })
+
+        except BillingoAPIError as e:
+            logger.error(f"Billingo sync failed for company {company.id}: {str(e)}")
+            return Response(
+                {'error': f'Billingo szinkronizálás hiba: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error during Billingo sync: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'Váratlan hiba történt: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class BillingoInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Billingo számlák megtekintése
+
+    Szinkronizált számlák lekérdezése Billingo-ból.
+    Csak olvasható - a számlák az API szinkronizálással frissülnek.
+
+    Szűrések:
+    - invoice_number: számlaszám alapján keresés
+    - partner_tax_number: partner adószáma alapján
+    - payment_status: fizetési státusz (paid, unpaid, overdue stb.)
+    - cancelled: true/false - sztornózott számlák
+    - from_date: számla dátuma >= (YYYY-MM-DD)
+    - to_date: számla dátuma <= (YYYY-MM-DD)
+    """
+    permission_classes = [IsAuthenticated, IsCompanyMember, RequireBillingoSync]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['invoice_number', 'partner_name', 'partner_tax_number']
+    ordering_fields = ['invoice_date', 'gross_total', 'payment_status']
+    ordering = ['-invoice_date']
+
+    def get_queryset(self):
+        """Csak a cég számlái"""
+        company = getattr(self.request, 'company', None)
+        if not company:
+            return BillingoInvoice.objects.none()
+
+        queryset = BillingoInvoice.objects.filter(company=company).prefetch_related('items')
+
+        # Filter by payment status
+        payment_status = self.request.query_params.get('payment_status')
+        if payment_status:
+            queryset = queryset.filter(payment_status=payment_status)
+
+        # Filter by cancelled
+        cancelled = self.request.query_params.get('cancelled')
+        if cancelled is not None:
+            queryset = queryset.filter(cancelled=cancelled.lower() == 'true')
+
+        # Filter by partner tax number
+        partner_tax_number = self.request.query_params.get('partner_tax_number')
+        if partner_tax_number:
+            queryset = queryset.filter(partner_tax_number=partner_tax_number)
+
+        # Filter by invoice number
+        invoice_number = self.request.query_params.get('invoice_number')
+        if invoice_number:
+            queryset = queryset.filter(invoice_number__icontains=invoice_number)
+
+        # Filter by date range
+        from_date = self.request.query_params.get('from_date')
+        to_date = self.request.query_params.get('to_date')
+        if from_date:
+            queryset = queryset.filter(invoice_date__gte=from_date)
+        if to_date:
+            queryset = queryset.filter(invoice_date__lte=to_date)
+
+        return queryset
+
+    def get_serializer_class(self):
+        """Use list serializer for list view, detail for retrieve"""
+        if self.action == 'list':
+            return BillingoInvoiceListSerializer
+        return BillingoInvoiceSerializer
+
+
+class BillingoSyncLogViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Billingo szinkronizálási naplók megtekintése
+
+    Audit log a Billingo szinkronizálási műveletekről.
+    Csak olvasható - a naplókat a sync service hozza létre.
+
+    Szűrések:
+    - sync_type: MANUAL vagy AUTOMATIC
+    - status: RUNNING, COMPLETED, FAILED, PARTIAL
+    - from_date: started_at >= (YYYY-MM-DD)
+    - to_date: started_at <= (YYYY-MM-DD)
+    """
+    serializer_class = BillingoSyncLogSerializer
+    permission_classes = [IsAuthenticated, IsCompanyMember, RequireBillingoSync]
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['started_at', 'sync_duration_seconds', 'invoices_processed']
+    ordering = ['-started_at']
+
+    def get_queryset(self):
+        """Csak a cég szinkronizálási naplói"""
+        company = getattr(self.request, 'company', None)
+        if not company:
+            return BillingoSyncLog.objects.none()
+
+        queryset = BillingoSyncLog.objects.filter(company=company)
+
+        # Filter by sync type
+        sync_type = self.request.query_params.get('sync_type')
+        if sync_type:
+            queryset = queryset.filter(sync_type=sync_type.upper())
+
+        # Filter by status
+        sync_status = self.request.query_params.get('status')
+        if sync_status:
+            queryset = queryset.filter(status=sync_status.upper())
+
+        # Filter by date range
+        from_date = self.request.query_params.get('from_date')
+        to_date = self.request.query_params.get('to_date')
+        if from_date:
+            queryset = queryset.filter(started_at__gte=from_date)
+        if to_date:
+            queryset = queryset.filter(started_at__lte=to_date)
+
+        return queryset
