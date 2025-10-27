@@ -19,6 +19,7 @@ class BankTransfersConfig(AppConfig):
 
             self.start_nav_scheduler()
             self.start_mnb_scheduler()
+            self.start_billingo_scheduler()
 
     def start_nav_scheduler(self):
         """Start the NAV invoice sync scheduler"""
@@ -107,3 +108,47 @@ class BankTransfersConfig(AppConfig):
             import logging
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to start MNB scheduler: {str(e)}")
+
+    def start_billingo_scheduler(self):
+        """Start the Billingo invoice sync scheduler"""
+        try:
+            from apscheduler.schedulers.background import BackgroundScheduler
+            from apscheduler.triggers.cron import CronTrigger
+            from django.core.management import call_command
+            import logging
+
+            logger = logging.getLogger(__name__)
+
+            scheduler = BackgroundScheduler()
+
+            def sync_billingo_invoices():
+                from django.db import close_old_connections
+                try:
+                    # Close any stale database connections before starting
+                    close_old_connections()
+
+                    logger.info("🧾 Starting Billingo invoice sync...")
+                    call_command('sync_billingo_invoices')
+                    logger.info("✅ Billingo sync completed successfully")
+                except Exception as e:
+                    logger.error(f"❌ Billingo sync failed: {str(e)}")
+                finally:
+                    # Always close connections after job completes
+                    close_old_connections()
+
+            # Schedule daily at 2:00 AM (production)
+            scheduler.add_job(
+                func=sync_billingo_invoices,
+                trigger=CronTrigger(hour=2, minute=0),
+                id='billingo_sync_job',
+                name='Billingo Invoice Sync',
+                replace_existing=True
+            )
+
+            scheduler.start()
+            logger.info("🧾 Billingo scheduler started (daily at 2:00 AM)")
+
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to start Billingo scheduler: {str(e)}")

@@ -6,7 +6,8 @@ from .api_views import (
     TransferViewSet, TransferBatchViewSet, ExcelImportView,
     CompanyUsersView, CompanyUserDetailView, InvoiceViewSet, InvoiceSyncLogViewSet,
     TrustedPartnerViewSet, ExchangeRateViewSet,
-    BankStatementViewSet, BankTransactionViewSet, OtherCostViewSet
+    BankStatementViewSet, BankTransactionViewSet, OtherCostViewSet,
+    CompanyBillingoSettingsViewSet, BillingoInvoiceViewSet, BillingoSyncLogViewSet
 )
 from .authentication import AuthenticationViewSet
 from .views.nav_views import (
@@ -37,6 +38,11 @@ router.register(r'exchange-rates', ExchangeRateViewSet, basename='exchangerate')
 router.register(r'bank-statements', BankStatementViewSet, basename='bankstatement')
 router.register(r'bank-transactions', BankTransactionViewSet, basename='banktransaction')
 router.register(r'other-costs', OtherCostViewSet, basename='othercost')
+
+# Billingo Integration endpoints
+router.register(r'billingo-settings', CompanyBillingoSettingsViewSet, basename='billingosettings')
+router.register(r'billingo-invoices', BillingoInvoiceViewSet, basename='billingoinvoice')
+router.register(r'billingo-sync-logs', BillingoSyncLogViewSet, basename='billingosynclog')
 
 urlpatterns = [
     path('', include(router.urls)),
