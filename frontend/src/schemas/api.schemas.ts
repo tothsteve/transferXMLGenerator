@@ -283,3 +283,144 @@ export const ExcelImportResponseSchema = z.object({
   imported_count: z.number(),
   errors: z.array(z.string()),
 });
+
+// ============================================================================
+// Billingo Invoice Synchronization Schemas
+// ============================================================================
+
+export const BillingoInvoiceItemSchema = z.object({
+  id: z.number(),
+  product_id: z.number(),
+  name: z.string(),
+  quantity: z.string(),
+  unit: z.string(),
+  net_unit_price: z.string(),
+  net_amount: z.string(),
+  gross_amount: z.string(),
+  vat: z.string(),
+  entitlement: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+export type BillingoInvoiceItemSchemaType = z.infer<typeof BillingoInvoiceItemSchema>;
+
+export const BillingoInvoiceSchema = z.object({
+  id: z.number(),
+  company: z.number(),
+  company_name: z.string(),
+  invoice_number: z.string(),
+  type: z.string(),
+  payment_status: z.string(),
+  payment_method: z.string(),
+  gross_total: z.string(),
+  gross_total_formatted: z.string(),
+  currency: z.string(),
+  invoice_date: z.string(),
+  invoice_date_formatted: z.string(),
+  due_date: z.string(),
+  paid_date: z.string(),
+  partner_name: z.string(),
+  partner_tax_number: z.string(),
+  cancelled: z.boolean(),
+  item_count: z.number(),
+  created_at: z.string(),
+});
+
+export type BillingoInvoiceSchemaType = z.infer<typeof BillingoInvoiceSchema>;
+
+export const BillingoInvoiceDetailSchema = BillingoInvoiceSchema.extend({
+  correction_type: z.string(),
+  block_id: z.number(),
+  conversion_rate: z.string(),
+  fulfillment_date: z.string(),
+  fulfillment_date_formatted: z.string(),
+  due_date_formatted: z.string(),
+  paid_date_formatted: z.string(),
+  organization_name: z.string(),
+  organization_tax_number: z.string(),
+  organization_bank_account_number: z.string(),
+  organization_bank_account_iban: z.string(),
+  organization_swift: z.string(),
+  partner_id: z.number(),
+  partner_iban: z.string(),
+  partner_swift: z.string(),
+  partner_account_number: z.string(),
+  comment: z.string(),
+  online_szamla_status: z.string(),
+  items: z.array(BillingoInvoiceItemSchema),
+  updated_at: z.string(),
+  last_modified: z.string(),
+  item_count: z.number().optional(), // Override: optional in detail view (we have items array instead)
+});
+
+export type BillingoInvoiceDetailSchemaType = z.infer<typeof BillingoInvoiceDetailSchema>;
+
+export const CompanyBillingoSettingsSchema = z.object({
+  id: z.number(),
+  company: z.number(),
+  company_name: z.string(),
+  has_api_key: z.boolean(),
+  last_sync_time: z.string().nullable(),
+  last_sync_time_formatted: z.string().nullable(),
+  is_active: z.boolean(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+export type CompanyBillingoSettingsSchemaType = z.infer<typeof CompanyBillingoSettingsSchema>;
+
+export const CompanyBillingoSettingsInputSchema = z.object({
+  api_key_input: z.string().optional(),
+  is_active: z.boolean(),
+});
+
+export type CompanyBillingoSettingsInputSchemaType = z.infer<typeof CompanyBillingoSettingsInputSchema>;
+
+export const BillingoSyncLogSchema = z.object({
+  id: z.number(),
+  company: z.number(),
+  company_name: z.string(),
+  sync_type: z.enum(['MANUAL', 'AUTOMATIC']),
+  sync_type_display: z.string(),
+  status: z.enum(['RUNNING', 'COMPLETED', 'FAILED', 'PARTIAL']),
+  status_display: z.string(),
+  invoices_processed: z.number(),
+  invoices_created: z.number(),
+  invoices_updated: z.number(),
+  invoices_skipped: z.number(),
+  items_extracted: z.number(),
+  api_calls_made: z.number(),
+  sync_duration_seconds: z.number().nullable(),
+  duration_formatted: z.string().nullable(),
+  started_at: z.string(),
+  started_at_formatted: z.string(),
+  completed_at: z.string().nullable(),
+  completed_at_formatted: z.string().nullable(),
+  errors: z.string(),
+  errors_parsed: z.array(z.object({
+    invoice_id: z.number(),
+    invoice_number: z.string(),
+    error: z.string(),
+  })),
+});
+
+export type BillingoSyncLogSchemaType = z.infer<typeof BillingoSyncLogSchema>;
+
+export const BillingoSyncTriggerResponseSchema = z.object({
+  status: z.string(),
+  invoices_processed: z.number(),
+  invoices_created: z.number(),
+  invoices_updated: z.number(),
+  invoices_skipped: z.number(),
+  items_extracted: z.number(),
+  api_calls: z.number(),
+  duration_seconds: z.number(),
+  errors: z.array(z.object({
+    invoice_id: z.number(),
+    invoice_number: z.string(),
+    error: z.string(),
+  })),
+});
+
+export type BillingoSyncTriggerResponseSchemaType = z.infer<typeof BillingoSyncTriggerResponseSchema>;

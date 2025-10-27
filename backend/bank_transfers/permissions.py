@@ -447,6 +447,59 @@ class RequireBankStatementImport(FeatureBasedPermission):
         return False
 
 
+class RequireBillingoSync(FeatureBasedPermission):
+    """
+    Permission class for Billingo invoice synchronization functionality.
+
+    Requires BILLINGO_SYNC feature to be enabled for the company.
+
+    Access levels by role:
+    - ADMIN: Full access (manage settings, trigger sync, view invoices)
+    - FINANCIAL: View only (cannot manage settings or trigger sync)
+    - ACCOUNTANT: View only (cannot manage settings or trigger sync)
+    - USER: No access
+    """
+
+    required_features = ['BILLINGO_SYNC']
+
+    def has_permission(self, request, view):
+        if not hasattr(request, 'company') or not request.company:
+            return False
+
+        # Get user's company membership and allowed features
+        try:
+            from .models import CompanyUser
+            company_user = CompanyUser.objects.get(
+                user=request.user,
+                company=request.company,
+                is_active=True
+            )
+            user_role = company_user.role
+            user_allowed_features = company_user.get_allowed_features()
+        except CompanyUser.DoesNotExist:
+            logger.warning(f"User {request.user.username} has no role in company {request.company}")
+            return False
+
+        # Check if BILLINGO_SYNC feature is enabled for company
+        if not FeatureChecker.is_feature_enabled(request.company, 'BILLINGO_SYNC'):
+            return False
+
+        # Check if user's role allows BILLINGO_SYNC
+        if 'BILLINGO_SYNC' not in user_allowed_features and '*' not in user_allowed_features:
+            return False
+
+        # Settings management and sync trigger - ADMIN only
+        if view.action in ['create', 'update', 'partial_update', 'destroy', 'trigger_sync']:
+            return user_role == 'ADMIN'
+
+        # View operations - ADMIN, FINANCIAL, ACCOUNTANT
+        if request.method in permissions.SAFE_METHODS:
+            return user_role in ['ADMIN', 'FINANCIAL', 'ACCOUNTANT']
+
+        # Default deny
+        return False
+
+
 class IsCompanyMember(permissions.BasePermission):
     """
     Engedély: felhasználó tagja a cégnek
