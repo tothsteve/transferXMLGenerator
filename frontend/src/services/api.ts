@@ -15,6 +15,11 @@ import {
   TrustedPartner,
   AvailablePartner,
   NAVInvoice,
+  SupplierCategory,
+  SupplierType,
+  Supplier,
+  Customer,
+  ProductPrice,
 } from '../types/api';
 import {
   BankStatement,
@@ -510,6 +515,335 @@ export const otherCostsApi = {
    */
   delete: async (id: number): Promise<void> => {
     await apiClient.delete(`/other-costs/${id}/`);
+  },
+};
+
+// ============================================================================
+// BASE_TABLES - Alaptáblák (Suppliers, Customers, Product Prices)
+// ============================================================================
+
+/**
+ * Supplier Categories API - Beszállító kategóriák kezelése
+ */
+export const supplierCategoriesApi = {
+  /**
+   * Get all supplier categories with optional filtering.
+   *
+   * @param params - Query parameters for filtering and pagination
+   * @returns Promise resolving to paginated category list
+   */
+  getAll: (params?: {
+    search?: string;
+    page?: number;
+    page_size?: number;
+    ordering?: string;
+  }) => apiClient.get<ApiResponse<SupplierCategory>>('/supplier-categories/', { params }),
+
+  /**
+   * Get single supplier category by ID.
+   *
+   * @param id - Category ID
+   * @returns Promise resolving to category
+   */
+  getById: async (id: number): Promise<SupplierCategory> => {
+    const response = await apiClient.get(`/supplier-categories/${id}/`);
+    return response.data;
+  },
+
+  /**
+   * Create new supplier category.
+   *
+   * @param data - Category data (without ID and system fields)
+   * @returns Promise resolving to created category
+   */
+  create: async (
+    data: Omit<SupplierCategory, 'id' | 'company' | 'company_name' | 'created_at' | 'updated_at'>
+  ): Promise<SupplierCategory> => {
+    const response = await apiClient.post('/supplier-categories/', data);
+    return response.data;
+  },
+
+  /**
+   * Update existing supplier category.
+   *
+   * @param id - Category ID
+   * @param data - Partial category data to update
+   * @returns Promise resolving to updated category
+   */
+  update: async (id: number, data: Partial<SupplierCategory>): Promise<SupplierCategory> => {
+    const response = await apiClient.patch(`/supplier-categories/${id}/`, data);
+    return response.data;
+  },
+
+  /**
+   * Delete supplier category.
+   *
+   * @param id - Category ID
+   */
+  delete: async (id: number): Promise<void> => {
+    await apiClient.delete(`/supplier-categories/${id}/`);
+  },
+};
+
+/**
+ * Supplier Types API - Beszállító típusok kezelése
+ */
+export const supplierTypesApi = {
+  /**
+   * Get all supplier types with optional filtering.
+   *
+   * @param params - Query parameters for filtering and pagination
+   * @returns Promise resolving to paginated type list
+   */
+  getAll: (params?: {
+    search?: string;
+    page?: number;
+    page_size?: number;
+    ordering?: string;
+  }) => apiClient.get<ApiResponse<SupplierType>>('/supplier-types/', { params }),
+
+  /**
+   * Get single supplier type by ID.
+   *
+   * @param id - Type ID
+   * @returns Promise resolving to type
+   */
+  getById: async (id: number): Promise<SupplierType> => {
+    const response = await apiClient.get(`/supplier-types/${id}/`);
+    return response.data;
+  },
+
+  /**
+   * Create new supplier type.
+   *
+   * @param data - Type data (without ID and system fields)
+   * @returns Promise resolving to created type
+   */
+  create: async (
+    data: Omit<SupplierType, 'id' | 'company' | 'company_name' | 'created_at' | 'updated_at'>
+  ): Promise<SupplierType> => {
+    const response = await apiClient.post('/supplier-types/', data);
+    return response.data;
+  },
+
+  /**
+   * Update existing supplier type.
+   *
+   * @param id - Type ID
+   * @param data - Partial type data to update
+   * @returns Promise resolving to updated type
+   */
+  update: async (id: number, data: Partial<SupplierType>): Promise<SupplierType> => {
+    const response = await apiClient.patch(`/supplier-types/${id}/`, data);
+    return response.data;
+  },
+
+  /**
+   * Delete supplier type.
+   *
+   * @param id - Type ID
+   */
+  delete: async (id: number): Promise<void> => {
+    await apiClient.delete(`/supplier-types/${id}/`);
+  },
+};
+
+/**
+ * Suppliers API - Beszállítók kezelése
+ */
+export const suppliersApi = {
+  /**
+   * Get all suppliers with optional filtering.
+   *
+   * @param params - Query parameters for filtering and pagination
+   * @returns Promise resolving to paginated supplier list
+   */
+  getAll: (params?: {
+    search?: string;
+    category?: string;
+    type?: string;
+    valid_only?: boolean;
+    page?: number;
+    page_size?: number;
+    ordering?: string;
+  }) => apiClient.get<ApiResponse<Supplier>>('/suppliers/', { params }),
+
+  /**
+   * Get single supplier by ID.
+   *
+   * @param id - Supplier ID
+   * @returns Promise resolving to supplier
+   */
+  getById: async (id: number): Promise<Supplier> => {
+    const response = await apiClient.get(`/suppliers/${id}/`);
+    return response.data;
+  },
+
+  /**
+   * Create new supplier.
+   *
+   * @param data - Supplier data (without ID and system fields)
+   * @returns Promise resolving to created supplier
+   */
+  create: async (
+    data: Omit<Supplier, 'id' | 'company' | 'company_name' | 'is_valid' | 'created_at' | 'updated_at'>
+  ): Promise<Supplier> => {
+    const response = await apiClient.post('/suppliers/', data);
+    return response.data;
+  },
+
+  /**
+   * Update existing supplier.
+   *
+   * @param id - Supplier ID
+   * @param data - Partial supplier data to update
+   * @returns Promise resolving to updated supplier
+   */
+  update: async (id: number, data: Partial<Supplier>): Promise<Supplier> => {
+    const response = await apiClient.patch(`/suppliers/${id}/`, data);
+    return response.data;
+  },
+
+  /**
+   * Delete supplier.
+   *
+   * @param id - Supplier ID to delete
+   * @returns Promise resolving when deletion is complete
+   */
+  delete: async (id: number): Promise<void> => {
+    await apiClient.delete(`/suppliers/${id}/`);
+  },
+};
+
+/**
+ * Customers API - Vevők kezelése
+ */
+export const customersApi = {
+  /**
+   * Get all customers with optional filtering.
+   *
+   * @param params - Query parameters for filtering and pagination
+   * @returns Promise resolving to paginated customer list
+   */
+  getAll: (params?: {
+    search?: string;
+    valid_only?: boolean;
+    page?: number;
+    page_size?: number;
+    ordering?: string;
+  }) => apiClient.get<ApiResponse<Customer>>('/customers/', { params }),
+
+  /**
+   * Get single customer by ID.
+   *
+   * @param id - Customer ID
+   * @returns Promise resolving to customer
+   */
+  getById: async (id: number): Promise<Customer> => {
+    const response = await apiClient.get(`/customers/${id}/`);
+    return response.data;
+  },
+
+  /**
+   * Create new customer.
+   *
+   * @param data - Customer data (without ID and system fields)
+   * @returns Promise resolving to created customer
+   */
+  create: async (
+    data: Omit<Customer, 'id' | 'company' | 'company_name' | 'is_valid' | 'created_at' | 'updated_at'>
+  ): Promise<Customer> => {
+    const response = await apiClient.post('/customers/', data);
+    return response.data;
+  },
+
+  /**
+   * Update existing customer.
+   *
+   * @param id - Customer ID
+   * @param data - Partial customer data to update
+   * @returns Promise resolving to updated customer
+   */
+  update: async (id: number, data: Partial<Customer>): Promise<Customer> => {
+    const response = await apiClient.patch(`/customers/${id}/`, data);
+    return response.data;
+  },
+
+  /**
+   * Delete customer.
+   *
+   * @param id - Customer ID to delete
+   * @returns Promise resolving when deletion is complete
+   */
+  delete: async (id: number): Promise<void> => {
+    await apiClient.delete(`/customers/${id}/`);
+  },
+};
+
+/**
+ * Product Prices API - CONMED árak kezelése
+ */
+export const productPricesApi = {
+  /**
+   * Get all product prices with optional filtering.
+   *
+   * @param params - Query parameters for filtering and pagination
+   * @returns Promise resolving to paginated product price list
+   */
+  getAll: (params?: {
+    search?: string;
+    product_value?: string;
+    is_inventory_managed?: boolean;
+    valid_only?: boolean;
+    page?: number;
+    page_size?: number;
+    ordering?: string;
+  }) => apiClient.get<ApiResponse<ProductPrice>>('/product-prices/', { params }),
+
+  /**
+   * Get single product price by ID.
+   *
+   * @param id - Product price ID
+   * @returns Promise resolving to product price
+   */
+  getById: async (id: number): Promise<ProductPrice> => {
+    const response = await apiClient.get(`/product-prices/${id}/`);
+    return response.data;
+  },
+
+  /**
+   * Create new product price.
+   *
+   * @param data - Product price data (without ID and system fields)
+   * @returns Promise resolving to created product price
+   */
+  create: async (
+    data: Omit<ProductPrice, 'id' | 'company' | 'company_name' | 'is_valid' | 'created_at' | 'updated_at'>
+  ): Promise<ProductPrice> => {
+    const response = await apiClient.post('/product-prices/', data);
+    return response.data;
+  },
+
+  /**
+   * Update existing product price.
+   *
+   * @param id - Product price ID
+   * @param data - Partial product price data to update
+   * @returns Promise resolving to updated product price
+   */
+  update: async (id: number, data: Partial<ProductPrice>): Promise<ProductPrice> => {
+    const response = await apiClient.patch(`/product-prices/${id}/`, data);
+    return response.data;
+  },
+
+  /**
+   * Delete product price.
+   *
+   * @param id - Product price ID to delete
+   * @returns Promise resolving when deletion is complete
+   */
+  delete: async (id: number): Promise<void> => {
+    await apiClient.delete(`/product-prices/${id}/`);
   },
 };
 

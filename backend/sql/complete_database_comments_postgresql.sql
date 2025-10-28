@@ -412,6 +412,48 @@ COMMENT ON COLUMN bank_transfers_othercost.created_by_id IS 'Foreign key to auth
 COMMENT ON COLUMN bank_transfers_othercost.created_at IS 'Record creation timestamp';
 COMMENT ON COLUMN bank_transfers_othercost.updated_at IS 'Last modification timestamp';
 
+-- Supplier Master Data (BASE_TABLES Feature)
+COMMENT ON TABLE bank_transfers_supplier IS 'Company-scoped supplier master data. Stores partner information with validity period management for temporal data tracking.';
+COMMENT ON COLUMN bank_transfers_supplier.id IS 'Primary key - unique supplier identifier';
+COMMENT ON COLUMN bank_transfers_supplier.company_id IS 'Foreign key to company - which company owns this supplier';
+COMMENT ON COLUMN bank_transfers_supplier.partner_name IS 'Legal name of the supplier/partner';
+COMMENT ON COLUMN bank_transfers_supplier.category IS 'Supplier category (e.g., "Medical Devices", "IT Services")';
+COMMENT ON COLUMN bank_transfers_supplier.type IS 'Supplier type classification (e.g., "Distributor", "Manufacturer")';
+COMMENT ON COLUMN bank_transfers_supplier.valid_from IS 'Start date of validity period (NULL = valid from beginning of time)';
+COMMENT ON COLUMN bank_transfers_supplier.valid_to IS 'End date of validity period (NULL = valid indefinitely)';
+COMMENT ON COLUMN bank_transfers_supplier.created_at IS 'Record creation timestamp';
+COMMENT ON COLUMN bank_transfers_supplier.updated_at IS 'Last modification timestamp';
+
+-- Customer Master Data (BASE_TABLES Feature)
+COMMENT ON TABLE bank_transfers_customer IS 'Company-scoped customer master data. Stores customer information with cashflow adjustment days for payment term management and validity tracking.';
+COMMENT ON COLUMN bank_transfers_customer.id IS 'Primary key - unique customer identifier';
+COMMENT ON COLUMN bank_transfers_customer.company_id IS 'Foreign key to company - which company owns this customer';
+COMMENT ON COLUMN bank_transfers_customer.customer_name IS 'Legal name of the customer';
+COMMENT ON COLUMN bank_transfers_customer.cashflow_adjustment IS 'Days to adjust cashflow calculations (e.g., payment terms offset) - negative = early payment, positive = delayed payment';
+COMMENT ON COLUMN bank_transfers_customer.valid_from IS 'Start date of validity period (NULL = valid from beginning of time)';
+COMMENT ON COLUMN bank_transfers_customer.valid_to IS 'End date of validity period (NULL = valid indefinitely)';
+COMMENT ON COLUMN bank_transfers_customer.created_at IS 'Record creation timestamp';
+COMMENT ON COLUMN bank_transfers_customer.updated_at IS 'Last modification timestamp';
+
+-- Product Price Master Data (BASE_TABLES Feature)
+COMMENT ON TABLE bank_transfers_productprice IS 'Company-scoped product price master data for CONMED products. Comprehensive pricing information with multi-currency support, markup tracking, unit of measure, and inventory management flags with validity periods.';
+COMMENT ON COLUMN bank_transfers_productprice.id IS 'Primary key - unique product price identifier';
+COMMENT ON COLUMN bank_transfers_productprice.company_id IS 'Foreign key to company - which company owns this product price';
+COMMENT ON COLUMN bank_transfers_productprice.product_value IS 'Product code/SKU (unique identifier for the product)';
+COMMENT ON COLUMN bank_transfers_productprice.product_description IS 'Detailed product description';
+COMMENT ON COLUMN bank_transfers_productprice.uom IS 'Unit of measure in English (e.g., "piece", "box", "kg")';
+COMMENT ON COLUMN bank_transfers_productprice.uom_hun IS 'Unit of measure in Hungarian (e.g., "darab", "doboz", "kg")';
+COMMENT ON COLUMN bank_transfers_productprice.purchase_price_usd IS 'Purchase price in USD (stored as string for formatting flexibility)';
+COMMENT ON COLUMN bank_transfers_productprice.purchase_price_huf IS 'Purchase price in HUF (stored as string for formatting flexibility)';
+COMMENT ON COLUMN bank_transfers_productprice.markup IS 'Markup percentage (e.g., "25%", "1.5x")';
+COMMENT ON COLUMN bank_transfers_productprice.sales_price_huf IS 'Sales price in HUF (stored as string for formatting flexibility)';
+COMMENT ON COLUMN bank_transfers_productprice.cap_disp IS 'Capital/Disposable classification or additional product categorization';
+COMMENT ON COLUMN bank_transfers_productprice.is_inventory_managed IS 'Indicates if this product requires inventory tracking';
+COMMENT ON COLUMN bank_transfers_productprice.valid_from IS 'Start date of validity period (NULL = valid from beginning of time)';
+COMMENT ON COLUMN bank_transfers_productprice.valid_to IS 'End date of validity period (NULL = valid indefinitely)';
+COMMENT ON COLUMN bank_transfers_productprice.created_at IS 'Record creation timestamp';
+COMMENT ON COLUMN bank_transfers_productprice.updated_at IS 'Last modification timestamp';
+
 -- =============================================================================
 -- VERIFICATION QUERIES
 -- =============================================================================

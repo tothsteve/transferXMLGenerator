@@ -13,6 +13,7 @@ import {
   CompanyBillingoSettingsInput,
   BillingoSyncLog,
   BillingoSyncTriggerResponse,
+  BillingoSpending,
   ApiResponse,
 } from '../types/api';
 import {
@@ -116,6 +117,58 @@ export const billingoApi = {
     ordering?: string;
   }): Promise<ApiResponse<BillingoSyncLog>> => {
     const response = await apiClient.get('/billingo-sync-logs/', { params });
+    return response.data;
+  },
+
+  /**
+   * Get paginated list of Billingo spendings.
+   *
+   * @param params - Query parameters for filtering and pagination
+   * @returns Promise resolving to spending list response
+   */
+  getSpendings: async (params?: {
+    page?: number;
+    page_size?: number;
+    category?: string;
+    paid?: string;
+    partner_tax_code?: string;
+    invoice_number?: string;
+    from_date?: string;
+    to_date?: string;
+    payment_method?: string;
+    search?: string;
+    ordering?: string;
+  }): Promise<ApiResponse<BillingoSpending>> => {
+    const response = await apiClient.get('/billingo-spendings/', { params });
+    return response.data;
+  },
+
+  /**
+   * Get single Billingo spending with full details.
+   *
+   * @param id - Billingo spending ID
+   * @returns Promise resolving to spending detail
+   */
+  getSpendingById: async (id: number): Promise<BillingoSpending> => {
+    const response = await apiClient.get(`/billingo-spendings/${id}/`);
+    return response.data;
+  },
+
+  /**
+   * Trigger manual Billingo spendings sync.
+   * ADMIN role required.
+   *
+   * @param full_sync - If true, ignores last sync date and fetches all spendings
+   * @returns Promise resolving to sync result metrics
+   */
+  triggerSpendingsSync: async (full_sync: boolean = false): Promise<{
+    success: boolean;
+    spendings_created: number;
+    spendings_updated: number;
+    spendings_skipped: number;
+    spendings_processed: number;
+  }> => {
+    const response = await apiClient.post('/billingo-spendings/trigger_sync/', { full_sync });
     return response.data;
   },
 };

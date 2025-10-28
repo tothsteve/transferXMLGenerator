@@ -343,3 +343,109 @@ export interface BillingoSyncTriggerResponse {
     error: string;
   }>;
 }
+
+export interface BillingoSpending {
+  id: number;
+  company: number;
+  company_name?: string;
+  organization_id: number;
+  category: 'advertisement' | 'development' | 'education_and_training' | 'other' | 'overheads' | 'service' | 'stock' | 'tangible_assets';
+  category_display?: string;
+  paid_at: string | null;
+  fulfillment_date: string;
+  invoice_number: string;
+  currency: string;
+  conversion_rate: number;
+  total_gross: number;
+  total_gross_local: number;
+  total_vat_amount: number;
+  total_vat_amount_local: number;
+  invoice_date: string;
+  due_date: string;
+  payment_method: string;
+  partner_id?: number | null;
+  partner_name: string;
+  partner_tax_code: string;
+  partner_address?: object | null;
+  partner_iban?: string;
+  partner_account_number?: string;
+  comment?: string;
+  is_created_by_nav: boolean;
+  is_paid?: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
+// BASE_TABLES - Alaptáblák (Suppliers, Customers, Product Prices)
+// ============================================================================
+
+export interface SupplierCategory {
+  id: number;
+  company: number;
+  company_name?: string | undefined;
+  name: string;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SupplierType {
+  id: number;
+  company: number;
+  company_name?: string | undefined;
+  name: string;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Supplier {
+  id: number;
+  company: number;
+  company_name?: string | undefined;
+  partner_name: string;
+  category?: number | null | undefined;  // FK to SupplierCategory
+  category_name?: string | null | undefined;  // Category name for display
+  type?: number | null | undefined;  // FK to SupplierType
+  type_name?: string | null | undefined;  // Type name for display
+  valid_from?: string | null | undefined;
+  valid_to?: string | null | undefined;
+  is_valid?: boolean | undefined;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Customer {
+  id: number;
+  company: number;
+  company_name?: string | undefined;
+  customer_name: string;
+  cashflow_adjustment: number;
+  valid_from?: string | null | undefined;
+  valid_to?: string | null | undefined;
+  is_valid?: boolean | undefined;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductPrice {
+  id: number;
+  company: number;
+  company_name?: string | undefined;
+  product_value: string;
+  product_description: string;
+  uom?: string | null | undefined;
+  uom_hun?: string | null | undefined;
+  purchase_price_usd?: string | null | undefined;
+  purchase_price_huf?: string | null | undefined;
+  markup?: string | null | undefined;
+  sales_price_huf?: string | null | undefined;
+  cap_disp?: string | null | undefined;
+  is_inventory_managed: boolean;
+  valid_from?: string | null | undefined;
+  valid_to?: string | null | undefined;
+  is_valid?: boolean | undefined;
+  created_at: string;
+  updated_at: string;
+}

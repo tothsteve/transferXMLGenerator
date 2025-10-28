@@ -20,6 +20,7 @@ import {
   CompanyBillingoSettingsInput,
   BillingoSyncLog,
   BillingoSyncTriggerResponse,
+  BillingoSpending,
   ApiResponse,
 } from '../types/api';
 
@@ -31,6 +32,8 @@ export const billingoQueryKeys = {
   invoices: (params?: object) => ['billingoInvoices', params] as const,
   invoice: (id: number) => ['billingoInvoice', id] as const,
   syncLogs: (params?: object) => ['billingoSyncLogs', params] as const,
+  spendings: (params?: object) => ['billingoSpendings', params] as const,
+  spending: (id: number) => ['billingoSpending', id] as const,
 };
 
 /**
@@ -218,5 +221,97 @@ export function useBillingoSyncLogs(params?: {
   return useQuery({
     queryKey: billingoQueryKeys.syncLogs(params),
     queryFn: () => billingoApi.getSyncLogs(params),
+  });
+}
+
+/**
+ * Hook for fetching paginated list of Billingo spendings.
+ *
+ * @param params - Query parameters for filtering and pagination
+ * @returns Query result with spending list
+ *
+ * @example
+ * ```tsx
+ * const { data, isLoading } = useBillingoSpendings({
+ *   category: 'service',
+ *   paid: 'true',
+ *   page: 1,
+ *   page_size: 20,
+ *   ordering: '-invoice_date'
+ * });
+ *
+ * if (data) {
+ *   console.log(`Found ${data.count} spendings`);
+ *   data.results.forEach(spending => {
+ *     console.log(spending.invoice_number, spending.total_gross_local);
+ *   });
+ * }
+ * ```
+ */
+export function useBillingoSpendings(params?: {
+  page?: number;
+  page_size?: number;
+  category?: string;
+  paid?: string;
+  partner_tax_code?: string;
+  invoice_number?: string;
+  from_date?: string;
+  to_date?: string;
+  payment_method?: string;
+  search?: string;
+  ordering?: string;
+}): UseQueryResult<ApiResponse<BillingoSpending>, Error> {
+  return useQuery({
+    queryKey: billingoQueryKeys.spendings(params),
+    queryFn: () => billingoApi.getSpendings(params),
+  });
+}
+
+/**
+ * Hook for fetching single Billingo spending with full details.
+ *
+ * @param id - Spending ID (query disabled if 0 or undefined)
+ * @returns Query result with spending detail
+ *
+ * @example
+ * ```tsx
+ * const [selectedId, setSelectedId] = useState<number>(0);
+ * const { data: spending, isLoading } = useBillingoSpending(selectedId);
+ *
+ * if (spending) {
+ *   console.log(`Spending ${spending.invoice_number}`);
+ *   console.log(`Partner: ${spending.partner_name}`);
+ *   console.log(`Amount: ${spending.total_gross_local} HUF`);
+ * }
+ * ```
+ */
+export function useBillingoSpending(id: number): UseQueryResult<BillingoSpending, Error> {
+  return useQuery({
+    queryKey: billingoQueryKeys.spending(id),
+    queryFn: () => billingoApi.getSpendingById(id),
+    enabled: !!id && id > 0,
+  });
+}
+
+/**
+ * Trigger manual Billingo spendings synchronization.
+ * ADMIN role required.
+ *
+ * @returns Mutation hook for triggering sync
+ *
+ * @example
+ * ```tsx
+ * const syncMutation = useTriggerBillingoSpendingsSync();
+ *
+ * // Partial sync (only new/changed)
+ * syncMutation.mutate(false);
+ *
+ * // Full sync (all records)
+ * syncMutation.mutate(true);
+ * ```
+ */
+export function useTriggerBillingoSpendingsSync() {
+  return useMutation({
+    mutationFn: (full_sync: boolean) => billingoApi.triggerSpendingsSync(full_sync),
   });
 }

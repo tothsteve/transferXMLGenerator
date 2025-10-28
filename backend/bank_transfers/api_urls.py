@@ -7,7 +7,8 @@ from .api_views import (
     CompanyUsersView, CompanyUserDetailView, InvoiceViewSet, InvoiceSyncLogViewSet,
     TrustedPartnerViewSet, ExchangeRateViewSet,
     BankStatementViewSet, BankTransactionViewSet, OtherCostViewSet,
-    CompanyBillingoSettingsViewSet, BillingoInvoiceViewSet, BillingoSyncLogViewSet
+    CompanyBillingoSettingsViewSet, BillingoInvoiceViewSet, BillingoSyncLogViewSet, BillingoSpendingViewSet,
+    SupplierCategoryViewSet, SupplierTypeViewSet, SupplierViewSet, CustomerViewSet, ProductPriceViewSet
 )
 from .authentication import AuthenticationViewSet
 from .views.nav_views import (
@@ -42,7 +43,15 @@ router.register(r'other-costs', OtherCostViewSet, basename='othercost')
 # Billingo Integration endpoints
 router.register(r'billingo-settings', CompanyBillingoSettingsViewSet, basename='billingosettings')
 router.register(r'billingo-invoices', BillingoInvoiceViewSet, basename='billingoinvoice')
+router.register(r'billingo-spendings', BillingoSpendingViewSet, basename='billingospending')
 router.register(r'billingo-sync-logs', BillingoSyncLogViewSet, basename='billingosynclog')
+
+# BASE_TABLES - Alaptáblák endpoints
+router.register(r'supplier-categories', SupplierCategoryViewSet, basename='suppliercategory')
+router.register(r'supplier-types', SupplierTypeViewSet, basename='suppliertype')
+router.register(r'suppliers', SupplierViewSet, basename='supplier')
+router.register(r'customers', CustomerViewSet, basename='customer')
+router.register(r'product-prices', ProductPriceViewSet, basename='productprice')
 
 urlpatterns = [
     path('', include(router.urls)),

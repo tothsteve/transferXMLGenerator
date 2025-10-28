@@ -110,7 +110,7 @@ class BankTransfersConfig(AppConfig):
             logger.error(f"Failed to start MNB scheduler: {str(e)}")
 
     def start_billingo_scheduler(self):
-        """Start the Billingo invoice sync scheduler"""
+        """Start the Billingo invoice and spending sync scheduler"""
         try:
             from apscheduler.schedulers.background import BackgroundScheduler
             from apscheduler.triggers.cron import CronTrigger
@@ -121,15 +121,21 @@ class BankTransfersConfig(AppConfig):
 
             scheduler = BackgroundScheduler()
 
-            def sync_billingo_invoices():
+            def sync_billingo_data():
                 from django.db import close_old_connections
                 try:
                     # Close any stale database connections before starting
                     close_old_connections()
 
+                    # Sync invoices (partial sync by default)
                     logger.info("🧾 Starting Billingo invoice sync...")
                     call_command('sync_billingo_invoices')
-                    logger.info("✅ Billingo sync completed successfully")
+                    logger.info("✅ Billingo invoice sync completed successfully")
+
+                    # Sync spendings (partial sync by default)
+                    logger.info("💰 Starting Billingo spending sync...")
+                    call_command('sync_billingo_spendings')
+                    logger.info("✅ Billingo spending sync completed successfully")
                 except Exception as e:
                     logger.error(f"❌ Billingo sync failed: {str(e)}")
                 finally:
@@ -138,15 +144,15 @@ class BankTransfersConfig(AppConfig):
 
             # Schedule daily at 2:00 AM (production)
             scheduler.add_job(
-                func=sync_billingo_invoices,
+                func=sync_billingo_data,
                 trigger=CronTrigger(hour=2, minute=0),
                 id='billingo_sync_job',
-                name='Billingo Invoice Sync',
+                name='Billingo Invoice & Spending Sync',
                 replace_existing=True
             )
 
             scheduler.start()
-            logger.info("🧾 Billingo scheduler started (daily at 2:00 AM)")
+            logger.info("🧾 Billingo scheduler started (daily at 2:00 AM - invoices & spendings)")
 
         except Exception as e:
             import logging

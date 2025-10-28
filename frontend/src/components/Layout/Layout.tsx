@@ -11,8 +11,13 @@ import BatchManager from '../BatchManager/BatchManager';
 import NAVInvoices from '../NAVInvoices/NAVInvoices';
 import BillingoInvoices from '../Billingo/BillingoInvoices';
 import BillingoSettings from '../Billingo/BillingoSettings';
+import BillingoSpendings from '../Billingo/BillingoSpendings';
 import BankStatements from '../BankStatements/BankStatements';
 import BankStatementDetails from '../BankStatements/BankStatementDetails';
+import Suppliers from '../BaseTables/Suppliers';
+import Customers from '../BaseTables/Customers';
+import ProductPrices from '../BaseTables/ProductPrices';
+import SupplierCategoriesTypes from '../BaseTables/SupplierCategoriesTypes';
 import { PDFImportWizard } from '../PDFImport';
 import { UserManagement } from '../UserManagement';
 import { Settings } from '../Settings';
@@ -72,9 +77,14 @@ const Layout: React.FC = () => {
             <Route path="/batches" element={<BatchManager />} />
             <Route path="/nav-invoices" element={<NAVInvoices />} />
             <Route path="/billingo" element={<BillingoInvoices />} />
+            <Route path="/billingo/spendings" element={<BillingoSpendings />} />
             <Route path="/billingo/settings" element={<BillingoSettings />} />
             <Route path="/bank-statements/:id/transactions" element={<BankStatementDetails />} />
             <Route path="/bank-statements" element={<BankStatements />} />
+            <Route path="/base-tables/suppliers" element={<Suppliers />} />
+            <Route path="/base-tables/customers" element={<Customers />} />
+            <Route path="/base-tables/product-prices" element={<ProductPrices />} />
+            <Route path="/base-tables/categories-types" element={<SupplierCategoriesTypes />} />
             <Route path="/pdf-import" element={<PDFImportWizard />} />
             <Route path="/users" element={<UserManagement />} />
             <Route path="/settings" element={<Settings />} />
