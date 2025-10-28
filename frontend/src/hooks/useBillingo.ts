@@ -112,15 +112,16 @@ export function useSaveBillingoSettings(): UseMutationResult<
 export function useTriggerBillingoSync(): UseMutationResult<
   BillingoSyncTriggerResponse,
   Error,
-  void
+  boolean
 > {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: () => billingoApi.triggerSync(),
+    mutationFn: (full_sync: boolean) => billingoApi.triggerSync(full_sync),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['billingoInvoices'] });
       void queryClient.invalidateQueries({ queryKey: ['billingoSyncLogs'] });
+      void queryClient.invalidateQueries({ queryKey: ['billingoSettings'] });
     },
   });
 }

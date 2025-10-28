@@ -7,7 +7,9 @@
       "Bash(grep:*)",
       "Bash(python manage.py makemigrations bank_transfers -n rename_extracost_to_othercost)",
       "Bash(python manage.py migrate bank_transfers)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Read(//Users/tothi/Workspace/ITCardigan/TransferGenerator/**)",
+      "Bash(pkill:*)"
     ],
     "deny": [],
     "ask": []
