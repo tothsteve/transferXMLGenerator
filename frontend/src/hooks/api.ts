@@ -16,6 +16,11 @@ import {
   bankStatementsApi,
   bankTransactionsApi,
   otherCostsApi,
+  supplierCategoriesApi,
+  supplierTypesApi,
+  suppliersApi,
+  customersApi,
+  productPricesApi,
 } from '../services/api';
 import {
   Beneficiary,
@@ -31,6 +36,11 @@ import {
   BankAccount,
   TransferBatch,
   NAVInvoice,
+  SupplierCategory,
+  SupplierType,
+  Supplier,
+  Customer,
+  ProductPrice,
 } from '../types/api';
 import {
   BeneficiarySchema,
@@ -72,6 +82,16 @@ export const queryKeys = {
   supportedBanks: ['supportedBanks'] as const,
   otherCosts: ['otherCosts'] as const,
   otherCost: (id: number) => ['otherCosts', id] as const,
+  supplierCategories: ['supplierCategories'] as const,
+  supplierCategory: (id: number) => ['supplierCategories', id] as const,
+  supplierTypes: ['supplierTypes'] as const,
+  supplierType: (id: number) => ['supplierTypes', id] as const,
+  suppliers: ['suppliers'] as const,
+  supplier: (id: number) => ['suppliers', id] as const,
+  customers: ['customers'] as const,
+  customer: (id: number) => ['customers', id] as const,
+  productPrices: ['productPrices'] as const,
+  productPrice: (id: number) => ['productPrices', id] as const,
 };
 
 /**
@@ -106,13 +126,12 @@ export function useBeneficiaries(params?: {
   });
 }
 
-export function useFrequentBeneficiaries(): UseQueryResult<ApiResponse<Beneficiary>, Error> {
+export function useFrequentBeneficiaries(): UseQueryResult<Beneficiary[], Error> {
   return useQuery({
     queryKey: queryKeys.beneficiariesFrequent,
-    queryFn: () => beneficiariesApi.getFrequent(),
-    select: (data) => {
-      const schema = ApiResponseSchema(BeneficiarySchema);
-      return schema.parse(data.data);
+    queryFn: async () => {
+      const response = await beneficiariesApi.getFrequent();
+      return response.data;
     },
   });
 }
@@ -988,6 +1007,352 @@ export function useDeleteOtherCost(): UseMutationResult<void, Error, number> {
     mutationFn: (id: number) => otherCostsApi.delete(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.otherCosts });
+    },
+  });
+}
+
+// ============================================================================
+// BASE_TABLES - Alaptáblák (Suppliers, Customers, Product Prices)
+// ============================================================================
+
+/**
+ * Supplier Categories Hooks - Beszállító kategóriák kezelése
+ *
+ * React Query hooks for managing supplier category data
+ */
+
+export function useSupplierCategories(params?: {
+  search?: string;
+  page?: number;
+  page_size?: number;
+  ordering?: string;
+}): UseQueryResult<ApiResponse<SupplierCategory>, Error> {
+  return useQuery({
+    queryKey: [...queryKeys.supplierCategories, params],
+    queryFn: async () => {
+      const response = await supplierCategoriesApi.getAll(params);
+      return response.data;
+    },
+  });
+}
+
+export function useSupplierCategory(id: number): UseQueryResult<SupplierCategory, Error> {
+  return useQuery({
+    queryKey: queryKeys.supplierCategory(id),
+    queryFn: () => supplierCategoriesApi.getById(id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateSupplierCategory(): UseMutationResult<
+  SupplierCategory,
+  Error,
+  Omit<SupplierCategory, 'id' | 'company' | 'company_name' | 'created_at' | 'updated_at' | 'display_order'> & { display_order?: number }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data) => supplierCategoriesApi.create(data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.supplierCategories });
+    },
+  });
+}
+
+export function useUpdateSupplierCategory(): UseMutationResult<SupplierCategory, Error, { id: number; data: Partial<SupplierCategory> }> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }) => supplierCategoriesApi.update(id, data),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.supplierCategories });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.supplierCategory(data.id) });
+    },
+  });
+}
+
+export function useDeleteSupplierCategory(): UseMutationResult<void, Error, number> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id) => supplierCategoriesApi.delete(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.supplierCategories });
+    },
+  });
+}
+
+/**
+ * Supplier Types Hooks - Beszállító típusok kezelése
+ *
+ * React Query hooks for managing supplier type data
+ */
+
+export function useSupplierTypes(params?: {
+  search?: string;
+  page?: number;
+  page_size?: number;
+  ordering?: string;
+}): UseQueryResult<ApiResponse<SupplierType>, Error> {
+  return useQuery({
+    queryKey: [...queryKeys.supplierTypes, params],
+    queryFn: async () => {
+      const response = await supplierTypesApi.getAll(params);
+      return response.data;
+    },
+  });
+}
+
+export function useSupplierType(id: number): UseQueryResult<SupplierType, Error> {
+  return useQuery({
+    queryKey: queryKeys.supplierType(id),
+    queryFn: () => supplierTypesApi.getById(id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateSupplierType(): UseMutationResult<
+  SupplierType,
+  Error,
+  Omit<SupplierType, 'id' | 'company' | 'company_name' | 'created_at' | 'updated_at' | 'display_order'> & { display_order?: number }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data) => supplierTypesApi.create(data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.supplierTypes });
+    },
+  });
+}
+
+export function useUpdateSupplierType(): UseMutationResult<SupplierType, Error, { id: number; data: Partial<SupplierType> }> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }) => supplierTypesApi.update(id, data),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.supplierTypes });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.supplierType(data.id) });
+    },
+  });
+}
+
+export function useDeleteSupplierType(): UseMutationResult<void, Error, number> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id) => supplierTypesApi.delete(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.supplierTypes });
+    },
+  });
+}
+
+/**
+ * Suppliers Hooks - Beszállítók kezelése
+ *
+ * React Query hooks for managing supplier data with Zod validation
+ */
+
+export function useSuppliers(params?: {
+  search?: string;
+  category?: string;
+  type?: string;
+  valid_only?: boolean;
+  page?: number;
+  page_size?: number;
+  ordering?: string;
+}): UseQueryResult<ApiResponse<Supplier>, Error> {
+  return useQuery({
+    queryKey: [...queryKeys.suppliers, params],
+    queryFn: async () => {
+      const response = await suppliersApi.getAll(params);
+      return response.data;
+    },
+  });
+}
+
+export function useSupplier(id: number): UseQueryResult<Supplier, Error> {
+  return useQuery({
+    queryKey: queryKeys.supplier(id),
+    queryFn: () => suppliersApi.getById(id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateSupplier(): UseMutationResult<
+  Supplier,
+  Error,
+  Omit<Supplier, 'id' | 'company' | 'company_name' | 'is_valid' | 'created_at' | 'updated_at'>
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data) => suppliersApi.create(data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.suppliers });
+    },
+  });
+}
+
+export function useUpdateSupplier(): UseMutationResult<Supplier, Error, { id: number; data: Partial<Supplier> }> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }) => suppliersApi.update(id, data),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.suppliers });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.supplier(data.id) });
+    },
+  });
+}
+
+export function useDeleteSupplier(): UseMutationResult<void, Error, number> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id) => suppliersApi.delete(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.suppliers });
+    },
+  });
+}
+
+/**
+ * Customers Hooks - Vevők kezelése
+ *
+ * React Query hooks for managing customer data with Zod validation
+ */
+
+export function useCustomers(params?: {
+  search?: string;
+  valid_only?: boolean;
+  page?: number;
+  page_size?: number;
+  ordering?: string;
+}): UseQueryResult<ApiResponse<Customer>, Error> {
+  return useQuery({
+    queryKey: [...queryKeys.customers, params],
+    queryFn: async () => {
+      const response = await customersApi.getAll(params);
+      return response.data;
+    },
+  });
+}
+
+export function useCustomer(id: number): UseQueryResult<Customer, Error> {
+  return useQuery({
+    queryKey: queryKeys.customer(id),
+    queryFn: () => customersApi.getById(id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateCustomer(): UseMutationResult<
+  Customer,
+  Error,
+  Omit<Customer, 'id' | 'company' | 'company_name' | 'is_valid' | 'created_at' | 'updated_at'>
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data) => customersApi.create(data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.customers });
+    },
+  });
+}
+
+export function useUpdateCustomer(): UseMutationResult<Customer, Error, { id: number; data: Partial<Customer> }> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }) => customersApi.update(id, data),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.customers });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.customer(data.id) });
+    },
+  });
+}
+
+export function useDeleteCustomer(): UseMutationResult<void, Error, number> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id) => customersApi.delete(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.customers });
+    },
+  });
+}
+
+/**
+ * Product Prices Hooks - CONMED árak kezelése
+ *
+ * React Query hooks for managing product price data with Zod validation
+ */
+
+export function useProductPrices(params?: {
+  search?: string;
+  product_value?: string;
+  is_inventory_managed?: boolean;
+  valid_only?: boolean;
+  page?: number;
+  page_size?: number;
+  ordering?: string;
+}): UseQueryResult<ApiResponse<ProductPrice>, Error> {
+  return useQuery({
+    queryKey: [...queryKeys.productPrices, params],
+    queryFn: async () => {
+      const response = await productPricesApi.getAll(params);
+      return response.data;
+    },
+  });
+}
+
+export function useProductPrice(id: number): UseQueryResult<ProductPrice, Error> {
+  return useQuery({
+    queryKey: queryKeys.productPrice(id),
+    queryFn: () => productPricesApi.getById(id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateProductPrice(): UseMutationResult<
+  ProductPrice,
+  Error,
+  Omit<ProductPrice, 'id' | 'company' | 'company_name' | 'is_valid' | 'created_at' | 'updated_at'>
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data) => productPricesApi.create(data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.productPrices });
+    },
+  });
+}
+
+export function useUpdateProductPrice(): UseMutationResult<ProductPrice, Error, { id: number; data: Partial<ProductPrice> }> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }) => productPricesApi.update(id, data),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.productPrices });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.productPrice(data.id) });
+    },
+  });
+}
+
+export function useDeleteProductPrice(): UseMutationResult<void, Error, number> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id) => productPricesApi.delete(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.productPrices });
     },
   });
 }

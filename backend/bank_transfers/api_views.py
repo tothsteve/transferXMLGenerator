@@ -16,7 +16,7 @@ from datetime import date
 
 logger = logging.getLogger(__name__)
 
-from .models import BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch, CompanyUser, Invoice, InvoiceLineItem, InvoiceSyncLog, TrustedPartner, ExchangeRate, ExchangeRateSyncLog, BankStatement, BankTransaction, OtherCost, CompanyBillingoSettings, BillingoInvoice, BillingoSyncLog
+from .models import BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch, CompanyUser, Invoice, InvoiceLineItem, InvoiceSyncLog, TrustedPartner, ExchangeRate, ExchangeRateSyncLog, BankStatement, BankTransaction, OtherCost, CompanyBillingoSettings, BillingoInvoice, BillingoSyncLog, BillingoSpending, SupplierCategory, SupplierType, Supplier, Customer, ProductPrice
 from .serializers import (
     BankAccountSerializer, BeneficiarySerializer, TransferTemplateSerializer,
     TemplateBeneficiarySerializer, TransferSerializer, TransferBatchSerializer,
@@ -27,12 +27,14 @@ from .serializers import (
     BankStatementListSerializer, BankStatementDetailSerializer, BankStatementUploadSerializer,
     BankTransactionSerializer, OtherCostSerializer, SupportedBanksSerializer,
     CompanyBillingoSettingsSerializer, BillingoInvoiceSerializer, BillingoInvoiceListSerializer,
-    BillingoSyncLogSerializer, BillingoSyncTriggerSerializer
+    BillingoSyncLogSerializer, BillingoSyncTriggerSerializer,
+    BillingoSpendingListSerializer, BillingoSpendingDetailSerializer,
+    SupplierCategorySerializer, SupplierTypeSerializer, SupplierSerializer, CustomerSerializer, ProductPriceSerializer
 )
 from .utils import generate_xml
 from .pdf_processor import PDFTransactionProcessor
 from .kh_export import KHBankExporter
-from .permissions import IsCompanyMember, IsCompanyAdmin, IsCompanyAdminOrReadOnly, RequireBeneficiaryManagement, RequireTransferManagement, RequireBatchManagement, RequireNavSync, RequireExportFeatures, RequireBankStatementImport, RequireBillingoSync, require_feature_api
+from .permissions import IsCompanyMember, IsCompanyAdmin, IsCompanyAdminOrReadOnly, RequireBeneficiaryManagement, RequireTransferManagement, RequireBatchManagement, RequireNavSync, RequireExportFeatures, RequireBankStatementImport, RequireBillingoSync, RequireBaseTables, require_feature_api
 from .services.bank_account_service import BankAccountService
 from .services.beneficiary_service import BeneficiaryService
 from .services.template_service import TemplateService
@@ -2418,3 +2420,388 @@ class BillingoSyncLogViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(started_at__lte=to_date)
 
         return queryset
+
+
+class BillingoSpendingViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Billingo költségek megtekintése
+
+    Szinkronizált költségek lekérdezése Billingo-ból.
+    Csak olvasható - a költségek az API szinkronizálással frissülnek.
+
+    Szűrések:
+    - category: kategória (advertisement, development, stb.)
+    - paid: true/false - kifizetett költségek
+    - partner_tax_code: partner adószáma
+    - invoice_number: számlaszám keresés
+    - from_date: számla dátuma >= (YYYY-MM-DD)
+    - to_date: számla dátuma <= (YYYY-MM-DD)
+    - payment_method: fizetési mód
+    """
+    permission_classes = [IsAuthenticated, IsCompanyMember, RequireBillingoSync]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['invoice_number', 'partner_name', 'partner_tax_code', 'comment']
+    ordering_fields = ['invoice_date', 'due_date', 'total_gross_local']
+    ordering = ['-invoice_date']
+
+    def get_queryset(self):
+        """Csak a cég költségei"""
+        company = getattr(self.request, 'company', None)
+        if not company:
+            return BillingoSpending.objects.none()
+
+        queryset = BillingoSpending.objects.filter(company=company)
+
+        # Filter by category
+        category = self.request.query_params.get('category')
+        if category:
+            queryset = queryset.filter(category=category)
+
+        # Filter by paid status
+        paid = self.request.query_params.get('paid')
+        if paid is not None:
+            if paid.lower() == 'true':
+                queryset = queryset.filter(paid_at__isnull=False)
+            else:
+                queryset = queryset.filter(paid_at__isnull=True)
+
+        # Filter by partner tax code
+        partner_tax_code = self.request.query_params.get('partner_tax_code')
+        if partner_tax_code:
+            queryset = queryset.filter(partner_tax_code=partner_tax_code)
+
+        # Filter by invoice number
+        invoice_number = self.request.query_params.get('invoice_number')
+        if invoice_number:
+            queryset = queryset.filter(invoice_number__icontains=invoice_number)
+
+        # Filter by date range
+        from_date = self.request.query_params.get('from_date')
+        to_date = self.request.query_params.get('to_date')
+        if from_date:
+            queryset = queryset.filter(invoice_date__gte=from_date)
+        if to_date:
+            queryset = queryset.filter(invoice_date__lte=to_date)
+
+        # Filter by payment method
+        payment_method = self.request.query_params.get('payment_method')
+        if payment_method:
+            queryset = queryset.filter(payment_method=payment_method)
+
+        return queryset
+
+    def get_serializer_class(self):
+        """Use list serializer for list view, detail for retrieve"""
+        if self.action == 'list':
+            return BillingoSpendingListSerializer
+        return BillingoSpendingDetailSerializer
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsCompanyMember, IsCompanyAdmin])
+    def trigger_sync(self, request):
+        """
+        Trigger manual Billingo spendings sync.
+        ADMIN role required.
+
+        POST params:
+        - full_sync: boolean (default: false) - If true, ignores last sync date
+        """
+        from .management.commands.sync_billingo_spendings import Command as SyncCommand
+
+        company = request.company
+        full_sync = request.data.get('full_sync', False)
+
+        sync_command = SyncCommand()
+        result = sync_command.sync_company_spendings(company, full_sync=full_sync)
+
+        if result.get('error'):
+            return Response(
+                {'error': result['error']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response({
+            'success': True,
+            'spendings_created': result['created'],
+            'spendings_updated': result['updated'],
+            'spendings_skipped': result['skipped'],
+            'spendings_processed': result['created'] + result['updated']
+        })
+
+
+# ============================================================================
+# BASE_TABLES ViewSets - Alaptáblák (Suppliers, Customers, Product Prices)
+# ============================================================================
+
+class SupplierCategoryViewSet(viewsets.ModelViewSet):
+    """
+    Beszállító kategóriák (Supplier Categories) kezelése
+
+    Cost category management for suppliers.
+
+    Támogatott szűrések:
+    - search: name alapján keresés
+
+    Rendezés:
+    - display_order, name, created_at (default: display_order)
+
+    Hozzáférés: BASE_TABLES feature required
+    """
+    serializer_class = SupplierCategorySerializer
+    permission_classes = [IsAuthenticated, IsCompanyMember, RequireBaseTables]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name']
+    ordering_fields = ['display_order', 'name', 'created_at']
+    ordering = ['display_order']
+
+    def get_queryset(self):
+        """Csak a cég kategóriái"""
+        company = getattr(self.request, 'company', None)
+        if not company:
+            return SupplierCategory.objects.none()
+        return SupplierCategory.objects.filter(company=company)
+
+    def perform_create(self, serializer):
+        """Assign company and auto-increment display_order on creation"""
+        # Get max display_order for this company, default to -1 if no items exist
+        max_order = SupplierCategory.objects.filter(
+            company=self.request.company
+        ).aggregate(max_order=models.Max('display_order'))['max_order'] or -1
+
+        # Set display_order to max + 1 if not provided
+        if 'display_order' not in serializer.validated_data:
+            serializer.save(company=self.request.company, display_order=max_order + 1)
+        else:
+            serializer.save(company=self.request.company)
+
+
+class SupplierTypeViewSet(viewsets.ModelViewSet):
+    """
+    Beszállító típusok (Supplier Types) kezelése
+
+    Cost subcategory management for suppliers.
+
+    Támogatott szűrések:
+    - search: name alapján keresés
+
+    Rendezés:
+    - display_order, name, created_at (default: display_order)
+
+    Hozzáférés: BASE_TABLES feature required
+    """
+    serializer_class = SupplierTypeSerializer
+    permission_classes = [IsAuthenticated, IsCompanyMember, RequireBaseTables]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name']
+    ordering_fields = ['display_order', 'name', 'created_at']
+    ordering = ['display_order']
+
+    def get_queryset(self):
+        """Csak a cég típusai"""
+        company = getattr(self.request, 'company', None)
+        if not company:
+            return SupplierType.objects.none()
+        return SupplierType.objects.filter(company=company)
+
+    def perform_create(self, serializer):
+        """Assign company and auto-increment display_order on creation"""
+        # Get max display_order for this company, default to -1 if no items exist
+        max_order = SupplierType.objects.filter(
+            company=self.request.company
+        ).aggregate(max_order=models.Max('display_order'))['max_order'] or -1
+
+        # Set display_order to max + 1 if not provided
+        if 'display_order' not in serializer.validated_data:
+            serializer.save(company=self.request.company, display_order=max_order + 1)
+        else:
+            serializer.save(company=self.request.company)
+
+
+class SupplierViewSet(viewsets.ModelViewSet):
+    """
+    Beszállítók (Suppliers) kezelése
+
+    Támogatott szűrések:
+    - valid_only: true/false - csak érvényes rekordok (default: true)
+    - search: partner_name, category, type alapján keresés
+    - category: kategória alapján szűrés
+    - type: típus alapján szűrés
+    - valid_from: érvényesség kezdete >= (YYYY-MM-DD)
+    - valid_to: érvényesség vége <= (YYYY-MM-DD)
+
+    Rendezés:
+    - partner_name, category, type, valid_from, valid_to, created_at
+
+    Hozzáférés: ADMIN only
+    """
+    serializer_class = SupplierSerializer
+    permission_classes = [IsAuthenticated, IsCompanyMember, RequireBaseTables]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['partner_name', 'category__name', 'type__name']
+    ordering_fields = ['partner_name', 'category', 'type', 'valid_from', 'valid_to', 'created_at']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        """Csak a cég beszállítói"""
+        company = getattr(self.request, 'company', None)
+        if not company:
+            return Supplier.objects.none()
+
+        queryset = Supplier.objects.filter(company=company)
+
+        # Filter by valid_only (default: true)
+        valid_only = self.request.query_params.get('valid_only', 'true').lower() == 'true'
+        if valid_only:
+            from datetime import date
+            today = date.today()
+            queryset = queryset.filter(
+                models.Q(valid_from__isnull=True) | models.Q(valid_from__lte=today),
+                models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=today)
+            )
+
+        # Filter by category
+        category = self.request.query_params.get('category')
+        if category:
+            queryset = queryset.filter(category__name__icontains=category)
+
+        # Filter by type
+        supplier_type = self.request.query_params.get('type')
+        if supplier_type:
+            queryset = queryset.filter(type__name__icontains=supplier_type)
+
+        # Filter by valid_from date
+        valid_from = self.request.query_params.get('valid_from')
+        if valid_from:
+            queryset = queryset.filter(valid_from__gte=valid_from)
+
+        # Filter by valid_to date
+        valid_to = self.request.query_params.get('valid_to')
+        if valid_to:
+            queryset = queryset.filter(valid_to__lte=valid_to)
+
+        return queryset
+
+    def perform_create(self, serializer):
+        """Assign company on creation"""
+        serializer.save(company=self.request.company)
+
+
+class CustomerViewSet(viewsets.ModelViewSet):
+    """
+    Vevők (Customers) kezelése
+
+    Támogatott szűrések:
+    - valid_only: true/false - csak érvényes rekordok (default: true)
+    - search: customer_name alapján keresés
+    - valid_from: érvényesség kezdete >= (YYYY-MM-DD)
+    - valid_to: érvényesség vége <= (YYYY-MM-DD)
+
+    Rendezés:
+    - customer_name, cashflow_adjustment, valid_from, valid_to, created_at
+
+    Hozzáférés: ADMIN only
+    """
+    serializer_class = CustomerSerializer
+    permission_classes = [IsAuthenticated, IsCompanyMember, RequireBaseTables]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['customer_name']
+    ordering_fields = ['customer_name', 'cashflow_adjustment', 'valid_from', 'valid_to', 'created_at']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        """Csak a cég vevői"""
+        company = getattr(self.request, 'company', None)
+        if not company:
+            return Customer.objects.none()
+
+        queryset = Customer.objects.filter(company=company)
+
+        # Filter by valid_only (default: true)
+        valid_only = self.request.query_params.get('valid_only', 'true').lower() == 'true'
+        if valid_only:
+            from datetime import date
+            today = date.today()
+            queryset = queryset.filter(
+                models.Q(valid_from__isnull=True) | models.Q(valid_from__lte=today),
+                models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=today)
+            )
+
+        # Filter by valid_from date
+        valid_from = self.request.query_params.get('valid_from')
+        if valid_from:
+            queryset = queryset.filter(valid_from__gte=valid_from)
+
+        # Filter by valid_to date
+        valid_to = self.request.query_params.get('valid_to')
+        if valid_to:
+            queryset = queryset.filter(valid_to__lte=valid_to)
+
+        return queryset
+
+    def perform_create(self, serializer):
+        """Assign company on creation"""
+        serializer.save(company=self.request.company)
+
+
+class ProductPriceViewSet(viewsets.ModelViewSet):
+    """
+    CONMED árak (Product Prices) kezelése
+
+    Támogatott szűrések:
+    - valid_only: true/false - csak érvényes rekordok (default: true)
+    - search: product_value, product_description alapján keresés
+    - is_inventory_managed: true/false - készletkezelt termékek
+    - valid_from: érvényesség kezdete >= (YYYY-MM-DD)
+    - valid_to: érvényesség vége <= (YYYY-MM-DD)
+
+    Rendezés:
+    - product_value, product_description, purchase_price_usd, purchase_price_huf,
+      sales_price_huf, valid_from, valid_to, created_at
+
+    Hozzáférés: ADMIN only
+    """
+    serializer_class = ProductPriceSerializer
+    permission_classes = [IsAuthenticated, IsCompanyMember, RequireBaseTables]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['product_value', 'product_description']
+    ordering_fields = ['product_value', 'product_description', 'purchase_price_usd', 'purchase_price_huf', 'sales_price_huf', 'valid_from', 'valid_to', 'created_at']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        """Csak a cég termékárai"""
+        company = getattr(self.request, 'company', None)
+        if not company:
+            return ProductPrice.objects.none()
+
+        queryset = ProductPrice.objects.filter(company=company)
+
+        # Filter by valid_only (default: true)
+        valid_only = self.request.query_params.get('valid_only', 'true').lower() == 'true'
+        if valid_only:
+            from datetime import date
+            today = date.today()
+            queryset = queryset.filter(
+                models.Q(valid_from__isnull=True) | models.Q(valid_from__lte=today),
+                models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=today)
+            )
+
+        # Filter by is_inventory_managed
+        is_inventory_managed = self.request.query_params.get('is_inventory_managed')
+        if is_inventory_managed is not None:
+            is_managed = is_inventory_managed.lower() == 'true'
+            queryset = queryset.filter(is_inventory_managed=is_managed)
+
+        # Filter by valid_from date
+        valid_from = self.request.query_params.get('valid_from')
+        if valid_from:
+            queryset = queryset.filter(valid_from__gte=valid_from)
+
+        # Filter by valid_to date
+        valid_to = self.request.query_params.get('valid_to')
+        if valid_to:
+            queryset = queryset.filter(valid_to__lte=valid_to)
+
+        return queryset
+
+    def perform_create(self, serializer):
+        """Assign company on creation"""
+        serializer.save(company=self.request.company)
