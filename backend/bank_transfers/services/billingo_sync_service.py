@@ -9,7 +9,7 @@ import requests
 import json
 import time
 import logging
-from datetime import datetime
+from datetime import datetime, date
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 from django.utils import timezone
@@ -102,7 +102,8 @@ class BillingoSyncService:
     def sync_company(
         self,
         company: Company,
-        sync_type: str = 'AUTOMATIC'
+        sync_type: str = 'AUTOMATIC',
+        full_sync: bool = False
     ) -> Dict[str, any]:
         """
         Sync invoices for a single company.
@@ -110,6 +111,7 @@ class BillingoSyncService:
         Args:
             company: Company to sync
             sync_type: 'MANUAL' or 'AUTOMATIC'
+            full_sync: If True, ignore last sync date and fetch all invoices (default: False)
 
         Returns:
             dict: Sync results with metrics
@@ -135,27 +137,104 @@ class BillingoSyncService:
             # Decrypt API key
             api_key = self.credential_manager.decrypt_credential(settings.api_key)
 
+            # Get last sync date for incremental sync (unless full_sync is requested)
+            # Apply 7-day safety buffer to catch any missed invoices
+            since_date = None
+            if not full_sync and settings.last_billingo_invoice_sync_date:
+                from datetime import timedelta
+                since_date = settings.last_billingo_invoice_sync_date - timedelta(days=7)
+
+            if full_sync:
+                logger.info(f"Full sync for {company.name} (manual full sync requested)")
+            elif since_date:
+                logger.info(
+                    f"Incremental sync for {company.name} since {since_date.isoformat()} "
+                    f"(last sync: {settings.last_billingo_invoice_sync_date.isoformat()}, -7 days buffer)"
+                )
+            else:
+                logger.info(f"Full sync for {company.name} (first sync)")
+
             # Fetch all invoices with pagination
             all_invoices = []
-            page = 1
-            total_pages = 1
             api_calls = 0
 
-            while page <= total_pages:
-                invoices_data, pagination = self._fetch_documents_page(
-                    api_key=api_key,
-                    page=page
-                )
-                api_calls += 1
+            if since_date:
+                # Incremental sync: fetch both newly created AND modified invoices
+                logger.info(f"Fetching newly created invoices (start_date >= {since_date.isoformat()})")
 
-                all_invoices.extend(invoices_data)
-                total_pages = pagination.get('last_page', 1)
-                page += 1
+                # 1. Fetch invoices created since last sync (by invoice date)
+                page = 1
+                total_pages = 1
+                while page <= total_pages:
+                    invoices_data, pagination = self._fetch_documents_page(
+                        api_key=api_key,
+                        page=page,
+                        start_date=since_date,
+                        last_modified_date=None
+                    )
+                    api_calls += 1
+                    all_invoices.extend(invoices_data)
+                    total_pages = pagination.get('last_page', 1)
+                    page += 1
+                    logger.info(
+                        f"Fetched page {page-1}/{total_pages} (by start_date) for {company.name} "
+                        f"({len(invoices_data)} invoices)"
+                    )
 
-                logger.info(
-                    f"Fetched page {page-1}/{total_pages} for {company.name} "
-                    f"({len(invoices_data)} invoices)"
-                )
+                logger.info(f"Fetching modified invoices (last_modified_date >= {since_date.isoformat()})")
+
+                # 2. Fetch invoices modified since last sync
+                page = 1
+                total_pages = 1
+                while page <= total_pages:
+                    invoices_data, pagination = self._fetch_documents_page(
+                        api_key=api_key,
+                        page=page,
+                        start_date=None,
+                        last_modified_date=since_date
+                    )
+                    api_calls += 1
+                    all_invoices.extend(invoices_data)
+                    total_pages = pagination.get('last_page', 1)
+                    page += 1
+                    logger.info(
+                        f"Fetched page {page-1}/{total_pages} (by last_modified_date) for {company.name} "
+                        f"({len(invoices_data)} invoices)"
+                    )
+
+                # Deduplicate by invoice ID (in case invoice was both created AND modified)
+                seen_ids = set()
+                deduplicated_invoices = []
+                for invoice in all_invoices:
+                    invoice_id = invoice.get('id')
+                    if invoice_id not in seen_ids:
+                        seen_ids.add(invoice_id)
+                        deduplicated_invoices.append(invoice)
+
+                duplicates_removed = len(all_invoices) - len(deduplicated_invoices)
+                if duplicates_removed > 0:
+                    logger.info(f"Removed {duplicates_removed} duplicate invoices")
+
+                all_invoices = deduplicated_invoices
+            else:
+                # Full sync: fetch all invoices
+                page = 1
+                total_pages = 1
+                while page <= total_pages:
+                    invoices_data, pagination = self._fetch_documents_page(
+                        api_key=api_key,
+                        page=page,
+                        start_date=None,
+                        last_modified_date=None
+                    )
+                    api_calls += 1
+                    all_invoices.extend(invoices_data)
+                    total_pages = pagination.get('last_page', 1)
+                    page += 1
+                    logger.info(
+                        f"Fetched page {page-1}/{total_pages} for {company.name} "
+                        f"({len(invoices_data)} invoices)"
+                    )
 
             # Process invoices
             created_count = 0
@@ -195,8 +274,9 @@ class BillingoSyncService:
             sync_log.completed_at = timezone.now()
             sync_log.save()
 
-            # Update last_sync_time
+            # Update last_sync_time and last_billingo_invoice_sync_date
             settings.last_sync_time = timezone.now()
+            settings.last_billingo_invoice_sync_date = timezone.now().date()
             settings.save()
 
             logger.info(
@@ -229,7 +309,9 @@ class BillingoSyncService:
         self,
         api_key: str,
         page: int = 1,
-        per_page: int = 100
+        per_page: int = 100,
+        start_date: Optional[date] = None,
+        last_modified_date: Optional[date] = None
     ) -> Tuple[List[Dict], Dict]:
         """
         Fetch a single page of documents from Billingo API.
@@ -238,6 +320,8 @@ class BillingoSyncService:
             api_key: Decrypted Billingo API key
             page: Page number (1-indexed)
             per_page: Results per page (max 100)
+            start_date: Optional date to filter by invoice date (>= this date)
+            last_modified_date: Optional date to filter by last modified date (>= this date)
 
         Returns:
             tuple: (list of invoice data dicts, pagination metadata)
@@ -251,6 +335,21 @@ class BillingoSyncService:
             'page': page,
             'per_page': min(per_page, 100)  # API limit
         }
+
+        # Add start_date filter (for newly created invoices)
+        if start_date:
+            params['start_date'] = start_date.isoformat()
+
+        # Add last_modified_date filter (for modified invoices)
+        if last_modified_date:
+            # Billingo API expects datetime format: '2021-09-03 11:27:00'
+            # Convert date to datetime at start of day (00:00:00)
+            from datetime import datetime
+            since_datetime = datetime.combine(last_modified_date, datetime.min.time())
+            params['last_modified_date'] = since_datetime.strftime('%Y-%m-%d %H:%M:%S')
+
+        # DEBUG: Log the full request URL and parameters
+        logger.info(f"Billingo API request: {url} with params: {params}")
 
         for attempt in range(self.MAX_RETRIES):
             try:
@@ -271,6 +370,12 @@ class BillingoSyncService:
 
                 response.raise_for_status()
                 data = response.json()
+
+                # DEBUG: Log the response summary
+                logger.info(
+                    f"Billingo API response: {len(data.get('data', []))} invoices on page {page}, "
+                    f"total: {data.get('total', 0)}, last_page: {data.get('last_page', 1)}"
+                )
 
                 return (
                     data.get('data', []),

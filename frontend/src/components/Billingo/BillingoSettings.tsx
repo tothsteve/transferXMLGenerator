@@ -20,8 +20,10 @@ import {
   Check as CheckIcon,
   Warning as WarningIcon,
   Info as InfoIcon,
+  Sync as SyncIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
-import { useBillingoSettings, useSaveBillingoSettings } from '../../hooks/useBillingo';
+import { useBillingoSettings, useSaveBillingoSettings, useTriggerBillingoSync } from '../../hooks/useBillingo';
 import { useToastContext } from '../../context/ToastContext';
 
 const BillingoSettings: React.FC = () => {
@@ -29,6 +31,7 @@ const BillingoSettings: React.FC = () => {
 
   const { data: settings, isLoading, error: fetchError } = useBillingoSettings();
   const saveMutation = useSaveBillingoSettings();
+  const syncMutation = useTriggerBillingoSync();
 
   const [apiKey, setApiKey] = useState('');
   const [isActive, setIsActive] = useState(true);
@@ -80,6 +83,40 @@ const BillingoSettings: React.FC = () => {
   const handleIsActiveChange = (checked: boolean): void => {
     setIsActive(checked);
     setHasChanges(true);
+  };
+
+  const handleIncrementalSync = (): void => {
+    syncMutation.mutate(false, {
+      onSuccess: (result) => {
+        showSuccess(
+          'Szinkronizálás sikeres',
+          `${result.invoices_processed} számla feldolgozva (${result.invoices_created} új, ${result.invoices_updated} frissítve)`
+        );
+      },
+      onError: (err: Error) => {
+        showError(
+          'Szinkronizálási hiba',
+          err.message || 'Hiba történt a szinkronizálás során'
+        );
+      },
+    });
+  };
+
+  const handleFullSync = (): void => {
+    syncMutation.mutate(true, {
+      onSuccess: (result) => {
+        showSuccess(
+          'Teljes szinkronizálás sikeres',
+          `${result.invoices_processed} számla feldolgozva (${result.invoices_created} új, ${result.invoices_updated} frissítve)`
+        );
+      },
+      onError: (err: Error) => {
+        showError(
+          'Szinkronizálási hiba',
+          err.message || 'Hiba történt a teljes szinkronizálás során'
+        );
+      },
+    });
   };
 
   if (isLoading) {
@@ -257,7 +294,30 @@ const BillingoSettings: React.FC = () => {
           </Alert>
 
           {/* Action Buttons */}
-          <Stack direction="row" spacing={2} justifyContent="flex-end">
+          <Stack direction="row" spacing={2} justifyContent="space-between">
+            {/* Sync Buttons */}
+            <Stack direction="row" spacing={2}>
+              <Button
+                variant="outlined"
+                color="primary"
+                startIcon={syncMutation.isPending ? <CircularProgress size={20} /> : <SyncIcon />}
+                onClick={handleIncrementalSync}
+                disabled={syncMutation.isPending || !settings?.has_api_key}
+              >
+                Szinkronizálás (utolsó óta)
+              </Button>
+              <Button
+                variant="outlined"
+                color="secondary"
+                startIcon={syncMutation.isPending ? <CircularProgress size={20} /> : <RefreshIcon />}
+                onClick={handleFullSync}
+                disabled={syncMutation.isPending || !settings?.has_api_key}
+              >
+                Teljes szinkronizálás (elejétől)
+              </Button>
+            </Stack>
+
+            {/* Save Button */}
             <Button
               variant="contained"
               startIcon={saveMutation.isPending ? <CircularProgress size={20} /> : <SaveIcon />}

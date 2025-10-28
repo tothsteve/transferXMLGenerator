@@ -67,10 +67,11 @@ export const billingoApi = {
    * Trigger manual Billingo invoice sync.
    * ADMIN role required.
    *
+   * @param full_sync - If true, ignores last sync date and fetches all invoices
    * @returns Promise resolving to sync result metrics
    */
-  triggerSync: async (): Promise<BillingoSyncTriggerResponse> => {
-    const response = await apiClient.post('/billingo-settings/trigger_sync/', {});
+  triggerSync: async (full_sync: boolean = false): Promise<BillingoSyncTriggerResponse> => {
+    const response = await apiClient.post('/billingo-settings/trigger_sync/', { full_sync });
     return BillingoSyncTriggerResponseSchema.parse(response.data);
   },
 

@@ -2196,9 +2196,32 @@ class CompanyBillingoSettingsViewSet(viewsets.ModelViewSet):
 
         return CompanyBillingoSettings.objects.filter(company=company)
 
-    def perform_create(self, serializer):
-        """Assign company on creation"""
-        serializer.save(company=self.request.company)
+    def create(self, request, *args, **kwargs):
+        """
+        Create or update Billingo settings for the company.
+
+        Since each company can only have one settings record (enforced by unique constraint),
+        this endpoint implements update-or-create logic:
+        - If settings exist: UPDATE them
+        - If settings don't exist: CREATE them
+        """
+        company = request.company
+
+        # Check if settings already exist for this company
+        try:
+            instance = CompanyBillingoSettings.objects.get(company=company)
+            # Settings exist - perform update
+            serializer = self.get_serializer(instance, data=request.data, partial=False)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except CompanyBillingoSettings.DoesNotExist:
+            # Settings don't exist - perform create
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save(company=company)
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
     @swagger_auto_schema(
         operation_description="Billingo szinkronizálás manuális indítása",
@@ -2228,6 +2251,7 @@ class CompanyBillingoSettingsViewSet(viewsets.ModelViewSet):
         Trigger manual Billingo sync for current company.
 
         POST /api/billingo-settings/trigger_sync/
+        Body: { "full_sync": true|false }  (optional, defaults to false for incremental sync)
         """
         from .services.billingo_sync_service import BillingoSyncService, BillingoAPIError
 
@@ -2248,10 +2272,13 @@ class CompanyBillingoSettingsViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Get full_sync parameter from request body (default: False for incremental sync)
+        full_sync = request.data.get('full_sync', False)
+
         # Trigger sync
         try:
             service = BillingoSyncService()
-            result = service.sync_company(company, sync_type='MANUAL')
+            result = service.sync_company(company, sync_type='MANUAL', full_sync=full_sync)
 
             return Response({
                 'status': 'success',

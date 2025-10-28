@@ -59,7 +59,7 @@ const BillingoInvoices: React.FC = () => {
     page_size: pageSize,
     ...(paymentStatus !== 'all' && { payment_status: paymentStatus }),
     ...(search && { search }),
-    ordering: '-invoice_date',
+    ordering: '-invoice_number',
   });
 
   const { data: invoiceDetails, isLoading: isLoadingDetails, error: detailsError } = useBillingoInvoice(selectedInvoiceId);
@@ -104,7 +104,7 @@ const BillingoInvoices: React.FC = () => {
   }, [data]);
 
   const handleSync = (): void => {
-    syncMutation.mutate(undefined, {
+    syncMutation.mutate(false, {
       onSuccess: (result) => {
         if (result.invoices_processed === 0) {
           showWarning(
@@ -123,6 +123,24 @@ const BillingoInvoices: React.FC = () => {
         showError(
           'Szinkronizálási hiba',
           err.message || 'Ismeretlen hiba történt a szinkronizálás során'
+        );
+      },
+    });
+  };
+
+  const handleFullSync = (): void => {
+    syncMutation.mutate(true, {
+      onSuccess: (result) => {
+        showSuccess(
+          'Teljes szinkronizálás sikeres',
+          `${result.invoices_processed} számla szinkronizálva (${result.invoices_created} új, ${result.invoices_updated} frissítve)`
+        );
+        void refetch();
+      },
+      onError: (err: Error) => {
+        showError(
+          'Teljes szinkronizálási hiba',
+          err.message || 'Ismeretlen hiba történt a teljes szinkronizálás során'
         );
       },
     });
@@ -172,12 +190,22 @@ const BillingoInvoices: React.FC = () => {
             Frissítés
           </Button>
           <Button
-            variant="contained"
+            variant="outlined"
+            color="primary"
             startIcon={syncMutation.isPending ? <CircularProgress size={20} /> : <SyncIcon />}
             onClick={handleSync}
             disabled={syncMutation.isPending}
           >
-            Szinkronizálás
+            Szinkronizálás (utolsó óta)
+          </Button>
+          <Button
+            variant="contained"
+            color="secondary"
+            startIcon={syncMutation.isPending ? <CircularProgress size={20} /> : <RefreshIcon />}
+            onClick={handleFullSync}
+            disabled={syncMutation.isPending}
+          >
+            Teljes szinkronizálás
           </Button>
         </Stack>
       </Stack>

@@ -1883,6 +1883,12 @@ class CompanyBillingoSettings(TimestampedModel):
         verbose_name="Utolsó szinkronizálás",
         help_text="Utolsó sikeres szinkronizálás időpontja"
     )
+    last_billingo_invoice_sync_date = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Utolsó Billingo számla szinkronizálás dátuma",
+        help_text="Az utolsó szinkronizált Billingo számla módosítási dátuma (Billingo API last_modified_date filter)"
+    )
     is_active = models.BooleanField(
         default=True,
         verbose_name="Aktív",

@@ -1432,9 +1432,13 @@ class CompanyBillingoSettingsSerializer(serializers.ModelSerializer):
             'id', 'company', 'company_name',
             'api_key_input', 'has_api_key',
             'last_sync_time', 'last_sync_time_formatted',
+            'last_billingo_invoice_sync_date',
             'is_active', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'company', 'company_name', 'last_sync_time']
+        read_only_fields = [
+            'created_at', 'updated_at', 'company', 'company_name',
+            'last_sync_time', 'last_billingo_invoice_sync_date'
+        ]
 
     def get_has_api_key(self, obj):
         """Indicate if API key is configured (without exposing it)"""
