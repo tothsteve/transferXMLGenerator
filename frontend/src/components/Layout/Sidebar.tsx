@@ -29,6 +29,7 @@ import {
   AccountBalance as AccountBalanceIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
+  TableChart as TableChartIcon,
 } from '@mui/icons-material';
 import { useIsCompanyAdmin } from '../../hooks/useAuth';
 
@@ -66,10 +67,21 @@ const navigation: NavigationItem[] = [
     icon: RequestQuoteIcon,
     submenu: [
       { name: 'Számlák', href: '/billingo' },
+      { name: 'Költségek', href: '/billingo/spendings' },
       { name: 'Beállítások', href: '/billingo/settings' },
     ],
   },
   { name: 'Bankkivonatok', href: '/bank-statements', icon: AccountBalanceIcon },
+  {
+    name: 'Alaptáblák',
+    icon: TableChartIcon,
+    submenu: [
+      { name: 'Beszállítók', href: '/base-tables/suppliers' },
+      { name: 'Kategóriák és Típusok', href: '/base-tables/categories-types' },
+      { name: 'Vevők', href: '/base-tables/customers' },
+      { name: 'CONMED árak', href: '/base-tables/product-prices' },
+    ],
+  },
   { name: 'Beállítások', href: '/settings', icon: SettingsIcon },
 ];
 
@@ -353,9 +365,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, width, isMobile }) =
           {drawerContent}
         </Drawer>
       ) : (
-        /* Desktop Drawer */
+        /* Desktop Drawer - Always visible */
         <Drawer
           variant="permanent"
+          anchor="left"
           sx={{
             width: width,
             flexShrink: 0,

@@ -8,6 +8,7 @@ This document contains detailed implementation information for all major feature
 - [Trusted Partners Auto-Payment System](#trusted-partners-auto-payment-system)
 - [MNB Exchange Rate Integration](#mnb-exchange-rate-integration)
 - [Bank Statement Import and Transaction Matching](#bank-statement-import-and-transaction-matching)
+- [Base Tables Import System](#base-tables-import-system)
 
 ---
 
@@ -322,3 +323,242 @@ The system prevents false positives by checking transaction direction compatibil
 
 **Documentation**:
 - `/BANK_STATEMENT_IMPORT_DOCUMENTATION.md` - Complete field mapping documentation (1200+ lines)
+
+---
+
+## Base Tables Import System
+
+### Overview
+The **Base Tables Import System** provides a Django management command for manually importing foundational business data from CSV files. This system is designed for **manual deployment workflows** where an administrator SSHs into the production environment (e.g., Railway) and imports data for specific companies.
+
+### Supported Table Types (3 Total)
+
+#### 1. Suppliers (Beszállítók)
+- **Two-phase import strategy**:
+  - **Phase 1**: Extract and create parent lookup tables (SupplierCategory, SupplierType)
+  - **Phase 2**: Import suppliers with foreign key relationships to categories and types
+- **CSV Columns**:
+  - `Partner neve` (Partner name) - Required
+  - `Category` (Category) - Optional, creates SupplierCategory if not exists
+  - `Type` (Type) - Optional, creates SupplierType if not exists
+  - `Valid_from` (Valid from date) - Optional, format: `YYYY-MM-DD`
+  - `Valid_to` (Valid to date) - Optional, format: `YYYY-MM-DD`
+- **Database Tables**:
+  - `SupplierCategory` - Parent lookup table with display_order
+  - `SupplierType` - Parent lookup table with display_order
+  - `Supplier` - Main table with FKs to category and type
+
+#### 2. Customers (Vevők)
+- **Direct import** with cashflow adjustment tracking
+- **CSV Columns**:
+  - `Customer name` (Customer name) - Required
+  - `Cashflow adjustment` (Cashflow adjustment in days) - Optional, default: 0
+  - `Validf_from` (Valid from date) - Optional, format: `YYYY/MM/DD`
+  - `Valid_to` (Valid to date) - Optional, format: `YYYY/MM/DD`
+- **Database Table**: `Customer`
+
+#### 3. Product Prices (CONMED Árak)
+- **Batch processing** with connection management for large datasets (5,000+ rows)
+- **Ignores "NEM KELL" column** - CSV contains this column but it's not imported
+- **CSV Columns** (14 total):
+  - `Product Value` (Product code) - Required
+  - `Product Description` (Product description) - Required
+  - `NEM KELL` (Not needed) - **IGNORED, not imported**
+  - `UOM` (Unit of measure) - Optional
+  - `UOM_HUN` (Hungarian unit of measure) - Optional
+  - ` PURCHASE PRICE USD ` (Purchase price in USD) - Optional
+  - ` PURCHASE PRICE HUF ` (Purchase price in HUF) - Optional
+  - ` MARKUP` (Markup multiplier) - Optional
+  - ` SALES PRICE HUF` (Sales price in HUF) - Optional
+  - `Cap/Disp` (Capital/Disposable) - Optional
+  - `Készletkezelt termék` (Inventory managed, y/n) - Optional, default: false
+  - `Valid from` (Valid from date) - Optional, format: `YYYY/MM/DD`
+  - `Valid to` (Valid to date) - Optional, format: `YYYY/MM/DD`
+- **Database Table**: `ProductPrice`
+- **Performance**: Processes 100 records per batch, closes/reopens connection between batches
+
+### Command Usage
+
+#### Basic Syntax
+```bash
+python manage.py import_base_tables \
+  --company-id=<COMPANY_ID> \
+  --csv-type=<suppliers|customers|prices> \
+  --csv-path=<PATH_TO_CSV_FILE>
+```
+
+#### Examples
+
+**Import Suppliers**:
+```bash
+python manage.py import_base_tables \
+  --company-id=4 \
+  --csv-type=suppliers \
+  --csv-path=/opt/data/BASE_table_Beszallitok.csv
+```
+
+**Import Customers**:
+```bash
+python manage.py import_base_tables \
+  --company-id=4 \
+  --csv-type=customers \
+  --csv-path=/opt/data/BASE_table_Vevok.csv
+```
+
+**Import Product Prices**:
+```bash
+python manage.py import_base_tables \
+  --company-id=4 \
+  --csv-type=prices \
+  --csv-path=/opt/data/BASE_table_CONMED_arak.csv
+```
+
+### Railway Deployment Workflow
+
+The recommended workflow for production deployment:
+
+1. **Commit management command to git** (CSV files NOT included)
+   ```bash
+   git add bank_transfers/management/commands/import_base_tables.py
+   git commit -m "feat: Add base tables import management command"
+   git push origin main
+   ```
+
+2. **Deploy to Railway** - Code is automatically deployed
+
+3. **SSH into Railway instance**
+   ```bash
+   railway shell
+   ```
+
+4. **Upload CSV files** (via SCP, SFTP, or volume mount)
+   ```bash
+   # From local machine
+   railway scp local_file.csv remote:/opt/data/
+   ```
+
+5. **Run import commands manually**
+   ```bash
+   # Inside Railway shell
+   cd /app/backend
+   python manage.py import_base_tables \
+     --company-id=<ID> \
+     --csv-type=suppliers \
+     --csv-path=/opt/data/suppliers.csv
+   ```
+
+### Key Features
+
+#### Company Isolation
+- All imports are **company-scoped** using `--company-id` parameter
+- Same CSV can be imported for multiple companies
+- Data is isolated per company with proper foreign keys
+
+#### Update-or-Create Logic
+- **Suppliers**: Match on `company` + `partner_name`
+- **Customers**: Match on `company` + `customer_name`
+- **Product Prices**: Match on `company` + `product_value`
+- Existing records are updated, new records are created
+
+#### Progress Reporting
+- **Detailed console output** with emojis for readability
+- **Phase reporting** for suppliers (categories → types → suppliers)
+- **Batch progress** for product prices (every 100 records)
+- **Summary statistics** at completion
+
+#### Error Handling
+- **Row-level error catching** - one bad row doesn't fail entire import
+- **Validation messages** for date format errors
+- **Skipped row counting** for audit trail
+- **Transaction rollback** on critical failures
+
+#### Performance Optimization
+- **Batch processing** for large datasets (ProductPrice with 5,299 rows)
+- **Connection management**: Closes/reopens connection every 100 records
+- **Prevents SQL Server connection timeouts** on long-running imports
+- **Indexed lookups** for category/type matching
+
+### Import Statistics Example
+
+**Suppliers Import (73 suppliers, 7 categories, 18 types)**:
+```
+================================================================================
+📊 Importing suppliers from CSV
+🏢 Company: IT Cardigan Kft. (ID: 4)
+📁 File: /opt/data/BASE_table_Beszallitok.csv
+================================================================================
+
+📊 Phase 1: Extracting categories and types...
+  Found 7 unique categories
+  Found 18 unique types
+
+🏷️  Creating categories...
+  ✨ 0. 1. TOTAL COST SALES:
+  ✨ 1. 2. TOTAL TRADING COST:
+  ...
+
+🔖 Creating types...
+  ✨ 0. Ortho
+  ✨ 1. Rent, lease
+  ...
+
+👥 Phase 2: Creating suppliers with FK links...
+  ✅ CONMED LINVATEC                                  | 1. TOTAL COST SALES:    | Ortho
+  ✅ PortoNovo Property Kft.                          | 3. TOTAL OFFICE COSTS:  | Rent, lease
+  ...
+
+================================================================================
+✅ Import completed successfully!
+
+  Phase 1 - Categories & Types:
+    Categories created: 7
+    Types created: 18
+  Phase 2 - Suppliers:
+    Suppliers created: 73
+    Suppliers updated: 0
+    Rows skipped: 0
+================================================================================
+```
+
+### Data Validation
+
+#### Date Formats
+- **Suppliers**: `YYYY-MM-DD` (e.g., `2024-06-30`)
+- **Customers**: `YYYY/MM/DD` (e.g., `2024/06/30`)
+- **Product Prices**: `YYYY/MM/DD` (e.g., `2024/06/30`)
+
+#### Currency Cleaning
+Product prices automatically clean currency values:
+- Removes `$`, `,`, `Ft` symbols
+- Converts to Decimal with proper precision
+- Handles empty values as `NULL`
+
+#### Boolean Fields
+- **Product Prices**: `Készletkezelt termék` - `y` = `True`, anything else = `False`
+
+### Implementation Files
+
+**Management Command**:
+- `/backend/bank_transfers/management/commands/import_base_tables.py` - Unified import command (500+ lines)
+
+**Models** (defined in `/backend/bank_transfers/models.py`):
+- `SupplierCategory` - Supplier category lookup table
+- `SupplierType` - Supplier type lookup table
+- `Supplier` - Main supplier table with FK relationships
+- `Customer` - Customer master data
+- `ProductPrice` - Product pricing and inventory data
+
+**Database Schema Documentation**:
+- `/DATABASE_DOCUMENTATION.md` - Complete schema reference
+- `/backend/sql/complete_database_comments_postgresql.sql` - PostgreSQL schema
+- `/backend/sql/complete_database_comments_sqlserver.sql` - SQL Server schema
+
+### Notes
+
+- **CSV files NOT in git**: Following security best practices, CSV files are uploaded manually to production
+- **Manual control**: Administrator must explicitly trigger imports with company ID
+- **No automatic migrations**: Unlike Django data migrations, this runs only when invoked
+- **Transaction safety**: Each import is wrapped in `@transaction.atomic` for rollback on failure
+- **Connection pooling**: Product prices import closes/reopens connection every 100 rows to prevent timeouts
+- **Company validation**: Command validates company exists and is active before import
+- **File validation**: Command validates CSV file exists before attempting import

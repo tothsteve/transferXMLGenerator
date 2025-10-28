@@ -119,6 +119,10 @@ DATABASES = {
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
         },
+        # Connection pooling - reuse connections for 600 seconds (10 minutes)
+        'CONN_MAX_AGE': 600,
+        # Health checks - validate connection before reuse
+        'CONN_HEALTH_CHECKS': True,
     }
 }
 

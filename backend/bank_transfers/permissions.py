@@ -500,37 +500,82 @@ class RequireBillingoSync(FeatureBasedPermission):
         return False
 
 
+class RequireBaseTables(FeatureBasedPermission):
+    """
+    Permission class for BASE_TABLES (Alaptáblák) functionality.
+
+    Requires BASE_TABLES feature to be enabled for the company.
+
+    Access levels by role:
+    - ADMIN: Full access (create, read, update, delete)
+    - FINANCIAL: No access
+    - ACCOUNTANT: No access
+    - USER: No access
+    """
+
+    required_features = ['BASE_TABLES']
+
+    def has_permission(self, request, view):
+        if not hasattr(request, 'company') or not request.company:
+            return False
+
+        # Get user's company membership and allowed features
+        try:
+            from .models import CompanyUser
+            company_user = CompanyUser.objects.get(
+                user=request.user,
+                company=request.company,
+                is_active=True
+            )
+            user_role = company_user.role
+            user_allowed_features = company_user.get_allowed_features()
+        except CompanyUser.DoesNotExist:
+            logger.warning(f"User {request.user.username} has no role in company {request.company}")
+            return False
+
+        # Check if BASE_TABLES feature is enabled for company
+        if not FeatureChecker.is_feature_enabled(request.company, 'BASE_TABLES'):
+            return False
+
+        # Check if user's role allows BASE_TABLES
+        if 'BASE_TABLES' not in user_allowed_features and '*' not in user_allowed_features:
+            return False
+
+        # All operations (read and write) - ADMIN only
+        return user_role == 'ADMIN'
+
+
 class IsCompanyMember(permissions.BasePermission):
     """
     Engedély: felhasználó tagja a cégnek
     ALSO sets request.company if not already set
     """
-    
+
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
-        
+
         # Set company context if not already set
         if not hasattr(request, 'company') or not request.company:
             self._set_company_context(request)
-        
+
         # Get company from request context
         company = getattr(request, 'company', None)
         if not company:
             return False
-        
+
         # Check if user is a member of this company
         return CompanyUser.objects.filter(
             user=request.user,
             company=company,
             is_active=True
         ).exists()
-    
+
     def _set_company_context(self, request):
         """Set request.company based on X-Company-ID header or user profile"""
         # Get company from header
         company_id = request.META.get('HTTP_X_COMPANY_ID')
-        
+
         if company_id:
             try:
                 company_id = int(company_id)
@@ -540,13 +585,13 @@ class IsCompanyMember(permissions.BasePermission):
                     company_id=company_id,
                     is_active=True
                 ).select_related('company').first()
-                
+
                 if membership:
                     request.company = membership.company
                     return
             except (ValueError, TypeError):
                 pass
-        
+
         # Fallback to user's last active company
         try:
             profile = UserProfile.objects.select_related('last_active_company').get(user=request.user)
@@ -561,13 +606,13 @@ class IsCompanyMember(permissions.BasePermission):
                     return
         except UserProfile.DoesNotExist:
             pass
-        
+
         # Find first available company for user
         membership = CompanyUser.objects.filter(
             user=request.user,
             is_active=True
         ).select_related('company').first()
-        
+
         if membership:
             request.company = membership.company
             # Update user profile

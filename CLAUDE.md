@@ -91,6 +91,7 @@ Contains detailed implementation information for all major features:
 - Trusted Partners Auto-Payment System (flexible tax number matching)
 - MNB Exchange Rate Integration (USD/EUR with 33 currencies available)
 - Bank Statement Import and Transaction Matching (7 matching strategies, 5 confidence levels)
+- Base Tables Import System (manual CSV import for suppliers, customers, product prices)
 
 #### API_GUIDE.md
 **Location**: `/API_GUIDE.md`
@@ -162,6 +163,12 @@ python manage.py runserver 8002
 
 # Create superuser
 python manage.py createsuperuser
+
+# Import base tables (Suppliers, Customers, Product Prices)
+# See FEATURES.md for detailed documentation
+python manage.py import_base_tables --company-id=<ID> --csv-type=suppliers --csv-path=<PATH>
+python manage.py import_base_tables --company-id=<ID> --csv-type=customers --csv-path=<PATH>
+python manage.py import_base_tables --company-id=<ID> --csv-type=prices --csv-path=<PATH>
 ```
 
 ### Frontend
