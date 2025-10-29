@@ -95,6 +95,35 @@ export const queryKeys = {
 };
 
 /**
+ * Helper to handle 403 Forbidden errors gracefully for feature-gated endpoints.
+ * Returns empty data instead of throwing, allowing components to show "no data" messages.
+ *
+ * @param queryFn - The original query function
+ * @param emptyData - The empty data to return on 403 (default: empty ApiResponse)
+ */
+function handleForbiddenGracefully<T>(
+  queryFn: () => Promise<T>,
+  emptyData?: T
+): () => Promise<T> {
+  return async () => {
+    try {
+      return await queryFn();
+    } catch (error: unknown) {
+      // Check if it's a 403 Forbidden error
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { status?: number } };
+        if (axiosError.response?.status === 403) {
+          // Return empty data instead of throwing - user doesn't have access
+          return (emptyData ?? { count: 0, next: null, previous: null, results: [] }) as T;
+        }
+      }
+      // For all other errors, rethrow
+      throw error;
+    }
+  };
+}
+
+/**
  * Beneficiaries Hooks
  *
  * React Query hooks for managing beneficiary data with Zod validation
@@ -1029,10 +1058,10 @@ export function useSupplierCategories(params?: {
 }): UseQueryResult<ApiResponse<SupplierCategory>, Error> {
   return useQuery({
     queryKey: [...queryKeys.supplierCategories, params],
-    queryFn: async () => {
+    queryFn: handleForbiddenGracefully(async () => {
       const response = await supplierCategoriesApi.getAll(params);
       return response.data;
-    },
+    }),
   });
 }
 
@@ -1096,10 +1125,10 @@ export function useSupplierTypes(params?: {
 }): UseQueryResult<ApiResponse<SupplierType>, Error> {
   return useQuery({
     queryKey: [...queryKeys.supplierTypes, params],
-    queryFn: async () => {
+    queryFn: handleForbiddenGracefully(async () => {
       const response = await supplierTypesApi.getAll(params);
       return response.data;
-    },
+    }),
   });
 }
 
@@ -1166,10 +1195,10 @@ export function useSuppliers(params?: {
 }): UseQueryResult<ApiResponse<Supplier>, Error> {
   return useQuery({
     queryKey: [...queryKeys.suppliers, params],
-    queryFn: async () => {
+    queryFn: handleForbiddenGracefully(async () => {
       const response = await suppliersApi.getAll(params);
       return response.data;
-    },
+    }),
   });
 }
 
@@ -1234,10 +1263,10 @@ export function useCustomers(params?: {
 }): UseQueryResult<ApiResponse<Customer>, Error> {
   return useQuery({
     queryKey: [...queryKeys.customers, params],
-    queryFn: async () => {
+    queryFn: handleForbiddenGracefully(async () => {
       const response = await customersApi.getAll(params);
       return response.data;
-    },
+    }),
   });
 }
 
@@ -1304,10 +1333,10 @@ export function useProductPrices(params?: {
 }): UseQueryResult<ApiResponse<ProductPrice>, Error> {
   return useQuery({
     queryKey: [...queryKeys.productPrices, params],
-    queryFn: async () => {
+    queryFn: handleForbiddenGracefully(async () => {
       const response = await productPricesApi.getAll(params);
       return response.data;
-    },
+    }),
   });
 }
 
