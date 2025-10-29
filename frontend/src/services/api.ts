@@ -553,11 +553,11 @@ export const supplierCategoriesApi = {
   /**
    * Create new supplier category.
    *
-   * @param data - Category data (without ID and system fields)
+   * @param data - Category data (without ID and system fields, display_order is optional)
    * @returns Promise resolving to created category
    */
   create: async (
-    data: Omit<SupplierCategory, 'id' | 'company' | 'company_name' | 'created_at' | 'updated_at'>
+    data: Omit<SupplierCategory, 'id' | 'company' | 'company_name' | 'created_at' | 'updated_at' | 'display_order'> & { display_order?: number }
   ): Promise<SupplierCategory> => {
     const response = await apiClient.post('/supplier-categories/', data);
     return response.data;
@@ -616,11 +616,11 @@ export const supplierTypesApi = {
   /**
    * Create new supplier type.
    *
-   * @param data - Type data (without ID and system fields)
+   * @param data - Type data (without ID and system fields, display_order is optional)
    * @returns Promise resolving to created type
    */
   create: async (
-    data: Omit<SupplierType, 'id' | 'company' | 'company_name' | 'created_at' | 'updated_at'>
+    data: Omit<SupplierType, 'id' | 'company' | 'company_name' | 'created_at' | 'updated_at' | 'display_order'> & { display_order?: number }
   ): Promise<SupplierType> => {
     const response = await apiClient.post('/supplier-types/', data);
     return response.data;
