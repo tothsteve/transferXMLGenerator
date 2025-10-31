@@ -416,8 +416,8 @@ class GranitBankAdapter(BankStatementAdapter):
                 name_lines = []
                 for line in lines:
                     line = line.strip()
-                    # Stop if we hit another field
-                    if any(keyword in line for keyword in ['Fizető fél BIC:', 'Kedvezményezett', 'Azonosító:', 'Tranzakció', 'Közlemény', 'BIC:', 'Értéknap']):
+                    # Stop if we hit another field or footer information
+                    if any(keyword in line for keyword in ['Fizető fél BIC:', 'Kedvezményezett', 'Azonosító:', 'Tranzakció', 'Közlemény', 'BIC:', 'Értéknap', 'Számlaszám:', 'Devizanem:', 'Takarékinfo']):
                         break
                     if line:
                         name_lines.append(line)
@@ -447,8 +447,8 @@ class GranitBankAdapter(BankStatementAdapter):
                     name_lines = []
                     for line in lines:
                         line = line.strip()
-                        # Stop if we hit another field
-                        if any(keyword in line for keyword in ['Kedvezményezett', 'Azonosító:', 'Tranzakció', 'Közlemény', 'BIC:', 'Értéknap']):
+                        # Stop if we hit another field or footer information
+                        if any(keyword in line for keyword in ['Kedvezményezett', 'Azonosító:', 'Tranzakció', 'Közlemény', 'BIC:', 'Értéknap', 'Számlaszám:', 'Devizanem:', 'Takarékinfo']):
                             break
                         if line:
                             name_lines.append(line)

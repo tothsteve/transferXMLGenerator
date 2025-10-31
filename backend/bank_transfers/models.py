@@ -1528,7 +1528,7 @@ class BankTransaction(CompanyOwnedTimestampedModel):
     )
 
     payer_name = models.CharField(
-        max_length=200,
+        max_length=300,
         blank=True,
         db_index=True,
         verbose_name="Fizető fél neve"
