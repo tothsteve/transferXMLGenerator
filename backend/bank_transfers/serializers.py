@@ -1304,6 +1304,7 @@ class BillingoInvoiceSerializer(serializers.ModelSerializer):
 
     # Formatted display fields
     gross_total_formatted = serializers.SerializerMethodField()
+    net_total_formatted = serializers.SerializerMethodField()
     invoice_date_formatted = serializers.SerializerMethodField()
     fulfillment_date_formatted = serializers.SerializerMethodField()
     due_date_formatted = serializers.SerializerMethodField()
@@ -1318,7 +1319,7 @@ class BillingoInvoiceSerializer(serializers.ModelSerializer):
 
             # Payment information
             'payment_status', 'payment_method', 'gross_total', 'gross_total_formatted',
-            'currency', 'conversion_rate',
+            'net_total', 'net_total_formatted', 'currency', 'conversion_rate',
 
             # Dates
             'invoice_date', 'invoice_date_formatted',
@@ -1349,6 +1350,12 @@ class BillingoInvoiceSerializer(serializers.ModelSerializer):
     def get_gross_total_formatted(self, obj):
         """Format gross total with currency"""
         return f"{obj.gross_total:,.2f} {obj.currency}"
+
+    def get_net_total_formatted(self, obj):
+        """Format net total with currency"""
+        if obj.net_total:
+            return f"{obj.net_total:,.2f} {obj.currency}"
+        return None
 
     def get_invoice_date_formatted(self, obj):
         """Format invoice date for display"""

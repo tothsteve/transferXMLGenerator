@@ -2326,8 +2326,79 @@ class BillingoInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated, IsCompanyMember, RequireBillingoSync]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['invoice_number', 'partner_name', 'partner_tax_number']
-    ordering_fields = ['invoice_date', 'gross_total', 'payment_status']
+    ordering_fields = ['invoice_number', 'partner_name', 'invoice_date', 'due_date', 'gross_total', 'net_total', 'payment_status']
     ordering = ['-invoice_date']
+
+    def _apply_string_filter(self, queryset, field_name, value, operator='contains'):
+        """Apply operator-based filter for string fields"""
+        if value:
+            if operator == 'contains':
+                return queryset.filter(**{f'{field_name}__icontains': value})
+            elif operator == 'notContains':
+                return queryset.exclude(**{f'{field_name}__icontains': value})
+            elif operator == 'equals':
+                return queryset.filter(**{f'{field_name}__iexact': value})
+            elif operator == 'notEqual':
+                return queryset.exclude(**{f'{field_name}__iexact': value})
+            elif operator == 'startsWith':
+                return queryset.filter(**{f'{field_name}__istartswith': value})
+            elif operator == 'endsWith':
+                return queryset.filter(**{f'{field_name}__iendswith': value})
+        elif operator == 'isEmpty':
+            return queryset.filter(**{f'{field_name}__isnull': True}) | queryset.filter(**{field_name: ''})
+        elif operator == 'isNotEmpty':
+            return queryset.exclude(**{f'{field_name}__isnull': True}).exclude(**{field_name: ''})
+        return queryset
+
+    def _apply_boolean_filter(self, queryset, field_name, value, operator='is'):
+        """Apply operator-based filter for boolean fields"""
+        if value is not None:
+            bool_value = value.lower() == 'true' if isinstance(value, str) else bool(value)
+            if operator == 'is':
+                return queryset.filter(**{field_name: bool_value})
+        return queryset
+
+    def _apply_date_filter(self, queryset, field_name, value, operator='is'):
+        """Apply operator-based filter for date fields"""
+        if value:
+            if operator == 'is':
+                return queryset.filter(**{field_name: value})
+            elif operator == 'not':
+                return queryset.exclude(**{field_name: value})
+            elif operator == 'after':
+                return queryset.filter(**{f'{field_name}__gt': value})
+            elif operator == 'onOrAfter':
+                return queryset.filter(**{f'{field_name}__gte': value})
+            elif operator == 'before':
+                return queryset.filter(**{f'{field_name}__lt': value})
+            elif operator == 'onOrBefore':
+                return queryset.filter(**{f'{field_name}__lte': value})
+        elif operator == 'isEmpty':
+            return queryset.filter(**{f'{field_name}__isnull': True})
+        elif operator == 'isNotEmpty':
+            return queryset.exclude(**{f'{field_name}__isnull': True})
+        return queryset
+
+    def _apply_numeric_filter(self, queryset, field_name, value, operator='='):
+        """Apply operator-based filter for numeric fields"""
+        if value:
+            if operator == '=':
+                return queryset.filter(**{field_name: value})
+            elif operator == '!=':
+                return queryset.exclude(**{field_name: value})
+            elif operator == '>':
+                return queryset.filter(**{f'{field_name}__gt': value})
+            elif operator == '>=':
+                return queryset.filter(**{f'{field_name}__gte': value})
+            elif operator == '<':
+                return queryset.filter(**{f'{field_name}__lt': value})
+            elif operator == '<=':
+                return queryset.filter(**{f'{field_name}__lte': value})
+        elif operator == 'isEmpty':
+            return queryset.filter(**{f'{field_name}__isnull': True})
+        elif operator == 'isNotEmpty':
+            return queryset.exclude(**{f'{field_name}__isnull': True})
+        return queryset
 
     def get_queryset(self):
         """Csak a cég számlái"""
@@ -2337,33 +2408,97 @@ class BillingoInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
 
         queryset = BillingoInvoice.objects.filter(company=company).prefetch_related('items')
 
-        # Filter by payment status
-        payment_status = self.request.query_params.get('payment_status')
-        if payment_status:
-            queryset = queryset.filter(payment_status=payment_status)
+        # String filters with operator support
+        queryset = self._apply_string_filter(
+            queryset, 'invoice_number',
+            self.request.query_params.get('invoice_number'),
+            self.request.query_params.get('invoice_number_operator', 'contains')
+        )
 
-        # Filter by cancelled
-        cancelled = self.request.query_params.get('cancelled')
-        if cancelled is not None:
-            queryset = queryset.filter(cancelled=cancelled.lower() == 'true')
+        queryset = self._apply_string_filter(
+            queryset, 'partner_name',
+            self.request.query_params.get('partner_name'),
+            self.request.query_params.get('partner_name_operator', 'contains')
+        )
 
-        # Filter by partner tax number
-        partner_tax_number = self.request.query_params.get('partner_tax_number')
-        if partner_tax_number:
-            queryset = queryset.filter(partner_tax_number=partner_tax_number)
+        queryset = self._apply_string_filter(
+            queryset, 'type',
+            self.request.query_params.get('type'),
+            self.request.query_params.get('type_operator', 'contains')
+        )
 
-        # Filter by invoice number
-        invoice_number = self.request.query_params.get('invoice_number')
-        if invoice_number:
-            queryset = queryset.filter(invoice_number__icontains=invoice_number)
+        queryset = self._apply_string_filter(
+            queryset, 'payment_status',
+            self.request.query_params.get('payment_status'),
+            self.request.query_params.get('payment_status_operator', 'equals')
+        )
 
-        # Filter by date range
+        # Boolean filter with operator support
+        queryset = self._apply_boolean_filter(
+            queryset, 'cancelled',
+            self.request.query_params.get('cancelled'),
+            self.request.query_params.get('cancelled_operator', 'is')
+        )
+
+        # Date filters with operator support
+        queryset = self._apply_date_filter(
+            queryset, 'invoice_date',
+            self.request.query_params.get('invoice_date'),
+            self.request.query_params.get('invoice_date_operator', 'is')
+        )
+
+        queryset = self._apply_date_filter(
+            queryset, 'due_date',
+            self.request.query_params.get('due_date'),
+            self.request.query_params.get('due_date_operator', 'is')
+        )
+
+        # Numeric filters with operator support
+        queryset = self._apply_numeric_filter(
+            queryset, 'gross_total',
+            self.request.query_params.get('gross_total'),
+            self.request.query_params.get('gross_total_operator', '=')
+        )
+
+        queryset = self._apply_numeric_filter(
+            queryset, 'net_total',
+            self.request.query_params.get('net_total'),
+            self.request.query_params.get('net_total_operator', '=')
+        )
+
+        # Legacy filters for backward compatibility (will be removed later)
+        # These handle old query params like from_date, to_date, etc.
         from_date = self.request.query_params.get('from_date')
         to_date = self.request.query_params.get('to_date')
         if from_date:
             queryset = queryset.filter(invoice_date__gte=from_date)
         if to_date:
             queryset = queryset.filter(invoice_date__lte=to_date)
+
+        due_date_from = self.request.query_params.get('due_date_from')
+        due_date_to = self.request.query_params.get('due_date_to')
+        if due_date_from:
+            queryset = queryset.filter(due_date__gte=due_date_from)
+        if due_date_to:
+            queryset = queryset.filter(due_date__lte=due_date_to)
+
+        gross_total_min = self.request.query_params.get('gross_total_min')
+        gross_total_max = self.request.query_params.get('gross_total_max')
+        if gross_total_min:
+            queryset = queryset.filter(gross_total__gte=gross_total_min)
+        if gross_total_max:
+            queryset = queryset.filter(gross_total__lte=gross_total_max)
+
+        net_total_min = self.request.query_params.get('net_total_min')
+        net_total_max = self.request.query_params.get('net_total_max')
+        if net_total_min:
+            queryset = queryset.filter(net_total__gte=net_total_min)
+        if net_total_max:
+            queryset = queryset.filter(net_total__lte=net_total_max)
+
+        partner_tax_number = self.request.query_params.get('partner_tax_number')
+        if partner_tax_number:
+            queryset = queryset.filter(partner_tax_number=partner_tax_number)
 
         return queryset
 

@@ -85,8 +85,33 @@ export const billingoApi = {
   getInvoices: async (params?: {
     page?: number;
     page_size?: number;
+    // String filters with operators
+    invoice_number?: string;
+    invoice_number_operator?: string;
+    partner_name?: string;
+    partner_name_operator?: string;
+    type?: string;
+    type_operator?: string;
     payment_status?: string;
-    search?: string;
+    payment_status_operator?: string;
+    // Boolean filter with operator
+    cancelled?: string;
+    cancelled_operator?: string;
+    // Date filters with operators
+    invoice_date?: string;
+    invoice_date_operator?: string;
+    due_date?: string;
+    due_date_operator?: string;
+    // Numeric filters with operators
+    gross_total?: string;
+    gross_total_operator?: string;
+    net_total?: string;
+    net_total_operator?: string;
+    // Legacy filters (for backward compatibility)
+    from_date?: string;
+    to_date?: string;
+    due_date_from?: string;
+    due_date_to?: string;
     ordering?: string;
   }): Promise<ApiResponse<BillingoInvoice>> => {
     const response = await apiClient.get('/billingo-invoices/', { params });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Paper,
@@ -7,15 +7,7 @@ import {
   Button,
   Chip,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Pagination,
   MenuItem,
-  InputAdornment,
   CircularProgress,
   Alert,
   Dialog,
@@ -25,15 +17,18 @@ import {
   Divider,
   Tooltip,
   IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from '@mui/material';
 import {
-  Search as SearchIcon,
   Refresh as RefreshIcon,
   Sync as SyncIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Info as InfoIcon,
 } from '@mui/icons-material';
+import { DataGrid, GridColDef, GridSortModel, GridRowParams, GridFilterModel } from '@mui/x-data-grid';
 import { useBillingoInvoices, useTriggerBillingoSync, useBillingoInvoice } from '../../hooks/useBillingo';
 import { useToastContext } from '../../context/ToastContext';
 import { BillingoInvoice } from '../../types/api';
@@ -41,11 +36,50 @@ import { BillingoInvoice } from '../../types/api';
 const BillingoInvoices: React.FC = () => {
   const { success: showSuccess, error: showError, warning: showWarning } = useToastContext();
 
-  // Filters
-  const [search, setSearch] = useState('');
+  // Column-specific filters with operators
+  // String filters
+  const [invoiceNumberFilter, setInvoiceNumberFilter] = useState('');
+  const [invoiceNumberOperator, setInvoiceNumberOperator] = useState('contains');
+  const [partnerNameFilter, setPartnerNameFilter] = useState('');
+  const [partnerNameOperator, setPartnerNameOperator] = useState('contains');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [typeOperator, setTypeOperator] = useState('contains');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
+  const [paymentStatusOperator, setPaymentStatusOperator] = useState('equals');
+
+  // Boolean filter
+  const [cancelledFilter, setCancelledFilter] = useState('');
+  const [cancelledOperator, setCancelledOperator] = useState('is');
+
+  // Date filters
+  const [invoiceDateFilter, setInvoiceDateFilter] = useState('');
+  const [invoiceDateOperator, setInvoiceDateOperator] = useState('is');
+  const [dueDateFilter, setDueDateFilter] = useState('');
+  const [dueDateOperator, setDueDateOperator] = useState('is');
+
+  // Numeric filters
+  const [grossTotalFilter, setGrossTotalFilter] = useState('');
+  const [grossTotalOperator, setGrossTotalOperator] = useState('=');
+  const [netTotalFilter, setNetTotalFilter] = useState('');
+  const [netTotalOperator, setNetTotalOperator] = useState('=');
+
+  // Legacy filters (kept for backward compatibility)
+  const [invoiceDateFromFilter, setInvoiceDateFromFilter] = useState('');
+  const [invoiceDateToFilter, setInvoiceDateToFilter] = useState('');
+  const [dueDateFromFilter, setDueDateFromFilter] = useState('');
+  const [dueDateToFilter, setDueDateToFilter] = useState('');
   const [paymentStatus, setPaymentStatus] = useState<string>('all');
-  const [page, setPage] = useState(1);
-  const pageSize = 20;
+
+  const [page, setPage] = useState(0); // DataGrid uses 0-based indexing
+  const [pageSize, setPageSize] = useState(20);
+
+  // Sorting
+  const [sortModel, setSortModel] = useState<GridSortModel>([
+    { field: 'invoice_date', sort: 'desc' }
+  ]);
+
+  // DataGrid filter model
+  const [filterModel, setFilterModel] = useState<GridFilterModel>({ items: [] });
 
   // Selected invoice for details
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<number>(0);
@@ -53,14 +87,88 @@ const BillingoInvoices: React.FC = () => {
   // Data validation state
   const [dataIssues, setDataIssues] = useState<string[]>([]);
 
+  // Map frontend field names to backend field names for sorting
+  const mapFieldNameToBackend = (fieldName: string): string => {
+    const fieldMap: Record<string, string> = {
+      'invoice_date_formatted': 'invoice_date',
+      'gross_total_formatted': 'gross_total',
+    };
+    return fieldMap[fieldName] || fieldName;
+  };
+
   // Queries
-  const { data, isLoading, error, refetch } = useBillingoInvoices({
-    page,
+  const frontendOrderField = sortModel[0]?.field || 'invoice_date';
+  const orderField = mapFieldNameToBackend(frontendOrderField);
+  const orderDirection = sortModel[0]?.sort || 'desc';
+
+  // Memoize query params to ensure stable reference for React Query
+  const queryParams = useMemo(() => ({
+    page: page + 1, // Convert back to 1-based for backend
     page_size: pageSize,
+    // String filters with operators
+    ...(invoiceNumberFilter && {
+      invoice_number: invoiceNumberFilter,
+      invoice_number_operator: invoiceNumberOperator
+    }),
+    ...(partnerNameFilter && {
+      partner_name: partnerNameFilter,
+      partner_name_operator: partnerNameOperator
+    }),
+    ...(typeFilter && {
+      type: typeFilter,
+      type_operator: typeOperator
+    }),
+    ...(paymentStatusFilter && {
+      payment_status: paymentStatusFilter,
+      payment_status_operator: paymentStatusOperator
+    }),
+    // Boolean filter
+    ...(cancelledFilter && {
+      cancelled: cancelledFilter,
+      cancelled_operator: cancelledOperator
+    }),
+    // Date filters with operators
+    ...(invoiceDateFilter && {
+      invoice_date: invoiceDateFilter,
+      invoice_date_operator: invoiceDateOperator
+    }),
+    ...(dueDateFilter && {
+      due_date: dueDateFilter,
+      due_date_operator: dueDateOperator
+    }),
+    // Numeric filters with operators
+    ...(grossTotalFilter && {
+      gross_total: grossTotalFilter,
+      gross_total_operator: grossTotalOperator
+    }),
+    ...(netTotalFilter && {
+      net_total: netTotalFilter,
+      net_total_operator: netTotalOperator
+    }),
+    // Legacy filters (for backward compatibility)
     ...(paymentStatus !== 'all' && { payment_status: paymentStatus }),
-    ...(search && { search }),
-    ordering: '-invoice_number',
-  });
+    ...(invoiceDateFromFilter && { from_date: invoiceDateFromFilter }),
+    ...(invoiceDateToFilter && { to_date: invoiceDateToFilter }),
+    ...(dueDateFromFilter && { due_date_from: dueDateFromFilter }),
+    ...(dueDateToFilter && { due_date_to: dueDateToFilter }),
+    ordering: `${orderDirection === 'desc' ? '-' : ''}${orderField}`,
+  }), [
+    page, pageSize,
+    invoiceNumberFilter, invoiceNumberOperator,
+    partnerNameFilter, partnerNameOperator,
+    typeFilter, typeOperator,
+    paymentStatusFilter, paymentStatusOperator,
+    cancelledFilter, cancelledOperator,
+    invoiceDateFilter, invoiceDateOperator,
+    dueDateFilter, dueDateOperator,
+    grossTotalFilter, grossTotalOperator,
+    netTotalFilter, netTotalOperator,
+    paymentStatus, invoiceDateFromFilter, invoiceDateToFilter,
+    dueDateFromFilter, dueDateToFilter,
+    orderField, orderDirection
+  ]);
+
+  const { data, isLoading, error, refetch } = useBillingoInvoices(queryParams);
 
   const { data: invoiceDetails, isLoading: isLoadingDetails, error: detailsError } = useBillingoInvoice(selectedInvoiceId);
 
@@ -162,18 +270,129 @@ const BillingoInvoices: React.FC = () => {
     return <Chip label={config.label} color={config.color} size="small" />;
   };
 
-  const totalPages = data ? Math.ceil(data.count / pageSize) : 0;
+  // Define DataGrid columns
+  const columns: GridColDef[] = [
+    {
+      field: 'type',
+      headerName: 'Típus',
+      width: 120,
+      filterable: true,
+    },
+    {
+      field: 'invoice_number',
+      headerName: 'Számlaszám',
+      width: 180,
+      filterable: true,
+    },
+    {
+      field: 'partner_name',
+      headerName: 'Partner',
+      width: 250,
+      filterable: true,
+    },
+    {
+      field: 'invoice_date_formatted',
+      headerName: 'Számla kelte',
+      width: 150,
+      filterable: true,
+      type: 'date',
+      valueGetter: (_value, row) => {
+        const invoice = row as BillingoInvoice;
+        return invoice.invoice_date_formatted ? new Date(invoice.invoice_date_formatted) : null;
+      },
+    },
+    {
+      field: 'due_date',
+      headerName: 'Fizetési határidő',
+      width: 150,
+      filterable: true,
+      type: 'date',
+      valueGetter: (_value, row) => {
+        const invoice = row as BillingoInvoice;
+        return invoice.due_date ? new Date(invoice.due_date) : null;
+      },
+    },
+    {
+      field: 'gross_total_formatted',
+      headerName: 'Bruttó',
+      width: 150,
+      align: 'right',
+      headerAlign: 'right',
+      filterable: true,
+    },
+    {
+      field: 'net_total',
+      headerName: 'Nettó',
+      width: 150,
+      align: 'right',
+      headerAlign: 'right',
+      filterable: true,
+      renderCell: (params) => {
+        const invoice = params.row as BillingoInvoice;
+        const gross = parseFloat(invoice.gross_total_formatted?.replace(/[^\d.-]/g, '') || '0');
+        const net = gross / 1.27;
+        return `${net.toLocaleString('hu-HU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${invoice.currency || 'HUF'}`;
+      },
+    },
+    {
+      field: 'currency',
+      headerName: 'Pénznem',
+      width: 100,
+      sortable: false,
+      filterable: false,
+    },
+    {
+      field: 'payment_status',
+      headerName: 'Fizetés',
+      width: 130,
+      filterable: true,
+      renderCell: (params) => {
+        return getPaymentStatusChip(params.row as BillingoInvoice);
+      },
+    },
+    {
+      field: 'cancelled',
+      headerName: 'Sztornó',
+      width: 100,
+      filterable: true,
+      type: 'boolean',
+      renderCell: (params) => {
+        const invoice = params.row as BillingoInvoice;
+        return invoice.cancelled ? (
+          <Chip label="Sztornó" color="error" size="small" />
+        ) : null;
+      },
+    },
+    {
+      field: 'item_count',
+      headerName: 'Tételek',
+      width: 100,
+      align: 'center',
+      headerAlign: 'center',
+      sortable: false,
+      filterable: false,
+      renderCell: (params) => (params.row as BillingoInvoice).item_count || 0,
+    },
+  ];
 
-  // Validation: Check if invoice data is complete
-  const isInvoiceDataComplete = (invoice: BillingoInvoice): boolean => {
-    return !!(
-      invoice.invoice_number &&
-      invoice.partner_name &&
-      invoice.gross_total_formatted &&
-      invoice.invoice_date_formatted &&
-      invoice.due_date
-    );
+  // Calculate totals for current page
+  const calculateTotals = () => {
+    if (!data?.results) return { gross: 0, net: 0, count: 0 };
+
+    const gross = data.results.reduce((sum, invoice) => {
+      const value = parseFloat(invoice.gross_total_formatted?.replace(/[^\d.-]/g, '') || '0');
+      return sum + value;
+    }, 0);
+
+    const net = data.results.reduce((sum, invoice) => {
+      const value = parseFloat(invoice.gross_total_formatted?.replace(/[^\d.-]/g, '') || '0');
+      return sum + (value / 1.27);
+    }, 0);
+
+    return { gross, net, count: data.results.length };
   };
+
+  const totals = calculateTotals();
 
   return (
     <Box sx={{ p: 3 }}>
@@ -234,42 +453,124 @@ const BillingoInvoices: React.FC = () => {
         </Alert>
       )}
 
-      {/* Filters */}
+      {/* Column Filters */}
       <Paper sx={{ p: 2, mb: 3 }}>
-        <Stack direction="row" spacing={2} alignItems="center">
-          <TextField
-            placeholder="Keresés számlaszám vagy partner alapján..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1); // Reset to first page on search
-            }}
-            size="small"
-            sx={{ flexGrow: 1 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            }}
-          />
-          <TextField
-            select
-            label="Fizetési státusz"
-            value={paymentStatus}
-            onChange={(e) => {
-              setPaymentStatus(e.target.value);
-              setPage(1); // Reset to first page on filter change
-            }}
-            size="small"
-            sx={{ minWidth: 200 }}
-          >
-            <MenuItem value="all">Összes</MenuItem>
-            <MenuItem value="outstanding">Függőben</MenuItem>
-            <MenuItem value="paid">Fizetve</MenuItem>
-            <MenuItem value="cancelled">Sztornózva</MenuItem>
-          </TextField>
+        <Typography variant="subtitle2" gutterBottom fontWeight="bold">
+          Szűrők
+        </Typography>
+        <Stack spacing={2}>
+          {/* Row 1: Text filters */}
+          <Stack direction="row" spacing={2}>
+            <TextField
+              label="Számlaszám"
+              placeholder="Keresés számlaszámra..."
+              value={invoiceNumberFilter}
+              onChange={(e) => {
+                setInvoiceNumberFilter(e.target.value);
+                setPage(0);
+              }}
+              size="small"
+              sx={{ flexGrow: 1 }}
+            />
+            <TextField
+              label="Partner név"
+              placeholder="Keresés partnerre..."
+              value={partnerNameFilter}
+              onChange={(e) => {
+                setPartnerNameFilter(e.target.value);
+                setPage(0);
+              }}
+              size="small"
+              sx={{ flexGrow: 1 }}
+            />
+            <TextField
+              select
+              label="Fizetési státusz"
+              value={paymentStatus}
+              onChange={(e) => {
+                setPaymentStatus(e.target.value);
+                setPage(0);
+              }}
+              size="small"
+              sx={{ minWidth: 200 }}
+            >
+              <MenuItem value="all">Összes</MenuItem>
+              <MenuItem value="outstanding">Függőben</MenuItem>
+              <MenuItem value="paid">Fizetve</MenuItem>
+              <MenuItem value="cancelled">Sztornózva</MenuItem>
+            </TextField>
+          </Stack>
+
+          {/* Row 2: Date filters */}
+          <Stack direction="row" spacing={2}>
+            <TextField
+              label="Számla kelte (tól)"
+              type="date"
+              value={invoiceDateFromFilter}
+              onChange={(e) => {
+                setInvoiceDateFromFilter(e.target.value);
+                setPage(0);
+              }}
+              size="small"
+              InputLabelProps={{ shrink: true }}
+              sx={{ flexGrow: 1 }}
+            />
+            <TextField
+              label="Számla kelte (ig)"
+              type="date"
+              value={invoiceDateToFilter}
+              onChange={(e) => {
+                setInvoiceDateToFilter(e.target.value);
+                setPage(0);
+              }}
+              size="small"
+              InputLabelProps={{ shrink: true }}
+              sx={{ flexGrow: 1 }}
+            />
+            <TextField
+              label="Fizetési határidő (tól)"
+              type="date"
+              value={dueDateFromFilter}
+              onChange={(e) => {
+                setDueDateFromFilter(e.target.value);
+                setPage(0);
+              }}
+              size="small"
+              InputLabelProps={{ shrink: true }}
+              sx={{ flexGrow: 1 }}
+            />
+            <TextField
+              label="Fizetési határidő (ig)"
+              type="date"
+              value={dueDateToFilter}
+              onChange={(e) => {
+                setDueDateToFilter(e.target.value);
+                setPage(0);
+              }}
+              size="small"
+              InputLabelProps={{ shrink: true }}
+              sx={{ flexGrow: 1 }}
+            />
+          </Stack>
+
+          {/* Clear Filters Button */}
+          <Stack direction="row" justifyContent="flex-end">
+            <Button
+              size="small"
+              onClick={() => {
+                setInvoiceNumberFilter('');
+                setPartnerNameFilter('');
+                setInvoiceDateFromFilter('');
+                setInvoiceDateToFilter('');
+                setDueDateFromFilter('');
+                setDueDateToFilter('');
+                setPaymentStatus('all');
+                setPage(0);
+              }}
+            >
+              Szűrők törlése
+            </Button>
+          </Stack>
         </Stack>
       </Paper>
 
@@ -293,107 +594,125 @@ const BillingoInvoices: React.FC = () => {
         </Alert>
       )}
 
-      {/* Loading State */}
-      {isLoading && (
-        <Box display="flex" justifyContent="center" alignItems="center" p={4}>
-          <CircularProgress />
-          <Typography ml={2} color="text.secondary">
-            Számlák betöltése...
-          </Typography>
-        </Box>
-      )}
+      {/* DataGrid */}
+      <Paper sx={{ height: 700, width: '100%' }}>
+        <DataGrid
+          rows={data?.results || []}
+          columns={columns}
+          paginationMode="server"
+          paginationModel={{ page, pageSize }}
+          onPaginationModelChange={(model) => {
+            setPage(model.page);
+            setPageSize(model.pageSize);
+          }}
+          pageSizeOptions={[10, 20, 50, 100]}
+          rowCount={data?.count || 0}
+          loading={isLoading}
+          sortingMode="server"
+          sortModel={sortModel}
+          onSortModelChange={(newSortModel) => setSortModel(newSortModel)}
+          filterMode="server"
+          filterModel={filterModel}
+          onFilterModelChange={(newFilterModel) => {
+            setFilterModel(newFilterModel);
+            // Convert DataGrid filter to our backend format
+            const filters = newFilterModel.items[0];
 
-      {/* Table */}
-      {!isLoading && data && (
-        <>
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Státusz</TableCell>
-                  <TableCell>Számlaszám</TableCell>
-                  <TableCell>Partner</TableCell>
-                  <TableCell>Számla kelte</TableCell>
-                  <TableCell>Fizetési határidő</TableCell>
-                  <TableCell align="right">Összeg</TableCell>
-                  <TableCell>Pénznem</TableCell>
-                  <TableCell>Fizetés</TableCell>
-                  <TableCell align="center">Tételek</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {data.results.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} align="center">
-                      <Stack alignItems="center" py={4} spacing={2}>
-                        <InfoIcon color="disabled" sx={{ fontSize: 48 }} />
-                        <Typography color="text.secondary">
-                          {search || paymentStatus !== 'all'
-                            ? 'Nincs a szűrési feltételeknek megfelelő számla'
-                            : 'Nincs megjeleníthető számla'
-                          }
-                        </Typography>
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  data.results.map((invoice) => {
-                    const dataComplete = isInvoiceDataComplete(invoice);
-                    return (
-                      <TableRow
-                        key={invoice.id}
-                        hover
-                        sx={{
-                          cursor: 'pointer',
-                          bgcolor: !dataComplete ? 'warning.50' : 'inherit'
-                        }}
-                        onClick={() => setSelectedInvoiceId(invoice.id)}
-                      >
-                        <TableCell>
-                          {dataComplete ? (
-                            <Tooltip title="Adatok rendben">
-                              <CheckCircleIcon color="success" fontSize="small" />
-                            </Tooltip>
-                          ) : (
-                            <Tooltip title="Hiányos adatok">
-                              <WarningIcon color="warning" fontSize="small" />
-                            </Tooltip>
-                          )}
-                        </TableCell>
-                        <TableCell>{invoice.invoice_number || '-'}</TableCell>
-                        <TableCell>{invoice.partner_name || 'Ismeretlen partner'}</TableCell>
-                        <TableCell>{invoice.invoice_date_formatted || '-'}</TableCell>
-                        <TableCell>{invoice.due_date || '-'}</TableCell>
-                        <TableCell align="right">
-                          {invoice.gross_total_formatted || '0'}
-                        </TableCell>
-                        <TableCell>{invoice.currency || 'HUF'}</TableCell>
-                        <TableCell>{getPaymentStatusChip(invoice)}</TableCell>
-                        <TableCell align="center">{invoice.item_count || 0}</TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+            // Helper to convert Date object or ISO datetime string to YYYY-MM-DD
+            const formatDateForBackend = (value: string | Date | null | undefined): string => {
+              if (!value) return '';
 
-          {/* Pagination */}
-          <Box display="flex" justifyContent="space-between" alignItems="center" mt={3}>
-            <Typography color="text.secondary">
-              Összesen: {data.count} számla
-              {data.count > 0 && ` (${Math.max(1, (page - 1) * pageSize + 1)} - ${Math.min(page * pageSize, data.count)})`}
+              // If it's a Date object, format it to YYYY-MM-DD
+              if (value instanceof Date) {
+                const year = value.getFullYear();
+                const month = String(value.getMonth() + 1).padStart(2, '0');
+                const day = String(value.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+              }
+
+              // If it's an ISO datetime string, extract just the date part
+              if (typeof value === 'string' && value.includes('T')) {
+                return value.split('T')[0] ?? value;
+              }
+
+              return String(value);
+            };
+
+            if (filters) {
+              switch (filters.field) {
+                // String filters
+                case 'invoice_number':
+                  setInvoiceNumberFilter(filters.value || '');
+                  setInvoiceNumberOperator(filters.operator || 'contains');
+                  break;
+                case 'partner_name':
+                  setPartnerNameFilter(filters.value || '');
+                  setPartnerNameOperator(filters.operator || 'contains');
+                  break;
+                case 'type':
+                  setTypeFilter(filters.value || '');
+                  setTypeOperator(filters.operator || 'contains');
+                  break;
+                case 'payment_status':
+                  setPaymentStatusFilter(filters.value || '');
+                  setPaymentStatusOperator(filters.operator || 'equals');
+                  break;
+                // Boolean filter
+                case 'cancelled':
+                  setCancelledFilter(filters.value || '');
+                  setCancelledOperator(filters.operator || 'is');
+                  break;
+                // Date filters - convert ISO datetime to date only
+                case 'invoice_date_formatted':
+                case 'invoice_date':
+                  setInvoiceDateFilter(formatDateForBackend(filters.value));
+                  setInvoiceDateOperator(filters.operator || 'is');
+                  break;
+                case 'due_date':
+                  setDueDateFilter(formatDateForBackend(filters.value));
+                  setDueDateOperator(filters.operator || 'is');
+                  break;
+                // Numeric filters
+                case 'gross_total_formatted':
+                case 'gross_total':
+                  setGrossTotalFilter(filters.value || '');
+                  setGrossTotalOperator(filters.operator || '=');
+                  break;
+                case 'net_total':
+                  setNetTotalFilter(filters.value || '');
+                  setNetTotalOperator(filters.operator || '=');
+                  break;
+              }
+            }
+            setPage(0);
+          }}
+          onRowClick={(params: GridRowParams) => {
+            setSelectedInvoiceId((params.row as BillingoInvoice).id);
+          }}
+          sx={{
+            '& .MuiDataGrid-row': {
+              cursor: 'pointer',
+            },
+          }}
+          disableRowSelectionOnClick
+        />
+      </Paper>
+
+      {/* Totals Summary */}
+      {data && data.results.length > 0 && (
+        <Paper sx={{ p: 2, mt: 2, bgcolor: 'primary.50' }}>
+          <Stack direction="row" spacing={4} justifyContent="flex-end" alignItems="center">
+            <Typography variant="subtitle1" fontWeight="bold">
+              Összesen ({totals.count} számla):
             </Typography>
-            {totalPages > 1 && (
-              <Pagination
-                count={totalPages}
-                page={page}
-                onChange={(_, value) => setPage(value)}
-                color="primary"
-              />
-            )}
-          </Box>
-        </>
+            <Typography variant="subtitle1" fontWeight="bold">
+              Bruttó: {totals.gross.toLocaleString('hu-HU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HUF
+            </Typography>
+            <Typography variant="subtitle1" fontWeight="bold">
+              Nettó: {totals.net.toLocaleString('hu-HU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HUF
+            </Typography>
+          </Stack>
+        </Paper>
       )}
 
       {/* Invoice Details Modal */}

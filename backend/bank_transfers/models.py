@@ -1979,6 +1979,13 @@ class BillingoInvoice(TimestampedModel):
         decimal_places=2,
         verbose_name="Bruttó összeg"
     )
+    net_total = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Nettó összeg"
+    )
     currency = models.CharField(
         max_length=5,
         verbose_name="Deviza"

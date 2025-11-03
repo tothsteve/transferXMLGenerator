@@ -247,6 +247,8 @@ export interface BillingoInvoice {
   payment_method: string;
   gross_total: string;
   gross_total_formatted: string;
+  net_total: string | null;
+  net_total_formatted: string | null;
   currency: string;
   invoice_date: string;
   invoice_date_formatted: string;

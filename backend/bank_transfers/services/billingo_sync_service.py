@@ -439,6 +439,7 @@ class BillingoSyncService:
                 'payment_status': invoice_data.get('payment_status', ''),
                 'payment_method': invoice_data.get('payment_method', ''),
                 'gross_total': Decimal(str(invoice_data.get('gross_total', 0))),
+                'net_total': Decimal(str(invoice_data.get('total', 0))) if invoice_data.get('total') else None,
                 'currency': invoice_data.get('currency', 'HUF'),
                 'conversion_rate': Decimal(str(invoice_data.get('conversion_rate', 1))),
                 'invoice_date': invoice_data.get('invoice_date'),
