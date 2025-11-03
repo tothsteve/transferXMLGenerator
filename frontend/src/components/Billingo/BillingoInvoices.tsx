@@ -381,6 +381,23 @@ const BillingoInvoices: React.FC = () => {
       filterable: false,
       renderCell: (params) => (params.row as BillingoInvoice).item_count || 0,
     },
+    {
+      field: 'related_documents_count',
+      headerName: 'Kapcsolódó dok.',
+      width: 140,
+      align: 'center',
+      headerAlign: 'center',
+      sortable: false,
+      filterable: false,
+      renderCell: (params) => {
+        const count = (params.row as BillingoInvoice).related_documents_count || 0;
+        return count > 0 ? (
+          <Chip label={count} color="warning" size="small" />
+        ) : (
+          '—'
+        );
+      },
+    },
   ];
 
   // Calculate totals for current page
@@ -865,6 +882,49 @@ const BillingoInvoices: React.FC = () => {
                   {invoiceDetails.gross_total_formatted || '0'} {invoiceDetails.currency || 'HUF'}
                 </Typography>
               </Stack>
+
+              {/* Related Documents */}
+              {invoiceDetails.related_documents && invoiceDetails.related_documents.length > 0 && (
+                <>
+                  <Divider />
+                  <Box>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Kapcsolódó dokumentumok ({invoiceDetails.related_documents.length})
+                    </Typography>
+                    <Alert severity="warning" sx={{ mb: 1 }}>
+                      Ez a számla kapcsolódik más dokumentumokhoz (pl. helyesbítés, sztornó)
+                    </Alert>
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Számlaszám</TableCell>
+                            <TableCell>Billingo ID</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {invoiceDetails.related_documents.map((relDoc) => (
+                            <TableRow key={relDoc.id}>
+                              <TableCell>
+                                <Typography variant="body2" fontWeight="bold">
+                                  {relDoc.related_invoice_number}
+                                </Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="body2" color="text.secondary">
+                                  {relDoc.related_invoice_id}
+                                </Typography>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                </>
+              )}
+
+              <Divider />
 
               {/* Payment Status */}
               <Box>
