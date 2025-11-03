@@ -34,7 +34,7 @@ const customTheme = createTheme({
       contrastText: '#ffffff',
     },
     background: {
-      default: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 25%, #f1f5f9 50%, #f8fafc 100%)',
+      default: '#f8fafc', // Light gray background (gradient applied in Layout component)
       paper: 'rgba(255, 255, 255, 0.9)', // Glassmorphism
     },
     text: {
