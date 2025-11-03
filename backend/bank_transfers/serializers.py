@@ -5,7 +5,7 @@ from .models import (
     NavConfiguration, Invoice, InvoiceLineItem, InvoiceSyncLog, TrustedPartner,
     ExchangeRate, ExchangeRateSyncLog,
     BankStatement, BankTransaction, OtherCost,
-    CompanyBillingoSettings, BillingoInvoice, BillingoInvoiceItem, BillingoSyncLog, BillingoSpending,
+    CompanyBillingoSettings, BillingoInvoice, BillingoInvoiceItem, BillingoRelatedDocument, BillingoSyncLog, BillingoSpending,
     SupplierCategory, SupplierType, Supplier, Customer, ProductPrice
 )
 from .hungarian_account_validator import validate_and_format_hungarian_account_number
@@ -1292,14 +1292,31 @@ class BillingoInvoiceItemSerializer(serializers.ModelSerializer):
         read_only_fields = fields  # All fields are read-only (synced from API)
 
 
+class BillingoRelatedDocumentSerializer(serializers.ModelSerializer):
+    """
+    Serializer for related Billingo documents (corrections, credit notes, etc.).
+
+    Read-only serializer as relationships are synced from Billingo API.
+    """
+
+    class Meta:
+        model = BillingoRelatedDocument
+        fields = [
+            'id', 'related_invoice_id', 'related_invoice_number',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = fields  # All fields are read-only (synced from API)
+
+
 class BillingoInvoiceSerializer(serializers.ModelSerializer):
     """
     Serializer for Billingo invoices.
 
     Read-only serializer as invoices are synced from Billingo API.
-    Includes nested invoice items.
+    Includes nested invoice items and related documents.
     """
     items = BillingoInvoiceItemSerializer(many=True, read_only=True)
+    related_documents = BillingoRelatedDocumentSerializer(many=True, read_only=True)
     company_name = serializers.CharField(source='company.name', read_only=True)
 
     # Formatted display fields
@@ -1339,8 +1356,9 @@ class BillingoInvoiceSerializer(serializers.ModelSerializer):
             # Additional information
             'comment', 'online_szamla_status',
 
-            # Nested items
+            # Nested items and relationships
             'items',
+            'related_documents',
 
             # Metadata
             'created_at', 'updated_at', 'last_modified'
@@ -1392,6 +1410,7 @@ class BillingoInvoiceListSerializer(serializers.ModelSerializer):
     gross_total_formatted = serializers.SerializerMethodField()
     invoice_date_formatted = serializers.SerializerMethodField()
     item_count = serializers.SerializerMethodField()
+    related_documents_count = serializers.SerializerMethodField()
 
     class Meta:
         model = BillingoInvoice
@@ -1400,7 +1419,7 @@ class BillingoInvoiceListSerializer(serializers.ModelSerializer):
             'payment_status', 'payment_method', 'gross_total', 'gross_total_formatted',
             'currency', 'invoice_date', 'invoice_date_formatted',
             'due_date', 'paid_date', 'partner_name', 'partner_tax_number',
-            'cancelled', 'item_count', 'created_at'
+            'cancelled', 'item_count', 'related_documents_count', 'created_at'
         ]
         read_only_fields = fields
 
@@ -1417,6 +1436,10 @@ class BillingoInvoiceListSerializer(serializers.ModelSerializer):
     def get_item_count(self, obj):
         """Return number of invoice items"""
         return obj.items.count()
+
+    def get_related_documents_count(self, obj):
+        """Return number of related documents"""
+        return obj.related_documents.count()
 
 
 class CompanyBillingoSettingsSerializer(serializers.ModelSerializer):

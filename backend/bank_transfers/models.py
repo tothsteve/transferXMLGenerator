@@ -2107,6 +2107,40 @@ class BillingoInvoice(TimestampedModel):
         return f"{self.invoice_number} - {self.partner_name}"
 
 
+class BillingoRelatedDocument(TimestampedModel):
+    """
+    Related documents for Billingo invoices (corrections, credit notes, etc.).
+    Stores document relationships from the Billingo API related_documents array.
+    """
+    invoice = models.ForeignKey(
+        BillingoInvoice,
+        on_delete=models.CASCADE,
+        related_name='related_documents',
+        verbose_name="Számla"
+    )
+    related_invoice_id = models.BigIntegerField(
+        verbose_name="Kapcsolódó számla ID",
+        help_text="Billingo invoice ID of the related document"
+    )
+    related_invoice_number = models.CharField(
+        max_length=100,
+        verbose_name="Kapcsolódó számlaszám",
+        help_text="Invoice number of the related document"
+    )
+
+    class Meta:
+        verbose_name = "Kapcsolódó Billingo dokumentum"
+        verbose_name_plural = "Kapcsolódó Billingo dokumentumok"
+        ordering = ['related_invoice_number']
+        indexes = [
+            models.Index(fields=['invoice', 'related_invoice_id']),
+            models.Index(fields=['related_invoice_id']),
+        ]
+
+    def __str__(self):
+        return f"{self.invoice.invoice_number} → {self.related_invoice_number}"
+
+
 class BillingoInvoiceItem(TimestampedModel):
     """
     Line items for Billingo invoices.

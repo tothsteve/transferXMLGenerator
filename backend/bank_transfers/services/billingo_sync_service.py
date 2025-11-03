@@ -20,6 +20,7 @@ from bank_transfers.models import (
     CompanyBillingoSettings,
     BillingoInvoice,
     BillingoInvoiceItem,
+    BillingoRelatedDocument,
     BillingoSyncLog
 )
 from bank_transfers.services.credential_manager import CredentialManager
@@ -462,9 +463,10 @@ class BillingoSyncService:
             }
         )
 
-        # Delete existing items if updating
+        # Delete existing items and related documents if updating
         if not created:
             invoice.items.all().delete()
+            invoice.related_documents.all().delete()
 
         # Create invoice items
         items_data = invoice_data.get('items', [])
@@ -484,5 +486,14 @@ class BillingoSyncService:
                 entitlement=item_data.get('entitlement', ''),
             )
             item_count += 1
+
+        # Create related documents
+        related_docs_data = invoice_data.get('related_documents', [])
+        for related_doc in related_docs_data:
+            BillingoRelatedDocument.objects.create(
+                invoice=invoice,
+                related_invoice_id=related_doc.get('id', 0),
+                related_invoice_number=related_doc.get('invoice_number', ''),
+            )
 
         return (created, item_count)

@@ -237,6 +237,14 @@ export interface BillingoInvoiceItem {
   updated_at: string;
 }
 
+export interface BillingoRelatedDocument {
+  id: number;
+  related_invoice_id: number;
+  related_invoice_number: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface BillingoInvoice {
   id: number;
   company: number;
@@ -258,6 +266,7 @@ export interface BillingoInvoice {
   partner_tax_number: string;
   cancelled: boolean;
   item_count?: number; // Optional: list view has this, detail view has items array instead
+  related_documents_count?: number; // Optional: list view has this, detail view has related_documents array instead
   created_at: string;
 }
 
@@ -281,6 +290,7 @@ export interface BillingoInvoiceDetail extends BillingoInvoice {
   comment: string;
   online_szamla_status: string;
   items: BillingoInvoiceItem[];
+  related_documents: BillingoRelatedDocument[];
   updated_at: string;
   last_modified: string;
 }
