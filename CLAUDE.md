@@ -145,6 +145,13 @@ Comprehensive bank statement import documentation (1200+ lines):
 
 **All 3 files must stay synchronized and complete. No exceptions.**
 
+## Git Commit Guidelines
+
+**IMPORTANT: DO NOT include Claude Code attribution in commit messages**
+- Never add "🤖 Generated with [Claude Code](https://claude.com/claude-code)" to commits
+- Never add "Co-Authored-By: Claude <noreply@anthropic.com>" to commits
+- Keep commit messages clean and professional without AI tool attribution
+
 ## Development Commands
 
 ### Backend
