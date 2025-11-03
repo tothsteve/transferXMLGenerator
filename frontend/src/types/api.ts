@@ -267,6 +267,7 @@ export interface BillingoInvoice {
   cancelled: boolean;
   item_count?: number; // Optional: list view has this, detail view has items array instead
   related_documents_count?: number; // Optional: list view has this, detail view has related_documents array instead
+  related_invoice_number?: string | null; // Optional: first related invoice number for list view
   created_at: string;
 }
 

@@ -1411,6 +1411,7 @@ class BillingoInvoiceListSerializer(serializers.ModelSerializer):
     invoice_date_formatted = serializers.SerializerMethodField()
     item_count = serializers.SerializerMethodField()
     related_documents_count = serializers.SerializerMethodField()
+    related_invoice_number = serializers.SerializerMethodField()
 
     class Meta:
         model = BillingoInvoice
@@ -1419,7 +1420,7 @@ class BillingoInvoiceListSerializer(serializers.ModelSerializer):
             'payment_status', 'payment_method', 'gross_total', 'gross_total_formatted',
             'currency', 'invoice_date', 'invoice_date_formatted',
             'due_date', 'paid_date', 'partner_name', 'partner_tax_number',
-            'cancelled', 'item_count', 'related_documents_count', 'created_at'
+            'cancelled', 'item_count', 'related_documents_count', 'related_invoice_number', 'created_at'
         ]
         read_only_fields = fields
 
@@ -1440,6 +1441,11 @@ class BillingoInvoiceListSerializer(serializers.ModelSerializer):
     def get_related_documents_count(self, obj):
         """Return number of related documents"""
         return obj.related_documents.count()
+
+    def get_related_invoice_number(self, obj):
+        """Return first related invoice number for display in list"""
+        first_related = obj.related_documents.first()
+        return first_related.related_invoice_number if first_related else None
 
 
 class CompanyBillingoSettingsSerializer(serializers.ModelSerializer):

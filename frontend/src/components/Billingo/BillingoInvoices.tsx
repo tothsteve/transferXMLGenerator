@@ -30,7 +30,7 @@ import {
   Refresh as RefreshIcon,
   Sync as SyncIcon,
 } from '@mui/icons-material';
-import { DataGrid, GridColDef, GridSortModel, GridRowParams, GridFilterModel } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridSortModel, GridRowParams, GridFilterModel, GridRenderCellParams } from '@mui/x-data-grid';
 import { useBillingoInvoices, useTriggerBillingoSync, useBillingoInvoice } from '../../hooks/useBillingo';
 import { useToastContext } from '../../context/ToastContext';
 import { BillingoInvoice } from '../../types/api';
@@ -358,46 +358,27 @@ const BillingoInvoices: React.FC = () => {
         return getPaymentStatusChip(params.row as BillingoInvoice);
       },
     },
-    {
-      field: 'cancelled',
-      headerName: 'Sztornó',
-      width: 100,
-      filterable: true,
-      type: 'boolean',
-      renderCell: (params) => {
+    // Conditionally add related invoice column only when filter is disabled
+    ...(!hideRelatedInvoices ? [{
+      field: 'related_invoice_number',
+      headerName: 'Kapcsolódó számla',
+      width: 200,
+      sortable: false,
+      filterable: false,
+      renderCell: (params: GridRenderCellParams) => {
         const invoice = params.row as BillingoInvoice;
-        return invoice.cancelled ? (
-          <Chip label="Sztornó" color="error" size="small" />
-        ) : null;
-      },
-    },
-    {
-      field: 'item_count',
-      headerName: 'Tételek',
-      width: 100,
-      align: 'center',
-      headerAlign: 'center',
-      sortable: false,
-      filterable: false,
-      renderCell: (params) => (params.row as BillingoInvoice).item_count || 0,
-    },
-    {
-      field: 'related_documents_count',
-      headerName: 'Kapcsolódó dok.',
-      width: 140,
-      align: 'center',
-      headerAlign: 'center',
-      sortable: false,
-      filterable: false,
-      renderCell: (params) => {
-        const count = (params.row as BillingoInvoice).related_documents_count || 0;
-        return count > 0 ? (
-          <Chip label={count} color="warning" size="small" />
-        ) : (
-          '—'
+        if (!invoice.related_invoice_number) return '—';
+
+        return (
+          <Chip
+            label={invoice.related_invoice_number}
+            color="warning"
+            size="small"
+            variant="outlined"
+          />
         );
       },
-    },
+    }] : []),
   ];
 
   // Calculate totals for current page
@@ -647,6 +628,7 @@ const BillingoInvoices: React.FC = () => {
       {/* DataGrid */}
       <Paper sx={{ height: 700, width: '100%' }}>
         <DataGrid
+          key={`datagrid-${hideRelatedInvoices}`}
           rows={data?.results || []}
           columns={columns}
           paginationMode="server"
@@ -900,6 +882,7 @@ const BillingoInvoices: React.FC = () => {
                           <TableRow>
                             <TableCell>Számlaszám</TableCell>
                             <TableCell>Billingo ID</TableCell>
+                            <TableCell>Művelet</TableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
@@ -914,6 +897,17 @@ const BillingoInvoices: React.FC = () => {
                                 <Typography variant="body2" color="text.secondary">
                                   {relDoc.related_invoice_id}
                                 </Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={() => {
+                                    setSelectedInvoiceId(relDoc.related_invoice_id);
+                                  }}
+                                >
+                                  Megnyitás
+                                </Button>
                               </TableCell>
                             </TableRow>
                           ))}
