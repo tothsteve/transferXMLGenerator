@@ -23,6 +23,8 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -62,6 +64,9 @@ const BillingoInvoices: React.FC = () => {
   const [grossTotalOperator, setGrossTotalOperator] = useState('=');
   const [netTotalFilter, setNetTotalFilter] = useState('');
   const [netTotalOperator, setNetTotalOperator] = useState('=');
+
+  // Related documents filter (hide invoices with related documents - corrections, storno, etc.)
+  const [hideRelatedInvoices, setHideRelatedInvoices] = useState(true);
 
   // Legacy filters (kept for backward compatibility)
   const [invoiceDateFromFilter, setInvoiceDateFromFilter] = useState('');
@@ -145,6 +150,8 @@ const BillingoInvoices: React.FC = () => {
       net_total: netTotalFilter,
       net_total_operator: netTotalOperator
     }),
+    // Related documents filter
+    hide_related_invoices: hideRelatedInvoices,
     // Legacy filters (for backward compatibility)
     ...(paymentStatus !== 'all' && { payment_status: paymentStatus }),
     ...(invoiceDateFromFilter && { from_date: invoiceDateFromFilter }),
@@ -163,6 +170,7 @@ const BillingoInvoices: React.FC = () => {
     dueDateFilter, dueDateOperator,
     grossTotalFilter, grossTotalOperator,
     netTotalFilter, netTotalOperator,
+    hideRelatedInvoices,
     paymentStatus, invoiceDateFromFilter, invoiceDateToFilter,
     dueDateFromFilter, dueDateToFilter,
     orderField, orderDirection
@@ -553,6 +561,30 @@ const BillingoInvoices: React.FC = () => {
             />
           </Stack>
 
+          {/* Related Documents Filter */}
+          <Stack direction="row" spacing={2} alignItems="center">
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={hideRelatedInvoices}
+                  onChange={(e) => {
+                    setHideRelatedInvoices(e.target.checked);
+                    setPage(0);
+                  }}
+                />
+              }
+              label="Kapcsolódó dokumentumok elrejtése (sztornó, helyesbítés)"
+            />
+            {!hideRelatedInvoices && (
+              <Chip
+                label="Kapcsolódó dokumentumok láthatóak"
+                color="warning"
+                size="small"
+                variant="outlined"
+              />
+            )}
+          </Stack>
+
           {/* Clear Filters Button */}
           <Stack direction="row" justifyContent="flex-end">
             <Button
@@ -565,6 +597,7 @@ const BillingoInvoices: React.FC = () => {
                 setDueDateFromFilter('');
                 setDueDateToFilter('');
                 setPaymentStatus('all');
+                setHideRelatedInvoices(true);
                 setPage(0);
               }}
             >

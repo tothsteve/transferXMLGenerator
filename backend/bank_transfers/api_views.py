@@ -2500,6 +2500,30 @@ class BillingoInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         if partner_tax_number:
             queryset = queryset.filter(partner_tax_number=partner_tax_number)
 
+        # Filter for invoices with related documents (corrections, storno, etc.)
+        # Only apply this filter to list view, not to retrieve (detail) view
+        # If hide_related_invoices=true (default), exclude both parent and child invoices
+        if self.action == 'list':
+            hide_related = self.request.query_params.get('hide_related_invoices', 'true').lower() == 'true'
+            if hide_related:
+                from .models import BillingoRelatedDocument
+
+                # Get invoice IDs that have related documents (parent invoices)
+                invoices_with_related = BillingoRelatedDocument.objects.filter(
+                    invoice__company=company
+                ).values_list('invoice_id', flat=True).distinct()
+
+                # Get invoice IDs that are referenced in related_documents (child invoices)
+                related_invoice_ids = BillingoRelatedDocument.objects.filter(
+                    invoice__company=company
+                ).values_list('related_invoice_id', flat=True).distinct()
+
+                # Combine both exclusions - hide invoices that are either parent or child
+                all_related_ids = set(invoices_with_related) | set(related_invoice_ids)
+
+                if all_related_ids:
+                    queryset = queryset.exclude(id__in=all_related_ids)
+
         return queryset
 
     def get_serializer_class(self):
