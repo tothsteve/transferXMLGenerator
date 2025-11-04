@@ -18,6 +18,8 @@ import {
   FormControlLabel,
   Switch,
   Checkbox,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -32,6 +34,31 @@ import { ProductPrice } from '../../types/api';
 import { useToastContext } from '../../context/ToastContext';
 import { useDebounce } from '../../hooks/useDebounce';
 import LoadingSpinner from '../UI/LoadingSpinner';
+
+// UOM (Unit of Measure) options
+const UOM_OPTIONS = [
+  { value: 'MO', label: 'MO' },
+  { value: 'BX', label: 'BX' },
+  { value: 'ML', label: 'ML' },
+  { value: 'EA', label: 'EA' },
+] as const;
+
+const UOM_HUN_OPTIONS = [
+  { value: 'eset', label: 'eset' },
+  { value: 'doboz', label: 'doboz' },
+  { value: 'ml', label: 'ml' },
+  { value: 'db', label: 'db' },
+] as const;
+
+const CAP_DISP_OPTIONS = [
+  { value: 'Charge Item', label: 'Charge Item' },
+  { value: 'Bill Code', label: 'Bill Code' },
+  { value: 'Other', label: 'Other' },
+  { value: 'Component', label: 'Component' },
+  { value: 'Capital', label: 'Capital' },
+  { value: 'Disposable', label: 'Disposable' },
+  { value: 'Unassigned', label: 'Unassigned' },
+] as const;
 
 const ProductPrices: React.FC = () => {
   const { success: showSuccess, error: showError } = useToastContext();
@@ -313,18 +340,36 @@ const ProductPrices: React.FC = () => {
                   />
                 </TableCell>
                 <TableCell>
-                  <TextField
+                  <Select
                     size="small"
                     value={editForm.uom || ''}
                     onChange={(e) => setEditForm({ ...editForm, uom: e.target.value })}
-                  />
+                    displayEmpty
+                    fullWidth
+                  >
+                    <MenuItem value="">-</MenuItem>
+                    {UOM_OPTIONS.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
                 </TableCell>
                 <TableCell>
-                  <TextField
+                  <Select
                     size="small"
                     value={editForm.uom_hun || ''}
                     onChange={(e) => setEditForm({ ...editForm, uom_hun: e.target.value })}
-                  />
+                    displayEmpty
+                    fullWidth
+                  >
+                    <MenuItem value="">-</MenuItem>
+                    {UOM_HUN_OPTIONS.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
                 </TableCell>
                 <TableCell>
                   <TextField
@@ -355,11 +400,20 @@ const ProductPrices: React.FC = () => {
                   />
                 </TableCell>
                 <TableCell>
-                  <TextField
+                  <Select
                     size="small"
                     value={editForm.cap_disp || ''}
                     onChange={(e) => setEditForm({ ...editForm, cap_disp: e.target.value })}
-                  />
+                    displayEmpty
+                    fullWidth
+                  >
+                    <MenuItem value="">-</MenuItem>
+                    {CAP_DISP_OPTIONS.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
                 </TableCell>
                 <TableCell>
                   <Checkbox
@@ -412,18 +466,36 @@ const ProductPrices: React.FC = () => {
                     />
                   </TableCell>
                   <TableCell>
-                    <TextField
+                    <Select
                       size="small"
                       value={editForm.uom || ''}
                       onChange={(e) => setEditForm({ ...editForm, uom: e.target.value })}
-                    />
+                      displayEmpty
+                      fullWidth
+                    >
+                      <MenuItem value="">-</MenuItem>
+                      {UOM_OPTIONS.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
                   </TableCell>
                   <TableCell>
-                    <TextField
+                    <Select
                       size="small"
                       value={editForm.uom_hun || ''}
                       onChange={(e) => setEditForm({ ...editForm, uom_hun: e.target.value })}
-                    />
+                      displayEmpty
+                      fullWidth
+                    >
+                      <MenuItem value="">-</MenuItem>
+                      {UOM_HUN_OPTIONS.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
                   </TableCell>
                   <TableCell>
                     <TextField
@@ -454,11 +526,20 @@ const ProductPrices: React.FC = () => {
                     />
                   </TableCell>
                   <TableCell>
-                    <TextField
+                    <Select
                       size="small"
                       value={editForm.cap_disp || ''}
                       onChange={(e) => setEditForm({ ...editForm, cap_disp: e.target.value })}
-                    />
+                      displayEmpty
+                      fullWidth
+                    >
+                      <MenuItem value="">-</MenuItem>
+                      {CAP_DISP_OPTIONS.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
                   </TableCell>
                   <TableCell>
                     <Checkbox
