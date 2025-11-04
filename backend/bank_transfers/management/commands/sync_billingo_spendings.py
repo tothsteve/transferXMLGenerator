@@ -99,6 +99,14 @@ class Command(BaseCommand):
             credential_manager = CredentialManager()
             api_key = credential_manager.decrypt_credential(settings.api_key)
 
+            # Delete existing spendings for full sync
+            if full_sync:
+                deleted_count = BillingoSpending.objects.filter(company=company).count()
+                BillingoSpending.objects.filter(company=company).delete()
+                self.stdout.write(self.style.WARNING(
+                    f"Full sync: Deleted {deleted_count} existing spendings for {company.name}"
+                ))
+
             # Determine start date for partial sync
             start_date = None
             if not full_sync:

@@ -62,7 +62,6 @@ from bank_transfers_supplier bts
 
 
 DROP VIEW IF EXISTS v_costs CASCADE;
-
 CREATE OR REPLACE VIEW v_costs AS
 select bs.id, bs.category, bs.paid_at, bs.fulfillment_date, 
        bs.invoice_number , bs.currency , bs.conversion_rate , 
@@ -71,9 +70,20 @@ select bs.id, bs.category, bs.paid_at, bs.fulfillment_date,
        bs.invoice_date , bs.due_date , bs.payment_method, 
        bs."comment" description, 
        bs.partner_name , bs.partner_tax_code , 
+       case when bs.currency = 'HUF' then total_gross - total_vat_amount 
+            when bs.currency in ('USD', 'EUR') then round(er.rate*(total_gross-total_vat_amount))  
+            else null end total_net_huf_amount,
+       case when bs.currency = 'HUF' then total_gross
+            when bs.currency in ('USD', 'EUR') then round(er.rate*total_gross) 
+            else null end total_gross_huf_amount ,
        s.cat_name, s.type_name, s.valid_from, s.valid_to
 from bank_transfers_billingospending bs 
     left outer join v_supplier_with_cat_and_type s on bs.partner_name = s.partner_name and bs.invoice_date  between s.valid_from and s.valid_to and bs.company_id =3 
+    left outer join bank_transfers_exchangerate er ON er.rate_date = (
+      SELECT MAX(rate_date)
+      FROM bank_transfers_exchangerate
+      WHERE rate_date <= bs.paid_at
+        AND currency = bs.currency) and bs.currency= er.currency     
 UNION
 select bt.id, 'other' category, null paid_at, bt.booking_date fulfillment_date, 
        null invoice_number, bt.currency , null conversion_rate,  
@@ -82,6 +92,7 @@ select bt.id, 'other' category, null paid_at, bt.booking_date fulfillment_date,
        bt.booking_date invoice_date, bt.booking_date due_date, 'wire_transfer' payment_method ,
        bt.short_description description, 
        bs.bank_name, null partner_tax_code , 
+       -1*bt.amount total_net_huf_amount, -1*bt.amount total_gross_huf_amount,
        s.cat_name , s.type_name , s.valid_from , s.valid_to 
   from bank_transfers_banktransaction bt 
         inner join bank_transfers_bankstatement bs on  bs.id = bt.bank_statement_id  and bs.company_id  = 3
@@ -95,12 +106,14 @@ select bt.id, 'other' category, null paid_at, bt.booking_date fulfillment_date,
        bt.booking_date invoice_date, bt.booking_date due_date, 'wire_transfer' payment_method ,
        bt.short_description description, 
        bs.bank_name, null partner_tax_code ,
+       -1*bt.amount total_net_huf_amount, -1*bt.amount total_gross_huf_amount,
        s.cat_name , s.type_name , s.valid_from , s.valid_to 
   from bank_transfers_banktransaction bt 
         inner join bank_transfers_bankstatement bs on  bs.id = bt.bank_statement_id  and bs.company_id  = 3
         left outer join v_supplier_with_cat_and_type s on bt.booking_date between s.valid_from and s.valid_to and bt.beneficiary_name = s.partner_name 
 where bt.beneficiary_name in ('Kövesi Dániel', 'Fekete Dávid') or bt.beneficiary_name like '%NAV%'
 ; 
+
 
 GRANT SELECT ON v_costs to medka_reader;
 GRANT SELECT ON v_supplier_with_cat_and_type to medka_reader;
