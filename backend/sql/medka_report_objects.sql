@@ -111,7 +111,7 @@ select bt.id, 'other' category, null paid_at, bt.booking_date fulfillment_date,
   from bank_transfers_banktransaction bt 
         inner join bank_transfers_bankstatement bs on  bs.id = bt.bank_statement_id  and bs.company_id  = 3
         left outer join v_supplier_with_cat_and_type s on bt.booking_date between s.valid_from and s.valid_to and bt.beneficiary_name = s.partner_name 
-where bt.beneficiary_name in ('Kövesi Dániel', 'Fekete Dávid') or bt.beneficiary_name like '%NAV%'
+where bt.beneficiary_name in ('Kövesi Dániel', 'Fekete Dávid','Turcsán János Gábor') or bt.beneficiary_name like '%NAV%'
 ; 
 
 

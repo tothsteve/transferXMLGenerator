@@ -9,7 +9,8 @@
       "Bash(python manage.py migrate bank_transfers)",
       "Bash(npx tsc:*)",
       "Read(//Users/tothi/Workspace/ITCardigan/TransferGenerator/**)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

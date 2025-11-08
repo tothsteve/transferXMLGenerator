@@ -964,7 +964,22 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         ]
     )
     def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
+        """Override list to handle empty search results gracefully (return empty list instead of 404)"""
+        try:
+            return super().list(request, *args, **kwargs)
+        except Exception as e:
+            # If pagination raises 404 for invalid page on empty queryset, return empty results
+            if 'EmptyPage' in str(type(e).__name__) or 'NotFound' in str(type(e).__name__):
+                queryset = self.filter_queryset(self.get_queryset())
+                # If queryset is empty, return empty paginated response
+                if not queryset.exists():
+                    return Response({
+                        'count': 0,
+                        'next': None,
+                        'previous': None,
+                        'results': []
+                    })
+            raise
     
     @swagger_auto_schema(
         operation_summary="NAV számla részletei",
