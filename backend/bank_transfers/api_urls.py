@@ -1,20 +1,20 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
-from .views import BankAccountViewSet, BeneficiaryViewSet  # Refactored to views/
-from .api_views import (
-    TransferTemplateViewSet,
-    TransferViewSet, TransferBatchViewSet, ExcelImportView,
-    CompanyUsersView, CompanyUserDetailView, InvoiceViewSet, InvoiceSyncLogViewSet,
+
+# All ViewSets now imported from views package (refactored from api_views.py)
+from .views import (
+    BankAccountViewSet, BeneficiaryViewSet,
+    TransferTemplateViewSet, TransferViewSet, TransferBatchViewSet, ExcelImportView,
+    CompanyUsersView, CompanyUserDetailView,
+    InvoiceViewSet, InvoiceSyncLogViewSet,
     TrustedPartnerViewSet, ExchangeRateViewSet,
     BankStatementViewSet, BankTransactionViewSet, OtherCostViewSet,
     CompanyBillingoSettingsViewSet, BillingoInvoiceViewSet, BillingoSyncLogViewSet, BillingoSpendingViewSet,
-    SupplierCategoryViewSet, SupplierTypeViewSet, SupplierViewSet, CustomerViewSet, ProductPriceViewSet
-)
-from .authentication import AuthenticationViewSet
-from .views.nav_views import (
+    SupplierCategoryViewSet, SupplierTypeViewSet, SupplierViewSet, CustomerViewSet, ProductPriceViewSet,
     NavConfigurationViewSet, InvoiceLineItemViewSet
 )
+from .authentication import AuthenticationViewSet
 
 router = DefaultRouter()
 router.register(r'auth', AuthenticationViewSet, basename='auth')
