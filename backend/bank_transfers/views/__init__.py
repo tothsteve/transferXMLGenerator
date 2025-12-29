@@ -7,7 +7,9 @@ Each module exports its ViewSets which are then imported by api_urls.py for URL 
 
 # Import all ViewSets for easy access from api_urls.py
 from .bank_accounts import BankAccountViewSet
+from .beneficiaries import BeneficiaryViewSet
 
 __all__ = [
     'BankAccountViewSet',
+    'BeneficiaryViewSet',
 ]
