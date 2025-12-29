@@ -1,8 +1,9 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
+from .views import BankAccountViewSet  # Refactored to views/bank_accounts.py
 from .api_views import (
-    BankAccountViewSet, BeneficiaryViewSet, TransferTemplateViewSet,
+    BeneficiaryViewSet, TransferTemplateViewSet,
     TransferViewSet, TransferBatchViewSet, ExcelImportView,
     CompanyUsersView, CompanyUserDetailView, InvoiceViewSet, InvoiceSyncLogViewSet,
     TrustedPartnerViewSet, ExchangeRateViewSet,
