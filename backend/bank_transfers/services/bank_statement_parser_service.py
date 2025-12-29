@@ -304,7 +304,68 @@ class BankStatementParserService:
         )
 
         transaction.save()
+
+        # Auto-categorize system transactions (bank fees, interest)
+        self._auto_categorize_system_transaction(transaction)
+
         return transaction
+
+    def _auto_categorize_system_transaction(self, transaction: BankTransaction) -> None:
+        """
+        Auto-categorize system transactions that don't need invoice matching.
+
+        Creates OtherCost record and marks transaction as "matched" for frontend display:
+        - BANK_FEE: Bank fees and charges
+        - INTEREST_CREDIT: Interest income
+        - INTEREST_DEBIT: Interest charges
+
+        These transactions will appear as matched on the frontend with method "SYSTEM_AUTO_CATEGORIZED".
+
+        Args:
+            transaction: BankTransaction instance
+        """
+        from decimal import Decimal
+        from django.utils import timezone
+        from ..models import OtherCost
+
+        # Map transaction types to OtherCost categories
+        SYSTEM_TRANSACTION_CATEGORIES = {
+            'BANK_FEE': 'BANK_FEE',
+            'INTEREST_CREDIT': 'INTEREST',
+            'INTEREST_DEBIT': 'INTEREST',
+        }
+
+        category = SYSTEM_TRANSACTION_CATEGORIES.get(transaction.transaction_type)
+
+        if category:
+            # Create OtherCost record automatically
+            OtherCost.objects.create(
+                company=self.company,
+                bank_transaction=transaction,
+                category=category,
+                amount=abs(transaction.amount),
+                currency=transaction.currency,
+                date=transaction.value_date,
+                notes=f"Auto-categorized {transaction.transaction_type} from bank statement import",
+                tags=f"auto-categorized,{transaction.transaction_type.lower()}"
+            )
+
+            # Mark transaction as "matched" for frontend display
+            # This ensures it shows up as handled/categorized, not as unmatched
+            transaction.match_confidence = Decimal('1.00')
+            transaction.match_method = 'SYSTEM_AUTO_CATEGORIZED'
+            transaction.matched_at = timezone.now()
+            transaction.match_notes = (
+                f"System transaction auto-categorized as {category}. "
+                f"No invoice matching needed for {transaction.transaction_type}."
+            )
+            transaction.save()
+
+            logger.info(
+                f"Auto-categorized transaction {transaction.id} "
+                f"({transaction.transaction_type}) as OtherCost category '{category}' "
+                f"and marked as matched (SYSTEM_AUTO_CATEGORIZED)"
+            )
 
     def _calculate_hash(self, file_bytes: bytes) -> str:
         """Calculate SHA256 hash of file"""

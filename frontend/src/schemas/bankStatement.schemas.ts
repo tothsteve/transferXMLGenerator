@@ -95,15 +95,20 @@ export type TransactionType = z.infer<typeof TransactionTypeSchema>;
  * Transaction matching method.
  *
  * Indicates how a transaction was matched to an invoice or transfer.
+ * Must match backend BankTransaction.match_method choices exactly.
  */
 export const MatchMethodSchema = z.enum([
   'REFERENCE_EXACT',
   'AMOUNT_IBAN',
+  'BATCH_INVOICES',
   'FUZZY_NAME',
-  'TRANSFER_EXACT',
-  'REIMBURSEMENT_PAIR',
   'AMOUNT_DATE_ONLY',
   'MANUAL',
+  'MANUAL_BATCH',
+  'TRANSFER_EXACT',
+  'REIMBURSEMENT_PAIR',
+  'SYSTEM_AUTO_CATEGORIZED', // Auto-categorized system transactions (BANK_FEE, INTEREST)
+  'LEARNED_PATTERN', // Recurring pattern matching (subscriptions, etc.)
   '',
 ]);
 export type MatchMethod = z.infer<typeof MatchMethodSchema>;
@@ -215,6 +220,24 @@ export const bankStatementSchema = z.object({
 });
 
 export type BankStatement = z.infer<typeof bankStatementSchema>;
+
+/**
+ * Other cost category enum.
+ *
+ * Used for categorizing expenses extracted from transactions.
+ */
+export const OtherCostCategorySchema = z.enum([
+  'BANK_FEE',
+  'CARD_PURCHASE',
+  'INTEREST',
+  'SUBSCRIPTION',
+  'UTILITY',
+  'FUEL',
+  'TRAVEL',
+  'OFFICE',
+  'OTHER',
+]);
+export type OtherCostCategory = z.infer<typeof OtherCostCategorySchema>;
 
 /**
  * Bank transaction schema.
@@ -337,7 +360,7 @@ export const bankTransactionSchema = z.object({
   /** Who matched (user ID or null for auto) */
   matched_by: z.number().int().positive().nullable().optional(),
 
-  /** Matched invoice details (nested object) */
+  /** Matched invoice details (nested object) - for single invoice match */
   matched_invoice_details: z.object({
     id: z.number().int().positive(),
     invoice_number: z.string(),
@@ -346,6 +369,56 @@ export const bankTransactionSchema = z.object({
     gross_amount: z.string().nullable(),
     payment_due_date: z.string().nullable(),
     payment_status: z.string(),
+  }).nullable().optional(),
+
+  /** Matched invoices details (array) - for batch invoice matching */
+  matched_invoices_details: z.array(z.object({
+    id: z.number().int().positive(),
+    invoice_number: z.string(),
+    supplier_name: z.string(),
+    supplier_tax_number: z.string(),
+    gross_amount: z.string(),
+    payment_due_date: z.string().nullable(),
+    payment_status: z.string(),
+    match_confidence: z.string(),
+    match_method: z.string(),
+    match_notes: z.string().optional(),
+  })).optional(),
+
+  /** Whether this is a batch match (one transaction to multiple invoices) */
+  is_batch_match: z.boolean().optional(),
+
+  /** Total amount of all matched invoices in batch match */
+  total_matched_amount: z.string().nullable().optional(),
+
+  /** Matched transfer batch ID */
+  matched_transfer_batch: z.number().int().positive().nullable().optional(),
+
+  /** Matched reimbursement transaction details */
+  matched_reimbursement_details: z.object({
+    id: BankTransactionIdSchema,
+    amount: z.string(),
+    currency: z.string(),
+    booking_date: z.string(),
+    description: z.string(),
+  }).nullable().optional(),
+
+  /** Whether this transaction has an associated other_cost record */
+  has_other_cost: z.boolean().optional(),
+
+  /** Other cost categorization details (if categorized) */
+  other_cost_detail: z.object({
+    id: OtherCostIdSchema,
+    category: OtherCostCategorySchema,
+    category_display: z.string(),
+    amount: z.string(),
+    currency: z.string(),
+    date: z.string().date(),
+    description: z.string(),
+    notes: z.string(),
+    tags: z.array(z.string()),
+    created_by: z.number().int().positive().nullable(),
+    created_at: z.string(),
   }).nullable().optional(),
 
   /** Statement details (nested object) */
@@ -371,24 +444,6 @@ export const bankTransactionSchema = z.object({
 export type BankTransaction = z.infer<typeof bankTransactionSchema>;
 
 /**
- * Other cost category enum.
- *
- * Used for categorizing expenses extracted from transactions.
- */
-export const OtherCostCategorySchema = z.enum([
-  'BANK_FEE',
-  'CARD_PURCHASE',
-  'INTEREST',
-  'SUBSCRIPTION',
-  'UTILITY',
-  'FUEL',
-  'TRAVEL',
-  'OFFICE',
-  'OTHER',
-]);
-export type OtherCostCategory = z.infer<typeof OtherCostCategorySchema>;
-
-/**
  * Other cost schema.
  *
  * Enhanced categorization layer for bank transactions.
@@ -407,9 +462,6 @@ export const otherCostSchema = z.object({
   /** Expense category */
   category: OtherCostCategorySchema,
 
-  /** Subcategory for granular tracking */
-  subcategory: z.string().max(100),
-
   /** Amount as decimal string */
   amount: z.string().regex(/^-?\d+(\.\d{1,2})?$/),
 
@@ -425,8 +477,8 @@ export const otherCostSchema = z.object({
   /** Additional notes */
   notes: z.string(),
 
-  /** Custom remittance information */
-  remittance_info: z.string().max(500),
+  /** Tags for categorization (JSON array) */
+  tags: z.array(z.string()),
 
   /** Created by user ID */
   created_by: z.number().int().positive(),

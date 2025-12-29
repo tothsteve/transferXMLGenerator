@@ -12,8 +12,9 @@ Auto-updates invoice payment status for high-confidence matches (≥0.90).
 import logging
 from datetime import timedelta
 from decimal import Decimal
-from typing import Dict, Any, Optional, Tuple
-from django.db.models import QuerySet
+from itertools import combinations
+from typing import Dict, Any, Optional, Tuple, List
+from django.db.models import QuerySet, Q
 from django.utils import timezone
 from rapidfuzz import fuzz
 
@@ -36,6 +37,13 @@ class TransactionMatchingService:
     FUZZY_NAME_MIN_SIMILARITY = 70  # Minimum name similarity percentage (70%)
     AMOUNT_TOLERANCE_PERCENT = Decimal('0.01')  # ±1% tolerance for fuzzy amount matching
     CANDIDATE_DATE_RANGE_DAYS = 90  # ±90 days from transaction date
+
+    # System transaction types that don't need matching (auto-categorized as OtherCost)
+    SYSTEM_TRANSACTION_TYPES = [
+        'BANK_FEE',          # Bank fees and charges
+        'INTEREST_CREDIT',   # Interest income
+        'INTEREST_DEBIT',    # Interest charges
+    ]
 
     def __init__(self, company):
         """
@@ -71,10 +79,23 @@ class TransactionMatchingService:
         """
         logger.info(f"Starting transaction matching for statement {statement.id}")
 
+        from ..models import BankTransactionInvoiceMatch
+
         # Get all unmatched transactions
+        # Must check BOTH matched_invoice (old ForeignKey) AND many-to-many relationship
+        matched_transaction_ids = BankTransactionInvoiceMatch.objects.filter(
+            transaction__bank_statement=statement
+        ).values_list('transaction_id', flat=True)
+
         transactions = BankTransaction.objects.filter(
             bank_statement=statement,
-            matched_invoice__isnull=True
+            matched_invoice__isnull=True,  # Old single match FK
+            matched_transfer__isnull=True,  # Transfer match
+            matched_reimbursement__isnull=True  # Reimbursement pair
+        ).exclude(
+            id__in=matched_transaction_ids  # Exclude batch matched transactions
+        ).exclude(
+            transaction_type__in=self.SYSTEM_TRANSACTION_TYPES  # Skip system transactions (auto-categorized)
         ).order_by('booking_date')
 
         matched_count = 0
@@ -95,19 +116,34 @@ class TransactionMatchingService:
                 if result.get('auto_paid'):
                     auto_paid_count += 1
 
-        total_transactions = transactions.count()
-        match_rate = (matched_count / total_transactions * 100) if total_transactions > 0 else 0
+        # Calculate TOTAL matched count (new matches + existing matches)
+        total_transactions_in_statement = BankTransaction.objects.filter(
+            bank_statement=statement
+        ).count()
+
+        # Count ALL matched transactions (including batch matches and auto-categorized OtherCost)
+        total_matched = BankTransaction.objects.filter(
+            bank_statement=statement
+        ).filter(
+            Q(matched_invoice__isnull=False) |
+            Q(matched_transfer__isnull=False) |
+            Q(matched_reimbursement__isnull=False) |
+            Q(id__in=matched_transaction_ids) |
+            Q(other_cost_detail__isnull=False)  # Include auto-categorized system transactions
+        ).count()
+
+        match_rate = (total_matched / total_transactions_in_statement * 100) if total_transactions_in_statement > 0 else 0
 
         logger.info(
             f"Matching completed for statement {statement.id}: "
-            f"{matched_count}/{total_transactions} matched ({match_rate:.1f}%), "
+            f"{matched_count} new matches, {total_matched}/{total_transactions_in_statement} total matched ({match_rate:.1f}%), "
             f"{auto_paid_count} invoices auto-marked as paid"
         )
 
         return {
             'statement_id': statement.id,
-            'total_transactions': total_transactions,
-            'matched_count': matched_count,
+            'total_transactions': total_transactions_in_statement,
+            'matched_count': total_matched,  # Return TOTAL matched (not just new)
             'match_rate': round(match_rate, 1),
             'auto_paid_count': auto_paid_count,
             'confidence_distribution': confidence_distribution
@@ -138,17 +174,30 @@ class TransactionMatchingService:
                 'auto_paid': bool (if invoice was auto-marked as paid)
             }
         """
+        # Skip system transactions (they're auto-categorized as OtherCost)
+        if transaction.transaction_type in self.SYSTEM_TRANSACTION_TYPES:
+            logger.debug(
+                f"Skipping matching for system transaction {transaction.id} "
+                f"(type={transaction.transaction_type}, auto-categorized as OtherCost)"
+            )
+            return {'matched': False, 'skipped': True, 'reason': 'system_transaction'}
+
         # Priority 1: Try transfer matching (highest confidence)
         result = self._try_transfer_matching(transaction, user)
         if result['matched']:
             return result
 
-        # Priority 2: Try invoice matching (medium confidence)
+        # Priority 2: Try learned pattern matching (recurring subscriptions/expenses)
+        result = self._try_learned_pattern_matching(transaction, user)
+        if result['matched']:
+            return result
+
+        # Priority 3: Try invoice matching (medium confidence)
         result = self._try_invoice_matching(transaction, user)
         if result['matched']:
             return result
 
-        # Priority 3: Try reimbursement pairing (requires manual review)
+        # Priority 4: Try reimbursement pairing (requires manual review)
         result = self._try_reimbursement_matching(transaction, user)
         if result['matched']:
             return result
@@ -204,7 +253,9 @@ class TransactionMatchingService:
 
     def _try_invoice_matching(self, transaction: BankTransaction, user=None) -> Dict[str, Any]:
         """
-        Try to match transaction to NAV invoice.
+        Try to match transaction to NAV invoice(s).
+
+        Supports both single invoice matching and batch invoice matching (one payment for multiple invoices).
 
         Args:
             transaction: BankTransaction instance
@@ -214,6 +265,7 @@ class TransactionMatchingService:
             Match result dictionary
         """
         from django.utils import timezone
+        from ..models import BankTransactionInvoiceMatch
 
         # Get candidate invoices for matching
         candidate_invoices = self._get_candidate_invoices(transaction)
@@ -223,36 +275,105 @@ class TransactionMatchingService:
 
         # Try matching strategies in order of confidence
         matched_invoice = None
+        matched_invoices_batch = []
         confidence = Decimal('0.00')
         method = ''
 
-        # Strategy 1: Reference Exact Match (highest confidence)
+        # Strategy 1: Reference Exact Match (highest confidence - single invoice)
         matched_invoice, confidence = self._match_by_reference(transaction, candidate_invoices)
         if matched_invoice:
             method = 'REFERENCE_EXACT'
 
-        # Strategy 2: Amount + IBAN Match
+        # Strategy 2: Amount + IBAN Match (exact amount + account - single invoice)
         if not matched_invoice:
             matched_invoice, confidence = self._match_by_amount_iban(transaction, candidate_invoices)
             if matched_invoice:
                 method = 'AMOUNT_IBAN'
 
-        # Strategy 3: Fuzzy Name Match
-        if not matched_invoice:
-            matched_invoice, confidence = self._match_by_fuzzy_name(transaction, candidate_invoices)
-            if matched_invoice:
-                method = 'FUZZY_NAME'
-
-        # Strategy 4: Amount + Date Only (lowest confidence - fallback for transactions with no identifying info)
+        # Strategy 3: Amount + Date Only (exact amount - single invoice)
         if not matched_invoice:
             matched_invoice, confidence = self._match_by_amount_date_only(transaction, candidate_invoices)
             if matched_invoice:
                 method = 'AMOUNT_DATE_ONLY'
 
-        # If no match found
+        # Strategy 4: Fuzzy Name Match (amount + name similarity - single invoice)
         if not matched_invoice:
+            matched_invoice, confidence = self._match_by_fuzzy_name(transaction, candidate_invoices)
+            if matched_invoice:
+                method = 'FUZZY_NAME'
+
+        # Strategy 5: Batch Invoice Match (multiple invoices - only if no single match found)
+        if not matched_invoice:
+            matched_invoices_batch = self._match_by_batch_invoices(transaction, candidate_invoices)
+            if matched_invoices_batch:
+                method = 'BATCH_INVOICES'
+                # All invoices in batch have same confidence
+                confidence = matched_invoices_batch[0][1]
+
+        # If no match found
+        if not matched_invoice and not matched_invoices_batch:
             return {'matched': False}
 
+        # === Handle BATCH match (multiple invoices) ===
+        if matched_invoices_batch:
+            invoice_numbers = ', '.join(inv.nav_invoice_number for inv, _ in matched_invoices_batch)
+            total_amount = sum(inv.invoice_gross_amount for inv, _ in matched_invoices_batch)
+
+            # Build match notes
+            match_notes = (
+                f"Batch match to {len(matched_invoices_batch)} invoices: {invoice_numbers} - "
+                f"{matched_invoices_batch[0][0].supplier_name} - "
+                f"Total: {total_amount} HUF - "
+                f"Method: {method} (confidence: {confidence}) - "
+                f"{'Manual match' if user else 'Automatic match'}"
+            )
+
+            # Save transaction metadata
+            transaction.match_confidence = confidence
+            transaction.match_method = method
+            transaction.matched_at = timezone.now()
+            transaction.matched_by = user
+            transaction.match_notes = match_notes
+            transaction.save()
+
+            # Create BankTransactionInvoiceMatch records for each invoice
+            auto_paid_count = 0
+            invoice_ids = []
+
+            for invoice, inv_confidence in matched_invoices_batch:
+                # Create match record in through table
+                BankTransactionInvoiceMatch.objects.create(
+                    transaction=transaction,
+                    invoice=invoice,
+                    match_confidence=inv_confidence,
+                    match_method=method,
+                    matched_by=user,
+                    match_notes=f"Part of batch payment ({len(matched_invoices_batch)} invoices)"
+                )
+                invoice_ids.append(invoice.id)
+
+                # Auto-update invoice payment status if high confidence
+                if inv_confidence >= self.AUTO_PAYMENT_THRESHOLD and invoice.payment_status != 'PAID':
+                    self._update_invoice_payment_status(invoice, transaction, auto=True)
+                    auto_paid_count += 1
+
+            logger.info(
+                f"Transaction {transaction.id} matched to {len(matched_invoices_batch)} invoices "
+                f"({invoice_numbers}) via {method} (confidence: {confidence}) - "
+                f"{auto_paid_count} invoices auto-marked as paid"
+            )
+
+            return {
+                'matched': True,
+                'invoice_ids': invoice_ids,
+                'batch_match': True,
+                'invoice_count': len(matched_invoices_batch),
+                'confidence': confidence,
+                'method': method,
+                'auto_paid': auto_paid_count > 0
+            }
+
+        # === Handle SINGLE invoice match ===
         # Build match notes with details
         match_notes = (
             f"Matched to Invoice #{matched_invoice.id} "
@@ -263,7 +384,7 @@ class TransactionMatchingService:
             f"{'Manual match' if user else 'Automatic match'}"
         )
 
-        # Save match to transaction with metadata
+        # Save match to transaction with metadata (backward compatibility)
         transaction.matched_invoice = matched_invoice
         transaction.match_confidence = confidence
         transaction.match_method = method
@@ -271,6 +392,16 @@ class TransactionMatchingService:
         transaction.matched_by = user
         transaction.match_notes = match_notes
         transaction.save()
+
+        # Also create BankTransactionInvoiceMatch record (new ManyToMany system)
+        BankTransactionInvoiceMatch.objects.create(
+            transaction=transaction,
+            invoice=matched_invoice,
+            match_confidence=confidence,
+            match_method=method,
+            matched_by=user,
+            match_notes="Single invoice match"
+        )
 
         logger.info(
             f"Transaction {transaction.id} matched to invoice {matched_invoice.id} "
@@ -291,6 +422,9 @@ class TransactionMatchingService:
         return {
             'matched': True,
             'invoice_id': matched_invoice.id,
+            'invoice_ids': [matched_invoice.id],
+            'batch_match': False,
+            'invoice_count': 1,
             'confidence': confidence,
             'method': method,
             'auto_paid': auto_paid
@@ -354,6 +488,111 @@ class TransactionMatchingService:
             'method': 'REIMBURSEMENT_PAIR',
             'auto_paid': False
         }
+
+    def _try_learned_pattern_matching(self, transaction: BankTransaction, user=None) -> Dict[str, Any]:
+        """
+        Try to match transaction to learned pattern from previous OtherCost categorizations.
+
+        This enables automatic categorization of recurring transactions (subscriptions, utilities)
+        based on exact merchant/beneficiary name matching.
+
+        Supported transaction types:
+        - POS_PURCHASE: Card payments (merchant_name)
+        - TRANSFER_DEBIT: Outgoing transfers (beneficiary_name)
+        - AFR_DEBIT: Automated transfers (beneficiary_name)
+
+        Args:
+            transaction: BankTransaction instance
+            user: User instance (optional) for manual matching
+
+        Returns:
+            Match result dictionary
+        """
+        from decimal import Decimal
+        from django.utils import timezone
+        from ..models import OtherCost
+
+        # Only process supported transaction types
+        SUPPORTED_TYPES = ['POS_PURCHASE', 'TRANSFER_DEBIT', 'AFR_DEBIT']
+        if transaction.transaction_type not in SUPPORTED_TYPES:
+            return {'matched': False}
+
+        # Get counterparty name based on transaction type
+        if transaction.transaction_type == 'POS_PURCHASE':
+            counterparty_name = transaction.merchant_name
+        else:
+            counterparty_name = transaction.beneficiary_name
+
+        if not counterparty_name:
+            return {'matched': False}
+
+        # Normalize name for exact matching (case-insensitive)
+        counterparty_norm = counterparty_name.strip().upper()
+
+        # Find existing OtherCost records with matching counterparty
+        # Only look at manually created OtherCost (not auto-categorized system transactions)
+        existing_patterns = OtherCost.objects.filter(
+            company=self.company,
+            bank_transaction__isnull=False  # Only patterns from bank transactions
+        ).select_related('bank_transaction').exclude(
+            bank_transaction__transaction_type__in=self.SYSTEM_TRANSACTION_TYPES
+        )
+
+        for pattern in existing_patterns:
+            pattern_tx = pattern.bank_transaction
+
+            # Get pattern counterparty name
+            if pattern_tx.transaction_type == 'POS_PURCHASE':
+                pattern_name = pattern_tx.merchant_name
+            else:
+                pattern_name = pattern_tx.beneficiary_name
+
+            if not pattern_name:
+                continue
+
+            # Exact match (case-insensitive)
+            pattern_name_norm = pattern_name.strip().upper()
+            if counterparty_norm == pattern_name_norm:
+                # Found matching pattern! Create OtherCost with same category
+                OtherCost.objects.create(
+                    company=self.company,
+                    bank_transaction=transaction,
+                    category=pattern.category,
+                    amount=abs(transaction.amount),
+                    currency=transaction.currency,
+                    date=transaction.value_date,
+                    notes=f"Auto-categorized based on learned pattern from transaction #{pattern_tx.id} ({pattern_name})",
+                    tags=f"learned-pattern,{pattern.category.lower()}"
+                )
+
+                # Mark transaction as matched
+                transaction.match_confidence = Decimal('1.00')
+                transaction.match_method = 'LEARNED_PATTERN'
+                transaction.matched_at = timezone.now()
+                transaction.matched_by = user
+                transaction.match_notes = (
+                    f"Learned pattern match: '{counterparty_name}' → Category: {pattern.category} "
+                    f"(based on pattern from transaction #{pattern_tx.id})"
+                )
+                transaction.save()
+
+                logger.info(
+                    f"Transaction {transaction.id} auto-categorized as {pattern.category} "
+                    f"using learned pattern from transaction {pattern_tx.id} "
+                    f"(merchant: '{counterparty_name}')"
+                )
+
+                return {
+                    'matched': True,
+                    'confidence': Decimal('1.00'),
+                    'method': 'LEARNED_PATTERN',
+                    'auto_paid': False,
+                    'pattern_source_id': pattern_tx.id,
+                    'category': pattern.category
+                }
+
+        # No matching pattern found
+        return {'matched': False}
 
     def _match_by_transfer(
         self,
@@ -640,7 +879,9 @@ class TransactionMatchingService:
 
         Logic:
         1. Transaction amount (absolute) must equal invoice gross_amount_huf (±1% tolerance)
-        2. Calculate name similarity between transaction.beneficiary_name and invoice.supplier_name
+        2. Calculate name similarity between transaction counterparty name and invoice.supplier_name
+           - Uses beneficiary_name for regular transactions
+           - Falls back to merchant_name for POS transactions
         3. Confidence = 0.70 + (similarity_ratio * 0.20)
            - 70% similarity → 0.70 confidence
            - 80% similarity → 0.78 confidence
@@ -654,7 +895,10 @@ class TransactionMatchingService:
         Returns:
             Tuple of (matched_invoice, confidence) or (None, 0.00)
         """
-        if not transaction.beneficiary_name:
+        # Use beneficiary_name for regular transactions, merchant_name for POS transactions
+        counterparty_name = transaction.beneficiary_name or transaction.merchant_name
+
+        if not counterparty_name:
             return None, Decimal('0.00')
 
         amount = abs(transaction.amount)
@@ -675,7 +919,7 @@ class TransactionMatchingService:
 
             # Calculate name similarity
             similarity = self._calculate_name_similarity(
-                transaction.beneficiary_name,
+                counterparty_name,
                 invoice.supplier_name
             )
 
@@ -778,6 +1022,134 @@ class TransactionMatchingService:
 
         return best_match, Decimal('0.60') if best_match else Decimal('0.00')
 
+    def _match_by_batch_invoices(
+        self,
+        transaction: BankTransaction,
+        invoices: QuerySet
+    ) -> List[Tuple[Invoice, Decimal]]:
+        """
+        Match transaction to MULTIPLE invoices (batch payment).
+
+        Business case: Company pays multiple invoices from same supplier in one payment.
+        Example: Payment of 450 HUF covers 3 invoices: 100 HUF, 150 HUF, 200 HUF
+
+        Algorithm:
+        1. Group candidate invoices by supplier (partner_tax_number)
+        2. For each supplier, try combinations of 2-5 invoices
+        3. Check if sum of invoice amounts equals transaction amount (±1% tolerance)
+        4. Calculate confidence: Base 0.85 + bonuses
+           - IBAN match bonus: +0.10 (if ANY invoice has matching IBAN)
+           - Name similarity bonus: +0.05 (if average name similarity >= 70%)
+
+        Args:
+            transaction: BankTransaction instance
+            invoices: QuerySet of candidate Invoice objects
+
+        Returns:
+            List of (invoice, confidence) tuples for all matched invoices
+            Empty list if no batch match found
+        """
+        # Only match debit transactions (we pay suppliers)
+        if transaction.amount >= 0:
+            return []
+
+        amount = abs(transaction.amount)
+
+        # Group invoices by supplier (partner_tax_number)
+        supplier_invoices = {}
+        for invoice in invoices:
+            # Only consider INBOUND invoices (we pay suppliers)
+            if invoice.invoice_direction != 'INBOUND':
+                continue
+
+            # Skip invoices with no amount
+            if not invoice.invoice_gross_amount:
+                continue
+
+            # Skip if no supplier tax number (can't group)
+            if not invoice.supplier_tax_number:
+                continue
+
+            tax_number = self._normalize_tax_number(invoice.supplier_tax_number)
+            if tax_number not in supplier_invoices:
+                supplier_invoices[tax_number] = []
+            supplier_invoices[tax_number].append(invoice)
+
+        # Try combinations for each supplier
+        best_match = []
+        best_confidence = Decimal('0.00')
+
+        for tax_number, supplier_invoice_list in supplier_invoices.items():
+            # Need at least 2 invoices for batch matching
+            if len(supplier_invoice_list) < 2:
+                continue
+
+            # Try combinations of 2 to 5 invoices
+            for combo_size in range(2, min(6, len(supplier_invoice_list) + 1)):
+                for invoice_combo in combinations(supplier_invoice_list, combo_size):
+                    # Calculate total amount
+                    total_amount = sum(inv.invoice_gross_amount for inv in invoice_combo)
+
+                    # Check amount match with ±1% tolerance
+                    tolerance = amount * self.AMOUNT_TOLERANCE_PERCENT
+                    if abs(total_amount - amount) > tolerance:
+                        continue
+
+                    # Found a matching combination!
+                    # Calculate confidence: Base 0.85 + bonuses
+
+                    # Base confidence for batch matching
+                    confidence = Decimal('0.85')
+
+                    # IBAN bonus: +0.10 if ANY invoice has matching IBAN
+                    if transaction.beneficiary_iban:
+                        iban_normalized = self._normalize_iban(transaction.beneficiary_iban)
+                        for invoice in invoice_combo:
+                            if invoice.supplier_bank_account_number:
+                                supplier_iban = self._normalize_iban(invoice.supplier_bank_account_number)
+                                if iban_normalized == supplier_iban:
+                                    confidence += Decimal('0.10')
+                                    break  # Only add bonus once
+
+                    # Name similarity bonus: +0.05 if average similarity >= 70%
+                    if transaction.beneficiary_name:
+                        total_similarity = 0.0
+                        count = 0
+                        for invoice in invoice_combo:
+                            if invoice.supplier_name:
+                                similarity = self._calculate_name_similarity(
+                                    transaction.beneficiary_name,
+                                    invoice.supplier_name
+                                )
+                                total_similarity += similarity
+                                count += 1
+
+                        if count > 0:
+                            avg_similarity = total_similarity / count
+                            if avg_similarity >= 70:
+                                confidence += Decimal('0.05')
+
+                    # Check if this is better than previous matches
+                    if confidence > best_confidence:
+                        best_match = [(inv, confidence) for inv in invoice_combo]
+                        best_confidence = confidence
+
+                        logger.debug(
+                            f"Batch invoice candidate: transaction {transaction.id} → "
+                            f"{len(invoice_combo)} invoices from {invoice_combo[0].supplier_name} "
+                            f"(total={total_amount} HUF, confidence={confidence})"
+                        )
+
+        if best_match:
+            invoice_numbers = ', '.join(inv.nav_invoice_number for inv, _ in best_match)
+            logger.info(
+                f"Batch invoice match: transaction {transaction.id} → "
+                f"{len(best_match)} invoices ({invoice_numbers}) "
+                f"(confidence={best_confidence})"
+            )
+
+        return best_match
+
     def _get_candidate_invoices(self, transaction: BankTransaction) -> QuerySet:
         """
         Get potential invoice candidates for matching.
@@ -836,10 +1208,13 @@ class TransactionMatchingService:
         """
         Update invoice payment status to PAID.
 
+        Supports both single invoice matches and batch invoice matches.
+        For batch matches, this method is called once per invoice in the batch.
+
         Args:
-            invoice: Invoice instance
-            transaction: BankTransaction instance
-            auto: If True, sets auto_marked_paid flag
+            invoice: Invoice instance to mark as paid
+            transaction: BankTransaction instance that paid this invoice
+            auto: If True, sets auto_marked_paid flag (default: True for automatic matches)
         """
         invoice.mark_as_paid(
             payment_date=transaction.booking_date,
@@ -918,7 +1293,9 @@ class TransactionMatchingService:
         """
         Calculate similarity between two names using fuzzy matching.
 
-        Uses rapidfuzz token_sort_ratio for best results with different word orders.
+        Uses multiple rapidfuzz algorithms and returns the maximum:
+        - token_sort_ratio: Handles different word orders
+        - partial_ratio: Handles partial name matches (e.g., "Bubbles02" in "Bubbles-Car Kft.")
 
         Args:
             name1: First name string
@@ -934,8 +1311,15 @@ class TransactionMatchingService:
         name1_norm = name1.strip().upper()
         name2_norm = name2.strip().upper()
 
-        # Use token_sort_ratio to handle different word orders
-        # Example: "IT Cardigan Kft." vs "Kft. IT Cardigan" → high similarity
-        similarity = fuzz.token_sort_ratio(name1_norm, name2_norm)
+        # Try multiple algorithms and take the best result
+        token_sort_sim = fuzz.token_sort_ratio(name1_norm, name2_norm)
+        partial_sim = fuzz.partial_ratio(name1_norm, name2_norm)
+
+        # Return the maximum similarity
+        # Example: "Bubbles02" vs "Bubbles-Car Kft."
+        #   token_sort_ratio: 56%
+        #   partial_ratio: 87.5%
+        #   max: 87.5% ✓
+        similarity = max(token_sort_sim, partial_sim)
 
         return float(similarity)

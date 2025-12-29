@@ -225,6 +225,7 @@ backend/test_bank_statement_import.py
 
 # Docker configuration - contains local paths and passwords
 docker-compose.yml
+docker-compose-postgres.yml
 
 # Database backups - may contain sensitive data
 backup_*.json

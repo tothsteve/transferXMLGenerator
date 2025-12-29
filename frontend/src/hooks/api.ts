@@ -26,6 +26,7 @@ import {
   Beneficiary,
   TransferTemplate,
   Transfer,
+  TransferWithBeneficiary,
   BulkCreateTransferRequest,
   GenerateXmlRequest,
   GenerateXmlResponse,
@@ -45,7 +46,7 @@ import {
 import {
   BeneficiarySchema,
   TransferTemplateSchema,
-  TransferSchema,
+  TransferWithBeneficiarySchema,
   NAVInvoiceSchema,
   BankAccountSchema,
   TransferBatchSchema,
@@ -430,12 +431,12 @@ export function useTransfers(params?: {
   execution_date_from?: string;
   execution_date_to?: string;
   ordering?: string;
-}): UseQueryResult<ApiResponse<Transfer>, Error> {
+}): UseQueryResult<ApiResponse<TransferWithBeneficiary>, Error> {
   return useQuery({
     queryKey: [...queryKeys.transfers, params],
     queryFn: () => transfersApi.getAll(params),
     select: (data) => {
-      const schema = ApiResponseSchema(TransferSchema);
+      const schema = ApiResponseSchema(TransferWithBeneficiarySchema);
       return schema.parse(data.data);
     },
   });

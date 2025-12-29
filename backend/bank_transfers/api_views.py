@@ -13,6 +13,7 @@ from drf_yasg import openapi
 import json
 import logging
 from datetime import date
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -2059,6 +2060,44 @@ class BankTransactionViewSet(viewsets.ReadOnlyModelViewSet):
 
         return queryset
 
+    def _update_statement_match_count(self, transaction):
+        """
+        Recalculate and update statement's matched_count after manual match operations.
+
+        Counts ALL types of matches:
+        - Single invoice matches (matched_invoice FK)
+        - Batch invoice matches (BankTransactionInvoiceMatch many-to-many)
+        - Transfer matches
+        - Reimbursement pairs
+        """
+        from .models import BankTransactionInvoiceMatch
+
+        statement = transaction.bank_statement
+
+        # Get IDs of transactions with batch matches
+        batch_matched_ids = BankTransactionInvoiceMatch.objects.filter(
+            transaction__bank_statement=statement
+        ).values_list('transaction_id', flat=True).distinct()
+
+        # Count all matched transactions (including auto-categorized OtherCost)
+        matched_count = BankTransaction.objects.filter(
+            bank_statement=statement
+        ).filter(
+            models.Q(matched_invoice__isnull=False) |
+            models.Q(matched_transfer__isnull=False) |
+            models.Q(matched_reimbursement__isnull=False) |
+            models.Q(id__in=batch_matched_ids) |
+            models.Q(other_cost_detail__isnull=False)  # Include auto-categorized system transactions
+        ).count()
+
+        # Update statement
+        statement.matched_count = matched_count
+        statement.save(update_fields=['matched_count'])
+
+        logger.info(
+            f"Statement {statement.id} matched_count updated: {matched_count}/{statement.total_transactions}"
+        )
+
     @action(detail=True, methods=['post'])
     def match_invoice(self, request, pk=None):
         """
@@ -2091,6 +2130,9 @@ class BankTransactionViewSet(viewsets.ReadOnlyModelViewSet):
         transaction.match_method = 'MANUAL'
         transaction.save()
 
+        # Update statement counter
+        self._update_statement_match_count(transaction)
+
         return Response({
             'message': 'Transaction matched successfully',
             'transaction_id': transaction.id,
@@ -2100,20 +2142,156 @@ class BankTransactionViewSet(viewsets.ReadOnlyModelViewSet):
         })
 
     @action(detail=True, methods=['post'])
+    def batch_match_invoices(self, request, pk=None):
+        """
+        Manually match transaction to MULTIPLE invoices (batch payment).
+
+        POST /api/bank-transactions/{id}/batch_match_invoices/
+        Body: {"invoice_ids": [123, 456, 789]}
+
+        Business case: One payment covers multiple invoices from same supplier.
+        Example: 450 HUF payment for invoices: 100, 150, 200 HUF
+        """
+        transaction = self.get_object()
+        invoice_ids = request.data.get('invoice_ids', [])
+
+        if not invoice_ids or not isinstance(invoice_ids, list):
+            return Response(
+                {'error': 'invoice_ids is required and must be a list'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if len(invoice_ids) < 2:
+            return Response(
+                {'error': 'Batch matching requires at least 2 invoices'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Fetch and validate invoices
+        from .models import Invoice, BankTransactionInvoiceMatch
+        from django.utils import timezone
+
+        invoices = Invoice.objects.filter(
+            id__in=invoice_ids,
+            company=transaction.company
+        )
+
+        if invoices.count() != len(invoice_ids):
+            return Response(
+                {'error': f'Some invoices not found. Expected {len(invoice_ids)}, found {invoices.count()}'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Validate: All invoices from same supplier
+        supplier_tax_numbers = set(inv.supplier_tax_number for inv in invoices if inv.supplier_tax_number)
+        if len(supplier_tax_numbers) > 1:
+            return Response(
+                {'error': 'All invoices must be from the same supplier (same tax number)'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Calculate total and validate amount
+        total_invoice_amount = sum(inv.invoice_gross_amount for inv in invoices if inv.invoice_gross_amount)
+        transaction_amount = abs(transaction.amount)
+        tolerance = transaction_amount * Decimal('0.01')  # ±1% tolerance
+
+        if abs(total_invoice_amount - transaction_amount) > tolerance:
+            return Response({
+                'error': 'Total invoice amount must match transaction amount (±1% tolerance)',
+                'transaction_amount': str(transaction_amount),
+                'total_invoice_amount': str(total_invoice_amount),
+                'difference': str(abs(total_invoice_amount - transaction_amount))
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Clear any existing matches first
+        transaction.matched_invoice = None
+        BankTransactionInvoiceMatch.objects.filter(transaction=transaction).delete()
+
+        # Create batch match
+        confidence = Decimal('1.00')  # Manual match = 100% confidence
+        method = 'MANUAL_BATCH'
+        match_timestamp = timezone.now()
+
+        # Save transaction metadata
+        transaction.match_confidence = confidence
+        transaction.match_method = method
+        transaction.matched_at = match_timestamp
+        transaction.matched_by = request.user
+        transaction.match_notes = (
+            f"Manual batch match to {len(invoices)} invoices: "
+            f"{', '.join(inv.nav_invoice_number for inv in invoices)} - "
+            f"Total: {total_invoice_amount} HUF"
+        )
+        transaction.save()
+
+        # Create BankTransactionInvoiceMatch records
+        created_matches = []
+        for invoice in invoices:
+            match = BankTransactionInvoiceMatch.objects.create(
+                transaction=transaction,
+                invoice=invoice,
+                match_confidence=confidence,
+                match_method=method,
+                matched_by=request.user,
+                match_notes=f"Part of manual batch payment ({len(invoices)} invoices)"
+            )
+            created_matches.append({
+                'invoice_id': invoice.id,
+                'invoice_number': invoice.nav_invoice_number,
+                'amount': str(invoice.invoice_gross_amount)
+            })
+
+        # Update statement counter
+        self._update_statement_match_count(transaction)
+
+        return Response({
+            'message': f'Transaction matched to {len(invoices)} invoices successfully',
+            'transaction_id': transaction.id,
+            'batch_match': True,
+            'invoice_count': len(invoices),
+            'matched_invoices': created_matches,
+            'total_matched_amount': str(total_invoice_amount),
+            'confidence': str(confidence),
+            'method': method
+        })
+
+    @action(detail=True, methods=['post'])
     def unmatch(self, request, pk=None):
         """
-        Remove invoice match from transaction.
+        Remove invoice match(es) from transaction.
+
+        Supports both single invoice matches and batch invoice matches.
 
         POST /api/bank-transactions/{id}/unmatch/
         """
+        from .models import BankTransactionInvoiceMatch
+
         transaction = self.get_object()
 
+        # Check if this is a batch match
+        match_count = BankTransactionInvoiceMatch.objects.filter(transaction=transaction).count()
+        was_batch = match_count > 1
+
+        # Delete all BankTransactionInvoiceMatch records
+        BankTransactionInvoiceMatch.objects.filter(transaction=transaction).delete()
+
+        # Clear old ForeignKey field (backward compatibility)
         transaction.matched_invoice = None
         transaction.match_confidence = Decimal('0.00')
         transaction.match_method = ''
+        transaction.matched_at = None
+        transaction.matched_by = None
+        transaction.match_notes = ''
         transaction.save()
 
-        return Response({'message': 'Transaction unmatched successfully'})
+        # Update statement counter
+        self._update_statement_match_count(transaction)
+
+        return Response({
+            'message': 'Transaction unmatched successfully',
+            'was_batch_match': was_batch,
+            'invoices_unmatched': match_count
+        })
 
     @action(detail=True, methods=['post'])
     def rematch(self, request, pk=None):
@@ -2135,6 +2313,80 @@ class BankTransactionViewSet(viewsets.ReadOnlyModelViewSet):
             'confidence': str(result.get('confidence')) if result.get('confidence') else None,
             'method': result.get('method'),
             'auto_paid': result.get('auto_paid', False)
+        })
+
+    @action(detail=True, methods=['post'])
+    def approve_match(self, request, pk=None):
+        """
+        Manually approve an automatic match (upgrade confidence to 1.00).
+
+        Use this to confirm that an automatic match is correct, even if it has
+        medium or low confidence. This sets confidence to 1.00 and marks the
+        match as manually approved by the current user.
+
+        POST /api/bank-transactions/{id}/approve_match/
+
+        Response:
+        {
+            "message": "Match approved successfully",
+            "previous_confidence": "0.60",
+            "new_confidence": "1.00",
+            "matched_invoices": 1,
+            "is_batch_match": false
+        }
+        """
+        from django.utils import timezone
+        from .models import BankTransactionInvoiceMatch
+
+        transaction = self.get_object()
+
+        # Check if transaction has any matches
+        invoice_matches = BankTransactionInvoiceMatch.objects.filter(transaction=transaction)
+
+        if not invoice_matches.exists() and not transaction.matched_transfer and not transaction.matched_reimbursement:
+            return Response(
+                {'error': 'Transaction has no matches to approve'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        previous_confidence = str(transaction.match_confidence)
+
+        # Update transaction metadata
+        transaction.match_confidence = Decimal('1.00')
+        transaction.matched_by = request.user
+        transaction.matched_at = timezone.now()
+
+        # Add approval note
+        original_notes = transaction.match_notes or ''
+        approval_note = f"Manually approved by {request.user.get_full_name() or request.user.username} (upgraded from {previous_confidence})"
+
+        if original_notes:
+            transaction.match_notes = f"{original_notes}\n{approval_note}"
+        else:
+            transaction.match_notes = approval_note
+
+        transaction.save()
+
+        # Update all invoice match records in through table
+        invoice_count = 0
+        for match in invoice_matches:
+            match.match_confidence = Decimal('1.00')
+            match.matched_by = request.user
+            match.match_notes = f"{match.match_notes or ''}\nManually approved".strip()
+            match.save()
+            invoice_count += 1
+
+        # Update statement counter
+        self._update_statement_match_count(transaction)
+
+        return Response({
+            'message': 'Match approved successfully',
+            'previous_confidence': previous_confidence,
+            'new_confidence': '1.00',
+            'matched_invoices': invoice_count,
+            'is_batch_match': invoice_count > 1,
+            'approved_by': request.user.get_full_name() or request.user.username,
+            'approved_at': transaction.matched_at.isoformat()
         })
 
 

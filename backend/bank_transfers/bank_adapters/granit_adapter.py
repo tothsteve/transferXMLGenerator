@@ -55,7 +55,9 @@ class GranitBankAdapter(BankStatementAdapter):
                 if not first_page_text:
                     return False
 
-                return ('GRÁNIT Bank' in first_page_text or 'GRANIT Bank' in first_page_text) and \
+                # Case-insensitive check for GRÁNIT/GRANIT Bank and BIC code
+                text_upper = first_page_text.upper()
+                return ('GRÁNIT BANK' in text_upper or 'GRANIT BANK' in text_upper) and \
                        'GNBAHUHB' in first_page_text
         except Exception as e:
             logger.warning(f"Error detecting GRÁNIT Bank PDF: {e}")
@@ -176,8 +178,8 @@ class GranitBankAdapter(BankStatementAdapter):
         transaction_starts = []
         for i, line in enumerate(lines):
             line_stripped = line.strip()
-            # Must start with date
-            if not re.match(r'^2025\.\d{2}\.\d{2}\s+', line_stripped):
+            # Must start with date (any year)
+            if not re.match(r'^\d{4}\.\d{2}\.\d{2}\s+', line_stripped):
                 continue
 
             # Check if line ends with space-separated amount (e.g., "-361 250" or "10 260")
@@ -228,14 +230,39 @@ class GranitBankAdapter(BankStatementAdapter):
         first_line = block_lines[0].strip()
 
         # Extract booking date and main description from first line
+        # The amount at the end has space separators (e.g., "-7 500 000")
+        # Transaction IDs are long continuous digit strings without spaces in amounts
+        # Pattern: date + description + optional_transaction_id + amount_with_spaces
         date_match = re.match(r'^([\d.]+)\s+(.+?)\s+([\d\s\-,]+)$', first_line)
         if not date_match:
             logger.warning(f"Could not parse first line: {first_line}")
             return None
 
         booking_date = self._parse_date(date_match.group(1))
-        main_desc = date_match.group(2).strip()
-        amount = self._clean_amount(date_match.group(3))
+        desc_and_maybe_id = date_match.group(2).strip()
+        amount_str = date_match.group(3)
+
+        # Check if amount_str contains a transaction ID followed by the actual amount
+        # Transaction IDs are long digit strings (20+ digits) without spaces
+        # Amounts have spaces for thousands separators
+        # Pattern: "121000112901487500000017 -7 500 000" -> split into ID and amount
+        amount_parts = amount_str.split()
+        if len(amount_parts) > 1:
+            # Check if first part is a very long digit string (transaction ID)
+            first_part = amount_parts[0].replace('-', '')
+            if len(first_part) >= 20 and first_part.isdigit():
+                # First part is transaction ID, rest is the actual amount
+                main_desc = desc_and_maybe_id
+                # Rejoin the rest as the amount
+                amount = self._clean_amount(' '.join(amount_parts[1:]))
+            else:
+                # Normal case - just an amount with spaces
+                main_desc = desc_and_maybe_id
+                amount = self._clean_amount(amount_str)
+        else:
+            # Single token, likely just the amount
+            main_desc = desc_and_maybe_id
+            amount = self._clean_amount(amount_str)
 
         # Determine transaction type and extract fields
         txn_type, fields = self._classify_and_extract(main_desc, block_text, amount)

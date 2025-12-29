@@ -38,8 +38,8 @@ import { format, parseISO } from 'date-fns';
 import { hu } from 'date-fns/locale';
 import { BankTransaction } from '../../schemas/bankStatement.schemas';
 import { NAVInvoiceSchemaType } from '../../schemas/api.schemas';
-import { Transfer } from '../../types/api';
-import { useNAVInvoices, useTransfers } from '../../hooks/api';
+import { TransferWithBeneficiary } from '../../types/api';
+import { useNAVInvoices, useTransfers, useBankTransactions } from '../../hooks/api';
 import { useMatchTransactionToInvoice } from '../../hooks/api';
 import { useToast } from '../../hooks/useToast';
 
@@ -107,7 +107,7 @@ const ManualMatchDialog: React.FC<ManualMatchDialogProps> = ({
         >
           <Tab label="NAV Számlák" value="invoices" />
           <Tab label="Átutalások" value="transfers" />
-          <Tab label="Tranzakciók" value="transactions" disabled />
+          <Tab label="Tranzakciók" value="transactions" />
         </Tabs>
 
         <Box sx={{ mt: 2 }}>
@@ -528,7 +528,7 @@ const TransferMatchTab: React.FC<TabProps> = ({
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
       results = results.filter((transfer) => {
-        const beneficiaryName = transfer.beneficiary_data?.name?.toLowerCase() || '';
+        const beneficiaryName = transfer.beneficiary?.name?.toLowerCase() || '';
         const amount = transfer.amount.toString();
         return beneficiaryName.includes(search) || amount.includes(search);
       });
@@ -568,7 +568,7 @@ const TransferMatchTab: React.FC<TabProps> = ({
     // );
   };
 
-  const isCompatible = (_transfer: Transfer): boolean => {
+  const isCompatible = (_transfer: TransferWithBeneficiary): boolean => {
     // Check direction compatibility: transfer amounts are positive (outgoing payment)
     // So we expect negative transaction amount (DEBIT)
     const transactionAmount = parseFloat(transaction.amount);
@@ -681,8 +681,8 @@ const TransferMatchTab: React.FC<TabProps> = ({
                     <Button
                       variant="text"
                       size="small"
-                      onClick={() => handleSort('beneficiary_data__name')}
-                      endIcon={getSortIcon('beneficiary_data__name')}
+                      onClick={() => handleSort('beneficiary__name')}
+                      endIcon={getSortIcon('beneficiary__name')}
                       sx={{
                         textTransform: 'none',
                         fontWeight: 600,
@@ -732,7 +732,7 @@ const TransferMatchTab: React.FC<TabProps> = ({
               <TableBody>
                 {filteredTransfers.map((transfer) => {
                   const compatible = isCompatible(transfer);
-                  const beneficiaryName = transfer.beneficiary_data?.name || 'N/A';
+                  const beneficiaryName = transfer.beneficiary?.name || 'N/A';
 
                   return (
                     <TableRow
@@ -801,21 +801,235 @@ const TransferMatchTab: React.FC<TabProps> = ({
  * Reimbursement pair matching tab component (stub - to be implemented).
  */
 const ReimbursementMatchTab: React.FC<TabProps> = ({
+  transaction,
   searchTerm,
   onSearchChange,
 }): ReactElement => {
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [showOnlyOppositeSign, setShowOnlyOppositeSign] = useState(false);
+  const toast = useToast();
+
+  // Fetch transactions from the same statement
+  const { data: transactionsData, isLoading } = useBankTransactions(
+    transaction.bank_statement
+  );
+
+  const allTransactions = useMemo(
+    () => transactionsData?.results ?? [],
+    [transactionsData]
+  );
+
+  // Filter transactions: exclude current transaction, optionally filter by opposite sign
+  const filteredTransactions = useMemo(() => {
+    const currentAmount = parseFloat(transaction.amount);
+    return allTransactions.filter((t) => {
+      // Exclude the current transaction
+      if (t.id === transaction.id) return false;
+
+      // Optionally show only transactions with opposite sign (for reimbursement pairs)
+      if (showOnlyOppositeSign) {
+        const txAmount = parseFloat(t.amount);
+        if (Math.sign(currentAmount) === Math.sign(txAmount)) return false;
+      }
+
+      // Apply search filter
+      if (searchTerm) {
+        const search = searchTerm.toLowerCase();
+        return (
+          t.description?.toLowerCase().includes(search) ||
+          t.reference?.toLowerCase().includes(search) ||
+          t.payer_name?.toLowerCase().includes(search) ||
+          t.beneficiary_name?.toLowerCase().includes(search)
+        );
+      }
+
+      return true;
+    });
+  }, [allTransactions, transaction, searchTerm, showOnlyOppositeSign]);
+
+  const paginatedTransactions = useMemo(() => {
+    const start = page * rowsPerPage;
+    return filteredTransactions.slice(start, start + rowsPerPage);
+  }, [filteredTransactions, page, rowsPerPage]);
+
+  const handleChangePage = (_: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  if (isLoading) {
+    return (
+      <Box display="flex" justifyContent="center" p={4}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  const totalInStatement = allTransactions.length - 1; // Exclude current transaction
+  const currentAmount = parseFloat(transaction.amount);
+  const isCurrentDebit = currentAmount < 0;
+
   return (
     <Stack spacing={2}>
       <TextField
-        label="Keresés leírás szerint"
+        label="Keresés"
         value={searchTerm}
         onChange={(e) => onSearchChange(e.target.value)}
         fullWidth
-        placeholder="Írja be a tranzakció leírását..."
+        placeholder="Keresés leírás, hivatkozás vagy partner szerint..."
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <Search />
+            </InputAdornment>
+          ),
+        }}
       />
+
+      <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Typography variant="body2" color="text.secondary">
+            Összes tranzakció a kivonatban: <strong>{totalInStatement}</strong>
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            •
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Szűrt: <strong>{filteredTransactions.length}</strong>
+          </Typography>
+        </Stack>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Typography variant="body2">
+            Csak {isCurrentDebit ? 'jóváírások' : 'terhelések'}
+          </Typography>
+          <input
+            type="checkbox"
+            checked={showOnlyOppositeSign}
+            onChange={(e) => {
+              setShowOnlyOppositeSign(e.target.checked);
+              setPage(0);
+            }}
+            style={{ cursor: 'pointer' }}
+          />
+        </Stack>
+      </Stack>
+
       <Alert severity="info">
-        A visszatérítés párosítás funkció hamarosan elérhető lesz.
+        {showOnlyOppositeSign ? (
+          <>
+            Visszatérítés párosításhoz válasszon egy ellentétes előjelű tranzakciót.
+            (Jelenlegi tranzakció: <strong>{isCurrentDebit ? 'terhelés' : 'jóváírás'}</strong>, keresés: <strong>{isCurrentDebit ? 'jóváírások' : 'terhelések'}</strong>)
+          </>
+        ) : (
+          <>
+            Az összes tranzakció megjelenik. A visszatérítés párosításhoz kapcsolja be az "Csak {isCurrentDebit ? 'jóváírások' : 'terhelések'}" szűrőt.
+          </>
+        )}
       </Alert>
+
+      {filteredTransactions.length === 0 ? (
+        <Alert severity="warning">
+          Nem található megfelelő tranzakció a párosításhoz.
+          {showOnlyOppositeSign && (
+            <> Próbálja meg kikapcsolni az ellentétes előjel szűrőt.</>
+          )}
+        </Alert>
+      ) : (
+        <>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Dátum</TableCell>
+                  <TableCell>Típus</TableCell>
+                  <TableCell>Partner</TableCell>
+                  <TableCell>Leírás</TableCell>
+                  <TableCell align="right">Összeg</TableCell>
+                  <TableCell>Párosítás</TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {paginatedTransactions.map((t) => {
+                  const amount = parseFloat(t.amount);
+                  const isCredit = amount > 0;
+
+                  return (
+                    <TableRow key={t.id} hover>
+                      <TableCell>
+                        {format(parseISO(t.booking_date), 'yyyy. MM. dd.', { locale: hu })}
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={0.5} alignItems="center">
+                          {isCredit ? <ArrowUpward fontSize="small" color="success" /> : <ArrowDownward fontSize="small" color="error" />}
+                          <Typography variant="body2">
+                            {isCredit ? 'Jóváírás' : 'Terhelés'}
+                          </Typography>
+                        </Stack>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {isCredit ? t.payer_name : t.beneficiary_name}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {t.description || '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography
+                          variant="body2"
+                          fontWeight="medium"
+                          color={isCredit ? 'success.main' : 'error.main'}
+                        >
+                          {amount > 0 ? '+' : ''}{Math.abs(amount).toLocaleString('hu-HU', { minimumFractionDigits: 2 })} {t.currency}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        {t.matched_invoice || t.matched_transfer || t.matched_reimbursement ? (
+                          <Chip label="Párosítva" size="small" color="success" icon={<CheckIcon />} />
+                        ) : (
+                          <Chip label="Nincs" size="small" />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          disabled
+                          onClick={() => {
+                            toast.warning('A manuális párosítás funkció hamarosan elérhető lesz');
+                          }}
+                        >
+                          Párosítás
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          <TablePagination
+            component="div"
+            count={filteredTransactions.length}
+            page={page}
+            onPageChange={handleChangePage}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+            rowsPerPageOptions={[5, 10, 25]}
+            labelRowsPerPage="Sorok száma:"
+            labelDisplayedRows={({ from, to, count }) => `${from}–${to} / ${count}`}
+          />
+        </>
+      )}
     </Stack>
   );
 };

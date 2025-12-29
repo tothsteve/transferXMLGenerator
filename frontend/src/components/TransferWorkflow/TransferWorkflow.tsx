@@ -210,12 +210,9 @@ const TransferWorkflow: React.FC = () => {
       console.log('Loading existing transfers:', existingTransfers);
 
       const convertedTransfers: TransferData[] = existingTransfers.map((transfer) => {
-        const beneficiaryId = typeof transfer.beneficiary === 'number'
-          ? transfer.beneficiary
-          : (transfer.beneficiary as Beneficiary).id;
-        const beneficiaryData = typeof transfer.beneficiary === 'number'
-          ? transfer.beneficiary_data
-          : (transfer.beneficiary as Beneficiary);
+        // TransferWithBeneficiary always has beneficiary as an object
+        const beneficiaryId = transfer.beneficiary.id;
+        const beneficiaryData = transfer.beneficiary;
 
         return {
           id: transfer.id,

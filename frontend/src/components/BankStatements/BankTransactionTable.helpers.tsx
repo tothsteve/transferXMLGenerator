@@ -96,7 +96,12 @@ interface MatchBadge {
  * ```
  */
 export const getMatchBadge = (transaction: BankTransaction): MatchBadge => {
-  const isMatched = transaction.matched_invoice !== null || transaction.matched_transfer !== null;
+  const isMatched = transaction.matched_invoice !== null ||
+                    transaction.matched_transfer !== null ||
+                    transaction.matched_reimbursement !== null ||
+                    (transaction.is_batch_match && transaction.matched_invoices_details && transaction.matched_invoices_details.length > 0) ||
+                    transaction.has_other_cost === true ||
+                    transaction.match_method === 'SYSTEM_AUTO_CATEGORIZED';
 
   if (!isMatched) {
     return {
