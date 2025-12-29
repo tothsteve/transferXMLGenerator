@@ -1,6 +1,12 @@
 import { useState, useCallback, useEffect, Dispatch, SetStateAction } from 'react';
 import { navInvoicesApi } from '../services/api';
+import { NAVInvoice } from '../types/api';
 
+// Re-export NAVInvoice as Invoice for backwards compatibility
+export type Invoice = NAVInvoice;
+
+// Keep the duplicate interface commented for reference, but use NAVInvoice instead
+/*
 export interface Invoice {
   id: number;
   nav_invoice_number: string;
@@ -53,6 +59,7 @@ export interface Invoice {
   customer_bank_account_number?: string | null;
   line_items?: unknown[];
 }
+*/
 
 export interface UseInvoiceDataParams {
   queryParams: Record<string, unknown>;

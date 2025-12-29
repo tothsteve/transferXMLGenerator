@@ -3,12 +3,16 @@
  * @module components/BankStatements/TransactionDetails
  */
 
-import { ReactElement } from 'react';
-import { Box, Typography, Stack } from '@mui/material';
+import { ReactElement, useState } from 'react';
+import { Box, Typography, Stack, Button, Alert } from '@mui/material';
+import { Category as CategoryIcon } from '@mui/icons-material';
 import { BankTransaction } from '../../schemas/bankStatement.schemas';
 import { format, parseISO } from 'date-fns';
 import { hu } from 'date-fns/locale';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import MatchDetailsCard from './MatchDetailsCard';
+import CategoryDialog, { CategoryFormData } from './CategoryDialog';
+import { otherCostsApi } from '../../services/api';
 
 /**
  * Props for TransactionDetails component.
@@ -18,6 +22,8 @@ import MatchDetailsCard from './MatchDetailsCard';
 interface TransactionDetailsProps {
   /** Transaction data to display details for */
   transaction: BankTransaction;
+  /** Optional callback after successful match action */
+  onActionSuccess?: () => void;
 }
 
 /**
@@ -43,15 +49,82 @@ interface TransactionDetailsProps {
  */
 const TransactionDetails: React.FC<TransactionDetailsProps> = ({
   transaction,
+  onActionSuccess,
 }): ReactElement => {
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  // Check if transaction can be categorized
+  const isMatched = transaction.matched_invoice !== null ||
+                    transaction.matched_transfer !== null ||
+                    transaction.matched_reimbursement !== null ||
+                    (transaction.is_batch_match && transaction.matched_invoices_details && transaction.matched_invoices_details.length > 0) ||
+                    transaction.has_other_cost === true ||
+                    transaction.match_method === 'SYSTEM_AUTO_CATEGORIZED' ||
+                    transaction.match_method === 'LEARNED_PATTERN';
+
+  // Mutation for creating OtherCost
+  const createOtherCostMutation = useMutation({
+    mutationFn: async (formData: CategoryFormData) => {
+      const tags = formData.tags
+        ? formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+        : [];
+
+      // Note: company and created_by are set by backend in perform_create()
+      return otherCostsApi.create({
+        bank_transaction: transaction.id,
+        category: formData.category,
+        amount: Math.abs(parseFloat(transaction.amount)).toString(),
+        currency: transaction.currency,
+        date: transaction.value_date,
+        description: formData.description || transaction.description,
+        notes: formData.notes,
+        tags: tags,
+        // company and created_by will be set automatically by the backend
+      } as any); // Type assertion needed because OtherCost type includes these fields
+    },
+    onSuccess: () => {
+      setCategoryDialogOpen(false);
+      setError(null);
+      // Invalidate queries to refresh transaction list
+      queryClient.invalidateQueries({ queryKey: ['bankTransactions'] });
+      queryClient.invalidateQueries({ queryKey: ['bankStatements'] });
+      if (onActionSuccess) {
+        onActionSuccess();
+      }
+    },
+    onError: (err: any) => {
+      setError(err.response?.data?.detail || 'Hiba történt a kategorizálás során');
+    },
+  });
+
+  const handleCategorize = async (formData: CategoryFormData) => {
+    // Prevent double-submit - check if mutation is already in progress
+    if (createOtherCostMutation.isPending) {
+      return;
+    }
+    await createOtherCostMutation.mutateAsync(formData);
+  };
+
   return (
     <Box sx={{ p: 2, bgcolor: 'background.default' }}>
       <Typography variant="subtitle2" gutterBottom>
         Részletek
       </Typography>
       <Stack spacing={2}>
+        {/* Error Alert */}
+        {error && (
+          <Alert severity="error" onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
+
         {/* Match Details Card (if matched) */}
-        <MatchDetailsCard transaction={transaction} />
+        <MatchDetailsCard
+          transaction={transaction}
+          {...(onActionSuccess && { onActionSuccess })}
+        />
 
         {/* Transaction Details */}
         <Stack spacing={1}>
@@ -99,7 +172,30 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({
             </Typography>
           </Box>
         </Stack>
+
+        {/* Categorize Button (only for unmatched transactions) */}
+        {!isMatched && (
+          <Box sx={{ pt: 1 }}>
+            <Button
+              variant="outlined"
+              startIcon={<CategoryIcon />}
+              onClick={() => setCategoryDialogOpen(true)}
+              fullWidth
+            >
+              Kategorizálás
+            </Button>
+          </Box>
+        )}
       </Stack>
+
+      {/* Category Dialog */}
+      <CategoryDialog
+        open={categoryDialogOpen}
+        transaction={transaction}
+        onClose={() => setCategoryDialogOpen(false)}
+        onSubmit={handleCategorize}
+        isSubmitting={createOtherCostMutation.isPending}
+      />
     </Box>
   );
 };

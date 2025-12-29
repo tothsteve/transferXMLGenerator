@@ -4,7 +4,7 @@ from .models import (
     BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch, Company,
     NavConfiguration, Invoice, InvoiceLineItem, InvoiceSyncLog, TrustedPartner,
     ExchangeRate, ExchangeRateSyncLog,
-    BankStatement, BankTransaction, OtherCost,
+    BankStatement, BankTransaction, BankTransactionInvoiceMatch, OtherCost,
     CompanyBillingoSettings, BillingoInvoice, BillingoInvoiceItem, BillingoRelatedDocument, BillingoSyncLog, BillingoSpending,
     SupplierCategory, SupplierType, Supplier, Customer, ProductPrice
 )
@@ -413,6 +413,7 @@ class InvoiceListSerializer(serializers.ModelSerializer):
             'fulfillment_date', 'fulfillment_date_formatted',
             'payment_due_date', 'payment_due_date_formatted',
             'payment_date', 'payment_date_formatted',
+            'completion_date', 'last_modified_date',
 
             # Financial
             'currency_code',
@@ -422,9 +423,17 @@ class InvoiceListSerializer(serializers.ModelSerializer):
 
             # Business
             'invoice_operation', 'payment_method', 'original_invoice_number',
+            'invoice_appearance',
             'payment_status', 'payment_status_date', 'payment_status_date_formatted',
             'auto_marked_paid', 'is_overdue', 'invoice_category',
             'supplier_bank_account_number', 'customer_bank_account_number',
+
+            # NAV metadata
+            'nav_source', 'original_request_version',
+
+            # Partner details
+            'supplier_name', 'customer_name',
+            'supplier_tax_number', 'customer_tax_number',
 
             # System
             'sync_status', 'created_at'
@@ -985,17 +994,54 @@ class CurrencyConversionSerializer(serializers.Serializer):
 # Bank Statement Import Serializers
 # =============================================================================
 
+class BankTransactionInvoiceMatchSerializer(serializers.ModelSerializer):
+    """
+    Serializer for BankTransactionInvoiceMatch intermediate model.
+
+    Provides invoice match details with confidence and method metadata.
+    """
+    invoice_details = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BankTransactionInvoiceMatch
+        fields = [
+            'id', 'transaction', 'invoice', 'invoice_details',
+            'match_confidence', 'match_method', 'matched_at',
+            'matched_by', 'match_notes'
+        ]
+        read_only_fields = ['matched_at']
+
+    def get_invoice_details(self, obj):
+        """Return matched invoice summary"""
+        if obj.invoice:
+            return {
+                'id': obj.invoice.id,
+                'invoice_number': obj.invoice.nav_invoice_number,
+                'supplier_name': obj.invoice.supplier_name,
+                'supplier_tax_number': obj.invoice.supplier_tax_number,
+                'gross_amount': str(obj.invoice.invoice_gross_amount) if obj.invoice.invoice_gross_amount else None,
+                'payment_due_date': obj.invoice.payment_due_date.isoformat() if obj.invoice.payment_due_date else None,
+                'payment_status': obj.invoice.payment_status,
+            }
+        return None
+
+
 class BankTransactionSerializer(serializers.ModelSerializer):
     """
     Serializer for bank transaction records.
 
     Provides full transaction details with nested invoice match information.
+    Supports both single invoice matches and batch invoice matches.
     """
     statement_details = serializers.SerializerMethodField()
     matched_invoice_details = serializers.SerializerMethodField()
+    matched_invoices_details = serializers.SerializerMethodField()  # NEW: Batch matching support
+    is_batch_match = serializers.SerializerMethodField()  # NEW: Batch flag
+    total_matched_amount = serializers.SerializerMethodField()  # NEW: Sum of matched invoices
     matched_transfer_batch = serializers.SerializerMethodField()
     matched_reimbursement_details = serializers.SerializerMethodField()
     has_other_cost = serializers.SerializerMethodField()
+    other_cost_detail = serializers.SerializerMethodField()
 
     class Meta:
         model = BankTransaction
@@ -1010,9 +1056,10 @@ class BankTransactionSerializer(serializers.ModelSerializer):
             'card_number', 'merchant_name', 'merchant_location',
             'original_amount', 'original_currency',
             'matched_invoice', 'matched_invoice_details', 'match_confidence', 'match_method',
+            'matched_invoices_details', 'is_batch_match', 'total_matched_amount',  # NEW: Batch matching fields
             'matched_transfer', 'matched_transfer_batch',
             'matched_reimbursement', 'matched_reimbursement_details',
-            'has_other_cost',
+            'has_other_cost', 'other_cost_detail',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
@@ -1030,7 +1077,7 @@ class BankTransactionSerializer(serializers.ModelSerializer):
         return None
     
     def get_matched_invoice_details(self, obj):
-        """Return matched invoice summary"""
+        """Return matched invoice summary (backward compatibility - single invoice)"""
         if obj.matched_invoice:
             return {
                 'id': obj.matched_invoice.id,
@@ -1044,6 +1091,37 @@ class BankTransactionSerializer(serializers.ModelSerializer):
                 'payment_status': obj.matched_invoice.payment_status,
             }
         return None
+
+    def get_matched_invoices_details(self, obj):
+        """Return list of all matched invoices with metadata (batch matching support)"""
+        matches = obj.invoice_matches.select_related('invoice').all()
+        if not matches:
+            return []
+
+        return [
+            {
+                'id': match.invoice.id,
+                'invoice_number': match.invoice.nav_invoice_number,
+                'supplier_name': match.invoice.supplier_name,
+                'supplier_tax_number': match.invoice.supplier_tax_number,
+                'gross_amount': str(match.invoice.invoice_gross_amount) if match.invoice.invoice_gross_amount else None,
+                'payment_due_date': match.invoice.payment_due_date.isoformat() if match.invoice.payment_due_date else None,
+                'payment_status': match.invoice.payment_status,
+                'match_confidence': str(match.match_confidence),
+                'match_method': match.match_method,
+                'match_notes': match.match_notes,
+            }
+            for match in matches
+        ]
+
+    def get_is_batch_match(self, obj):
+        """Return True if transaction is matched to multiple invoices"""
+        return obj.is_batch_match
+
+    def get_total_matched_amount(self, obj):
+        """Return sum of all matched invoice amounts"""
+        total = obj.total_matched_amount
+        return str(total) if total else None
 
     def get_matched_transfer_batch(self, obj):
         """Return batch ID for matched transfer"""
@@ -1074,6 +1152,27 @@ class BankTransactionSerializer(serializers.ModelSerializer):
     def get_has_other_cost(self, obj):
         """Check if transaction has associated other cost record"""
         return hasattr(obj, 'other_cost_detail') and obj.other_cost_detail is not None
+
+    def get_other_cost_detail(self, obj):
+        """Return other cost categorization details"""
+        if hasattr(obj, 'other_cost_detail') and obj.other_cost_detail:
+            cost = obj.other_cost_detail
+            # Ensure tags is always a list (JSONField can sometimes serialize as string)
+            tags = cost.tags if isinstance(cost.tags, list) else []
+            return {
+                'id': cost.id,
+                'category': cost.category,
+                'category_display': cost.get_category_display(),
+                'amount': str(cost.amount),
+                'currency': cost.currency,
+                'date': cost.date.isoformat(),
+                'description': cost.description,
+                'notes': cost.notes,
+                'tags': tags,
+                'created_by': cost.created_by_id,
+                'created_at': cost.created_at.isoformat(),
+            }
+        return None
 
 
 class BankStatementListSerializer(serializers.ModelSerializer):
@@ -1230,7 +1329,7 @@ class OtherCostSerializer(serializers.ModelSerializer):
             'created_by', 'created_by_name',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'company']
+        read_only_fields = ['created_at', 'updated_at', 'company', 'created_by']
     
     def get_transaction_details(self, obj):
         """Return basic transaction info if linked"""

@@ -46,12 +46,12 @@ interface SelectedInvoice {
   invoice_direction: string;
   invoice_direction_display: string;
   invoice_operation: string | null;
-  supplier_name?: string | null;
-  supplier_tax_number?: string | null;
-  supplier_bank_account_number?: string | null;
-  customer_name?: string | null;
-  customer_tax_number?: string | null;
-  customer_bank_account_number?: string | null;
+  supplier_name?: string | null | undefined;
+  supplier_tax_number?: string | null | undefined;
+  supplier_bank_account_number?: string | null | undefined;
+  customer_name?: string | null | undefined;
+  customer_tax_number?: string | null | undefined;
+  customer_bank_account_number?: string | null | undefined;
   fulfillment_date_formatted: string | null;
   issue_date_formatted: string;
   payment_due_date_formatted: string | null;

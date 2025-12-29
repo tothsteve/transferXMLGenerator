@@ -49,6 +49,9 @@ interface TransactionRowProps {
 
   /** Optional callback when match button is clicked (only for unmatched transactions) */
   onMatch?: (transactionId: number) => void;
+
+  /** Optional callback after successful match action */
+  onActionSuccess?: () => void;
 }
 
 /**
@@ -82,12 +85,18 @@ const TransactionRow: React.FC<TransactionRowProps> = ({
   isExpanded,
   onExpand,
   onMatch,
+  onActionSuccess,
 }): ReactElement => {
   const matchBadge = getMatchBadge(transaction);
   const transactionDate = format(parseISO(transaction.booking_date), 'yyyy. MM. dd.', {
     locale: hu,
   });
-  const isMatchedTx = transaction.matched_invoice !== null || transaction.matched_transfer !== null;
+  const isMatchedTx = transaction.matched_invoice !== null ||
+                      transaction.matched_transfer !== null ||
+                      transaction.matched_reimbursement !== null ||
+                      (transaction.is_batch_match && transaction.matched_invoices_details && transaction.matched_invoices_details.length > 0) ||
+                      transaction.has_other_cost === true ||
+                      transaction.match_method === 'SYSTEM_AUTO_CATEGORIZED';
   const partnerName = getPartnerName(transaction);
   const partnerAccount = getPartnerAccount(transaction);
 
@@ -170,7 +179,10 @@ const TransactionRow: React.FC<TransactionRowProps> = ({
       <TableRow>
         <TableCell colSpan={8} sx={{ py: 0 }}>
           <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-            <TransactionDetails transaction={transaction} />
+            <TransactionDetails
+              transaction={transaction}
+              {...(onActionSuccess && { onActionSuccess })}
+            />
           </Collapse>
         </TableCell>
       </TableRow>

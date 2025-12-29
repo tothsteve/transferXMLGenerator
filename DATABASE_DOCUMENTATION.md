@@ -1,9 +1,9 @@
 # Database Schema Documentation
 ## Transfer XML Generator - Hungarian Banking System
 
-**Last Updated:** 2025-10-24
+**Last Updated:** 2025-12-29
 **Database:** PostgreSQL (Production on Railway) / SQL Server (Local Development)
-**Schema Version:** Multi-Company Architecture with Feature Flags, NAV Invoice Payment Status Tracking, Trusted Partners Auto-Payment System, VAT Number and Tax Number Beneficiary Support, Bank Statement Import System (Migration 0039)  
+**Schema Version:** Multi-Company Architecture with Feature Flags, NAV Invoice Payment Status Tracking, Trusted Partners Auto-Payment System, VAT Number and Tax Number Beneficiary Support, Bank Statement Import System with Batch Invoice Matching (Migration 0062)  
 
 > **Note:** This documentation is the **single source of truth** for database schema. All database comment scripts should be generated from this document.
 
@@ -1166,10 +1166,15 @@ for sync in failed_syncs:
 **Match Methods (MATCH_METHOD_CHOICES):**
 - `REFERENCE_EXACT` - Közlemény alapján (pontos) - Exact reference match
 - `AMOUNT_IBAN` - Összeg + IBAN alapján - Amount and IBAN match
+- `BATCH_INVOICES` - Több számla összevonása - Batch invoice matching (2-5 invoices)
 - `FUZZY_NAME` - Összeg + név hasonlóság alapján - Amount and fuzzy name match
 - `TRANSFER_EXACT` - Átutalási köteg alapján - Transfer batch match
 - `REIMBURSEMENT_PAIR` - Ellentételezés (személyes visszafizetés) - Reimbursement offsetting
 - `MANUAL` - Manuális párosítás - Manual matching by user
+- `MANUAL_BATCH` - Manuális többszámlás párosítás - Manual batch matching
+- `BATCH_TRANSFER_MATCH` - Batch transfer match - Transfer batch matched to transaction
+- `SYSTEM_AUTO_CATEGORIZED` - Rendszer által automatikusan kategorizált - System auto-categorized transaction
+- `LEARNED_PATTERN` - Tanult minta alapján - Learned pattern matching
 
 **Extra Cost Categories (EXTRA_COST_CATEGORIES):**
 - `BANK_FEE` - Banki költség
@@ -1207,7 +1212,9 @@ for sync in failed_syncs:
 - **Negative for Debit**: Negative amounts indicate money leaving account (debit)
 - **Positive for Credit**: Positive amounts indicate money entering account (credit)
 - **Multi-Type Support**: Single model handles all transaction types (transfers, POS, fees, etc.)
-- **NAV Invoice Matching**: Automatic matching to invoices using 7 matching strategies
+- **NAV Invoice Matching**: Automatic matching to invoices using 8 matching strategies (including batch invoice matching)
+- **Batch Invoice Matching**: One transaction can match to 2-5 invoices via `matched_invoices` ManyToMany relationship (NEW in Migration 0062)
+- **Backward Compatibility**: Legacy `matched_invoice` ForeignKey preserved for single-invoice matches (deprecated, use `matched_invoices`)
 - **Transfer Matching**: Links to executed transfers from TransferBatch (used_in_bank=True)
 - **Reimbursement Pairs**: Self-referencing FK for offsetting transactions (e.g., POS purchase + personal reimbursement)
 - **Confidence Scoring**: Match confidence from 0.00 (no match) to 1.00 (perfect match)
@@ -1216,26 +1223,125 @@ for sync in failed_syncs:
 - **FX Support**: Original amount and exchange rate stored for foreign currency transactions
 
 **Transaction Matching Engine:**
-The system uses a sophisticated matching engine with 7 strategies:
-1. **Invoice Reference Match**: Exact invoice number in reference field
-2. **Amount + IBAN Match**: Amount and supplier IBAN match
-3. **Amount + Date Match**: Amount and payment due date match
-4. **Fuzzy Name Match**: Amount and fuzzy name similarity (>80%)
-5. **Amount + Tax Number Match**: Amount and supplier tax number match
-6. **Amount Range Match**: Amount within ±2% tolerance
-7. **Transfer Batch Match**: Matches executed transfers from batches
+The system uses a sophisticated matching engine with 8 strategies:
+1. **Invoice Reference Match**: Exact invoice number in reference field (confidence: 1.00)
+2. **Amount + IBAN Match**: Amount and supplier IBAN match (confidence: 0.95)
+3. **Batch Invoice Match**: Matches 2-5 invoices from same supplier where sum equals transaction amount (confidence: 0.85-1.00) - NEW
+4. **Fuzzy Name Match**: Amount and fuzzy name similarity (>70%) (confidence: 0.70-0.90)
+5. **Amount + Date Match**: Amount and payment due date match (confidence: 0.70)
+6. **Amount + Tax Number Match**: Amount and supplier tax number match (confidence: 0.70)
+7. **Amount Range Match**: Amount within ±2% tolerance (confidence: 0.60)
+8. **Transfer Batch Match**: Matches executed transfers from batches (confidence: 1.00)
 
 **API Access:**
 - `GET /api/bank-transactions/` - List transactions with filtering and pagination
-- `GET /api/bank-transactions/{id}/` - Transaction details
-- `POST /api/bank-transactions/{id}/match_invoice/` - Manually match to invoice
-- `POST /api/bank-transactions/{id}/unmatch_invoice/` - Remove invoice match
+- `GET /api/bank-transactions/{id}/` - Transaction details (includes matched_invoices array)
+- `POST /api/bank-transactions/{id}/match_invoice/` - Manually match to single invoice
+- `POST /api/bank-transactions/{id}/batch_match_invoices/` - Manually match to multiple invoices (2-5) - NEW
+- `POST /api/bank-transactions/{id}/unmatch/` - Remove all invoice matches (single or batch)
 - `POST /api/bank-transactions/{id}/categorize_cost/` - Categorize as extra cost
 - `GET /api/bank-transactions/statistics/` - Transaction statistics and summaries
 
 ---
 
-## 22. **bank_transfers_othercost**
+## 22. **bank_transfers_banktransactioninvoicematch**
+**Table Comment:** *Intermediate many-to-many relationship table linking bank transactions to NAV invoices. Enables batch invoice matching where a single bank transaction can match to 2-5 invoices from the same supplier. Stores per-match metadata including confidence scoring, matching method, user attribution, and timestamping.*
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY | Unique identifier for the match record |
+| `transaction_id` | BIGINT | NOT NULL, FK(bank_transfers_banktransaction.id), CASCADE | Bank transaction being matched |
+| `invoice_id` | BIGINT | NOT NULL, FK(bank_transfers_invoice.id), CASCADE | NAV invoice being matched |
+| `match_confidence` | DECIMAL(4,2) | DEFAULT 0.00, CHECK (0.00 ≤ value ≤ 1.00) | Matching confidence score from 0.00 to 1.00 |
+| `match_method` | VARCHAR(50) | CHECK | Method used for matching (see MATCH_METHOD_CHOICES in BankTransaction) |
+| `matched_at` | TIMESTAMP | NOT NULL | Timestamp when match was created |
+| `matched_by_id` | INTEGER | FK(auth_user.id), SET_NULL | User who performed the match (NULL for automatic matches) |
+| `match_notes` | TEXT | | Additional notes about the matching process or reasoning |
+
+**UNIQUE Constraints:**
+- Unique constraint on `(transaction_id, invoice_id)` - Prevents duplicate matches of same transaction-invoice pair
+
+**Indexes:**
+- Primary key on `id`
+- Composite index on `(transaction_id, invoice_id)` for fast lookup of transaction's matched invoices
+- Index on `invoice_id` for reverse lookup (which transactions matched this invoice)
+- Index on `matched_by_id` for user audit queries
+
+**Business Rules:**
+- **Batch Matching**: Enables 1-to-many relationship (one transaction → multiple invoices)
+- **Supplier Consistency**: Batch matched invoices must all be from the same supplier (application-level validation)
+- **Amount Tolerance**: Sum of matched invoice amounts must be within ±1% of transaction amount for automatic matching
+- **Confidence Calculation**: For batch matches, base confidence is 0.85 + IBAN bonus (0.10) + name similarity bonus (0.05)
+- **Auto-Payment Threshold**: If confidence ≥ 0.90, ALL matched invoices are automatically marked as PAID
+- **Manual Override**: Users can force batch matching even if amounts differ by >5% (sets confidence to 1.00)
+- **Invoice Limit**: Batch matching limited to 2-5 invoices per transaction (configurable)
+- **Performance Protection**: Algorithm skips supplier groups with >20 unpaid invoices to prevent timeout
+- **Direction Compatibility**: All matched invoices must have compatible direction with transaction type
+
+**Match Metadata:**
+- `match_confidence`: Quality indicator for match (0.00-1.00 scale)
+  - 1.00: Perfect match (manual or exact algorithmic match)
+  - 0.95: High confidence (IBAN + amount match)
+  - 0.85-0.90: Good confidence (batch match with IBAN/name bonuses)
+  - 0.70-0.80: Medium confidence (fuzzy name match)
+  - 0.60-0.69: Low confidence (requires manual review)
+- `match_method`: Algorithm or user action that created the match
+  - `BATCH_INVOICES`: Automatic batch matching algorithm
+  - `MANUAL_BATCH`: Manual batch matching by user
+  - Other methods inherited from BankTransaction.MATCH_METHOD_CHOICES
+- `matched_by_id`: User attribution for manual matches, NULL for automatic
+- `match_notes`: Free text field for reasoning, especially for manual overrides
+
+**Usage Patterns:**
+1. **Automatic Batch Matching**:
+   - Transaction parser runs on uploaded statement
+   - For each unmatched debit transaction, system tries batch matching
+   - Searches for 2-5 invoice combinations from same supplier
+   - If sum matches transaction amount (±1%), creates matches in this table
+   - Sets `match_method='BATCH_INVOICES'`, `matched_by=NULL`, confidence based on IBAN/name
+
+2. **Manual Batch Matching**:
+   - User selects unmatched transaction
+   - Clicks "Batch Match" button
+   - Selects multiple invoices from same supplier
+   - System validates amount tolerance (warns if >5% difference)
+   - Creates matches with `match_method='MANUAL_BATCH'`, `matched_by=user`, confidence=1.00
+
+3. **Query Patterns**:
+   - Get all invoices for transaction: `SELECT invoice_id FROM ... WHERE transaction_id = ?`
+   - Get all transactions for invoice: `SELECT transaction_id FROM ... WHERE invoice_id = ?`
+   - Check if transaction is batch match: `SELECT COUNT(*) > 1 FROM ... WHERE transaction_id = ?`
+   - Audit user matches: `SELECT * FROM ... WHERE matched_by_id = ? ORDER BY matched_at DESC`
+
+**Migration History:**
+- **Migration 0061**: Created table with schema
+- **Migration 0062**: Data migration copying existing single `matched_invoice` ForeignKey to `matched_invoices` ManyToMany
+
+**API Access:**
+- Accessed via `BankTransaction.matched_invoices` relationship in API responses
+- Returns array of `BankTransactionInvoiceMatch` objects with nested `invoice_data`
+- Each match includes: `id`, `invoice`, `invoice_data`, `match_confidence`, `match_method`, `matched_at`, `matched_by`, `match_notes`
+
+**Frontend Display:**
+- Single match: Shows invoice number directly
+- Batch match: Shows "X számlák" badge with expandable table
+- Expandable section displays all matched invoices with individual confidence scores
+- Total matched amount displayed vs transaction amount for validation
+
+**Performance Considerations:**
+- Composite index `(transaction_id, invoice_id)` ensures O(1) duplicate prevention
+- Index on `invoice_id` enables efficient reverse queries
+- Batch matching algorithm limited to 20 invoices per supplier to prevent combinatorial explosion
+- Uses `select_related()` and `prefetch_related()` in API queries to avoid N+1 problems
+
+**Related Tables:**
+- `bank_transfers_banktransaction` - Parent transaction
+- `bank_transfers_invoice` - Matched NAV invoice
+- `auth_user` - User who performed manual matching
+
+---
+
+## 23. **bank_transfers_othercost**
 **Table Comment:** *Additional cost records derived from bank transactions. Allows enhanced categorization, detailed notes, and flexible tagging beyond standard BankTransaction fields. Used for expense tracking, cost analysis, and financial reporting.*
 
 | Column | Type | Constraints | Description |

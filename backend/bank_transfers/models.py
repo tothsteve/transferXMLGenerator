@@ -786,6 +786,93 @@ class InvoiceSyncLog(TimestampedModel):
         return f"{self.company.name} - {self.sync_start_time.strftime('%Y-%m-%d %H:%M')} ({self.sync_status})"
 
 
+class BankTransactionInvoiceMatch(models.Model):
+    """
+    Intermediate model for ManyToMany relationship between BankTransaction and Invoice.
+
+    Stores per-invoice match metadata (confidence, method, notes) for both single
+    and batch invoice matching. Replaces the deprecated matched_invoice ForeignKey.
+
+    Business Logic:
+    - Used for BOTH single and batch invoice matching
+    - match_method = 'BATCH_INVOICES' for automatic batch matches
+    - match_method = 'MANUAL_BATCH' for user-created batch matches
+    - match_confidence = 1.00 for all manual matches
+
+    Performance:
+    - Unique index on (transaction, invoice) prevents duplicate matches
+    - Index on invoice_id for reverse lookups (all transactions for an invoice)
+    """
+    transaction = models.ForeignKey(
+        'BankTransaction',
+        on_delete=models.CASCADE,
+        related_name='invoice_matches',
+        verbose_name='Bank tranzakció',
+        help_text='The bank transaction that was matched'
+    )
+    invoice = models.ForeignKey(
+        'Invoice',
+        on_delete=models.CASCADE,
+        related_name='transaction_matches',
+        verbose_name='NAV számla',
+        help_text='The NAV invoice that was matched'
+    )
+    match_confidence = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name='Párosítás megbízhatósága',
+        help_text='Match confidence score (0.00-1.00)'
+    )
+    match_method = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name='Párosítási módszer',
+        help_text='Matching method used (BATCH_INVOICES, MANUAL_BATCH, etc.)',
+        choices=[
+            ('REFERENCE_EXACT', 'Reference Exact Match'),
+            ('AMOUNT_IBAN', 'Amount + IBAN Match'),
+            ('BATCH_INVOICES', 'Batch Invoice Match'),
+            ('FUZZY_NAME', 'Fuzzy Name Match'),
+            ('AMOUNT_DATE_ONLY', 'Amount + Date Only'),
+            ('MANUAL', 'Manual Single Match'),
+            ('MANUAL_BATCH', 'Manual Batch Match'),
+        ]
+    )
+    matched_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Párosítás időpontja',
+        help_text='When the match was created'
+    )
+    matched_by = models.ForeignKey(
+        'auth.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name='Párosította',
+        help_text='User who created manual match (NULL for automatic)'
+    )
+    match_notes = models.TextField(
+        blank=True,
+        verbose_name='Párosítási megjegyzések',
+        help_text='Detailed match information for audit trail'
+    )
+
+    class Meta:
+        db_table = 'bank_transfers_banktransactioninvoicematch'
+        verbose_name = 'Tranzakció-számla párosítás'
+        verbose_name_plural = 'Tranzakció-számla párosítások'
+        unique_together = [['transaction', 'invoice']]
+        indexes = [
+            models.Index(fields=['transaction', 'invoice'], name='idx_tx_invoice_match'),
+            models.Index(fields=['invoice'], name='idx_invoice_matches'),
+        ]
+        ordering = ['transaction', 'invoice']
+
+    def __str__(self):
+        return f"Transaction {self.transaction.id} → Invoice {self.invoice.nav_invoice_number} ({self.match_confidence})"
+
+
 # Company Feature Management Models
 
 class FeatureTemplate(TimestampedModel):
@@ -1638,13 +1725,25 @@ class BankTransaction(CompanyOwnedTimestampedModel):
     )
 
     # === Matching to NAV invoices ===
+    # DEPRECATED: Keep for backward compatibility during migration
     matched_invoice = models.ForeignKey(
         'Invoice',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='bank_transactions',
-        verbose_name="Párosított számla"
+        verbose_name="Párosított számla",
+        help_text="(DEPRECATED) Use matched_invoices instead - single invoice match"
+    )
+
+    # NEW: ManyToMany relationship for batch matching
+    matched_invoices = models.ManyToManyField(
+        'Invoice',
+        through='BankTransactionInvoiceMatch',
+        related_name='bank_transactions_many',
+        blank=True,
+        verbose_name='Párosított számlák',
+        help_text='Multiple matched invoices (for batch payments)'
     )
 
     # === Matching to Transfers (from TransferBatch) ===
@@ -1684,6 +1783,8 @@ class BankTransaction(CompanyOwnedTimestampedModel):
         ('TRANSFER_EXACT', 'Átutalási köteg alapján'),
         ('REIMBURSEMENT_PAIR', 'Ellentételezés (személyes visszafizetés)'),
         ('MANUAL', 'Manuális párosítás'),
+        ('SYSTEM_AUTO_CATEGORIZED', 'Automatikusan kategorizált (banki tranzakció)'),
+        ('LEARNED_PATTERN', 'Ismétlődő minta alapján (tanult)'),
     ]
     match_method = models.CharField(
         max_length=50,
@@ -1738,6 +1839,26 @@ class BankTransaction(CompanyOwnedTimestampedModel):
         verbose_name="Nyers adatok"
     )
 
+    # === Helper properties for batch matching ===
+
+    @property
+    def is_batch_match(self) -> bool:
+        """Returns True if transaction is matched to multiple invoices"""
+        return self.matched_invoices.count() > 1
+
+    @property
+    def total_matched_amount(self) -> Decimal:
+        """Sum of all matched invoice amounts"""
+        return sum(
+            match.invoice.invoice_gross_amount
+            for match in self.invoice_matches.all()
+        )
+
+    @property
+    def matched_invoices_count(self) -> int:
+        """Count of matched invoices (0 if unmatched)"""
+        return self.matched_invoices.count()
+
     class Meta:
         verbose_name = "Banki tranzakció"
         verbose_name_plural = "Banki tranzakciók"
@@ -1768,8 +1889,36 @@ class BankTransaction(CompanyOwnedTimestampedModel):
 
     @property
     def is_matched(self):
-        """Check if transaction is matched to an invoice"""
-        return self.matched_invoice is not None
+        """
+        Check if transaction is matched or categorized.
+
+        Returns True if:
+        - Matched to invoice (single or batch)
+        - Matched to transfer
+        - Matched to reimbursement
+        - Auto-categorized as OtherCost (system transactions like BANK_FEE, INTEREST)
+        """
+        # Check old single-invoice match FK
+        if self.matched_invoice is not None:
+            return True
+
+        # Check new many-to-many invoice matches
+        if self.matched_invoices.exists():
+            return True
+
+        # Check transfer match
+        if self.matched_transfer is not None:
+            return True
+
+        # Check reimbursement match
+        if self.matched_reimbursement is not None:
+            return True
+
+        # Check if auto-categorized as OtherCost (system transactions)
+        if hasattr(self, 'other_cost_detail') and self.other_cost_detail is not None:
+            return True
+
+        return False
 
     @property
     def is_high_confidence_match(self):

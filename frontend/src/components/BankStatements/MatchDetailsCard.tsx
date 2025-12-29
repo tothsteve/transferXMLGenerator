@@ -12,16 +12,19 @@ import {
   Chip,
   Box,
   Link as MuiLink,
+  Divider,
 } from '@mui/material';
 import {
   CheckCircle as MatchedIcon,
   SwapHoriz as TransferIcon,
   Receipt as InvoiceIcon,
   SwapVert as ReimbursementIcon,
+  Category as CategoryIcon,
 } from '@mui/icons-material';
 import { BankTransaction } from '../../schemas/bankStatement.schemas';
 import { format, parseISO } from 'date-fns';
 import { hu } from 'date-fns/locale';
+import MatchActionButtons from './MatchActionButtons';
 
 /**
  * Props for MatchDetailsCard component.
@@ -31,6 +34,8 @@ import { hu } from 'date-fns/locale';
 interface MatchDetailsCardProps {
   /** Transaction with match information */
   transaction: BankTransaction;
+  /** Optional callback after successful match action */
+  onActionSuccess?: () => void;
 }
 
 /**
@@ -46,8 +51,12 @@ const getMatchMethodLabel = (method: string): string => {
     'AMOUNT_IBAN': 'Összeg + IBAN',
     'FUZZY_NAME': 'Név hasonlóság',
     'AMOUNT_DATE_ONLY': 'Csak összeg/dátum',
+    'BATCH_INVOICES': 'Automatikus tömeges párosítás',
+    'MANUAL_BATCH': 'Kézi tömeges párosítás',
     'REIMBURSEMENT_PAIR': 'Visszatérítés pár',
     'MANUAL': 'Manuális',
+    'SYSTEM_AUTO_CATEGORIZED': 'Automatikusan kategorizált',
+    'LEARNED_PATTERN': 'Ismétlődő minta',
   };
   return methodLabels[method] || method;
 };
@@ -127,11 +136,14 @@ const getPaymentStatusLabel = (status: string): string => {
  */
 const MatchDetailsCard: React.FC<MatchDetailsCardProps> = ({
   transaction,
+  onActionSuccess,
 }): ReactElement | null => {
-  // Check if transaction is matched
+  // Check if transaction is matched or categorized
   const hasMatch = transaction.matched_invoice !== null ||
                    transaction.matched_transfer !== null ||
-                   transaction.matched_reimbursement !== null;
+                   transaction.matched_reimbursement !== null ||
+                   (transaction.is_batch_match && transaction.matched_invoices_details && transaction.matched_invoices_details.length > 0) ||
+                   (transaction.has_other_cost && transaction.other_cost_detail !== null);
 
   if (!hasMatch) {
     return null;
@@ -167,8 +179,74 @@ const MatchDetailsCard: React.FC<MatchDetailsCardProps> = ({
             />
           </Stack>
 
-          {/* Matched Invoice Details */}
-          {transaction.matched_invoice !== null && transaction.matched_invoice_details && (
+          {/* Batch Matched Invoices Details */}
+          {transaction.is_batch_match && transaction.matched_invoices_details && transaction.matched_invoices_details.length > 0 && (
+            <Box>
+              <Stack direction="row" spacing={1} alignItems="center" mb={1}>
+                <InvoiceIcon fontSize="small" color="primary" />
+                <Typography variant="body2" fontWeight="medium">
+                  Párosított számlák ({transaction.matched_invoices_details.length} db)
+                </Typography>
+              </Stack>
+              <Stack spacing={2} pl={3.5}>
+                {transaction.matched_invoices_details.map((invoice, index) => (
+                  <Box key={invoice.id} sx={{
+                    pb: index < transaction.matched_invoices_details!.length - 1 ? 1.5 : 0,
+                    borderBottom: index < transaction.matched_invoices_details!.length - 1 ? '1px solid' : 'none',
+                    borderColor: 'divider'
+                  }}>
+                    <Stack spacing={0.5}>
+                      <Typography variant="body2">
+                        <strong>#{index + 1} - Számlaszám:</strong>{' '}
+                        <MuiLink
+                          href={`/nav-invoices?invoiceId=${invoice.id}`}
+                          underline="hover"
+                          color="primary"
+                        >
+                          {invoice.invoice_number}
+                        </MuiLink>
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Szállító:</strong> {invoice.supplier_name}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        <strong>Adószám:</strong> {invoice.supplier_tax_number}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Összeg:</strong>{' '}
+                        {new Intl.NumberFormat('hu-HU', {
+                          style: 'decimal',
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 0,
+                        }).format(parseFloat(invoice.gross_amount))}{' '}
+                        HUF
+                      </Typography>
+                      <Chip
+                        label={getPaymentStatusLabel(invoice.payment_status)}
+                        size="small"
+                        color={getPaymentStatusColor(invoice.payment_status)}
+                        sx={{ width: 'fit-content', mt: 0.5 }}
+                      />
+                    </Stack>
+                  </Box>
+                ))}
+                {transaction.total_matched_amount && (
+                  <Box sx={{ pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+                    <Typography variant="body2" fontWeight="bold" color="success.main">
+                      Összesen: {new Intl.NumberFormat('hu-HU', {
+                        style: 'decimal',
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0,
+                      }).format(parseFloat(transaction.total_matched_amount))} HUF
+                    </Typography>
+                  </Box>
+                )}
+              </Stack>
+            </Box>
+          )}
+
+          {/* Single Matched Invoice Details */}
+          {!transaction.is_batch_match && transaction.matched_invoice !== null && transaction.matched_invoice_details && (
             <Box>
               <Stack direction="row" spacing={1} alignItems="center" mb={1}>
                 <InvoiceIcon fontSize="small" color="primary" />
@@ -238,7 +316,7 @@ const MatchDetailsCard: React.FC<MatchDetailsCardProps> = ({
           )}
 
           {/* Matched Reimbursement Details */}
-          {transaction.matched_reimbursement !== null && (
+          {transaction.matched_reimbursement !== null && transaction.matched_reimbursement_details && (
             <Box>
               <Stack direction="row" spacing={1} alignItems="center" mb={1}>
                 <ReimbursementIcon fontSize="small" color="primary" />
@@ -248,11 +326,79 @@ const MatchDetailsCard: React.FC<MatchDetailsCardProps> = ({
               </Stack>
               <Stack spacing={0.5} pl={3.5}>
                 <Typography variant="body2">
-                  Kapcsolódó tranzakció #{transaction.matched_reimbursement}
+                  Tranzakció #{transaction.matched_reimbursement_details.id}
                 </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Dátum: {format(parseISO(transaction.matched_reimbursement_details.booking_date), 'yyyy. MM. dd.', { locale: hu })}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Összeg: {parseFloat(transaction.matched_reimbursement_details.amount) > 0 ? '+' : ''}{parseFloat(transaction.matched_reimbursement_details.amount).toLocaleString('hu-HU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {transaction.matched_reimbursement_details.currency}
+                </Typography>
+                {transaction.matched_reimbursement_details.description && (
+                  <Typography variant="body2" color="text.secondary">
+                    Leírás: {transaction.matched_reimbursement_details.description}
+                  </Typography>
+                )}
               </Stack>
             </Box>
           )}
+
+          {/* Other Cost Categorization Details */}
+          {transaction.has_other_cost && transaction.other_cost_detail && (
+            <Box>
+              <Stack direction="row" spacing={1} alignItems="center" mb={1}>
+                <CategoryIcon fontSize="small" color="primary" />
+                <Typography variant="body2" fontWeight="medium">
+                  Kategorizálva
+                </Typography>
+              </Stack>
+              <Stack spacing={0.5} pl={3.5}>
+                <Typography variant="body2">
+                  <strong>Kategória:</strong> {transaction.other_cost_detail.category_display}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Összeg:</strong>{' '}
+                  {new Intl.NumberFormat('hu-HU', {
+                    style: 'decimal',
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  }).format(parseFloat(transaction.other_cost_detail.amount))}{' '}
+                  {transaction.other_cost_detail.currency}
+                </Typography>
+                {transaction.other_cost_detail.description && (
+                  <Typography variant="body2" color="text.secondary">
+                    <strong>Leírás:</strong> {transaction.other_cost_detail.description}
+                  </Typography>
+                )}
+                {transaction.other_cost_detail.notes && (
+                  <Typography variant="body2" color="text.secondary">
+                    <strong>Megjegyzés:</strong> {transaction.other_cost_detail.notes}
+                  </Typography>
+                )}
+                {transaction.other_cost_detail.tags && transaction.other_cost_detail.tags.length > 0 && (
+                  <Box sx={{ mt: 0.5 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Címkék:
+                    </Typography>
+                    <Stack direction="row" spacing={0.5} sx={{ mt: 0.5, flexWrap: 'wrap', gap: 0.5 }}>
+                      {transaction.other_cost_detail.tags.map((tag, index) => (
+                        <Chip key={index} label={tag} size="small" variant="outlined" />
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
+              </Stack>
+            </Box>
+          )}
+
+          {/* Action Buttons */}
+          <Box sx={{ pt: 1, pb: 1 }}>
+            <Divider sx={{ mb: 2 }} />
+            <MatchActionButtons
+              transaction={transaction}
+              {...(onActionSuccess && { onSuccess: onActionSuccess })}
+            />
+          </Box>
 
           {/* Match Timestamp */}
           {transaction.matched_at && (

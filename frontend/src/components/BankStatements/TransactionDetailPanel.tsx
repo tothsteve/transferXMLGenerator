@@ -71,7 +71,9 @@ const TransactionDetailPanel: React.FC<TransactionDetailPanelProps> = ({
   transaction,
 }): ReactElement => {
   const credit = isCredit(transaction.amount);
-  const isMatched = transaction.matched_invoice !== null || transaction.matched_transfer !== null;
+  const isMatched = transaction.matched_invoice !== null ||
+                    transaction.matched_transfer !== null ||
+                    (transaction.is_batch_match && transaction.matched_invoices_details && transaction.matched_invoices_details.length > 0);
 
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>

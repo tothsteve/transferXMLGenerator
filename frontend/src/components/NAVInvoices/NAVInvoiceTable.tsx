@@ -26,55 +26,10 @@ import {
   Receipt as ReceiptIcon,
   AttachMoney as CashIcon,
 } from '@mui/icons-material';
+import { NAVInvoice } from '../../types/api';
 
-interface Invoice {
-  id: number;
-  nav_invoice_number: string;
-  invoice_direction: string; // 'INBOUND' | 'OUTBOUND' - using string for Zod v4 compatibility
-  invoice_direction_display: string;
-  partner_name: string;
-  partner_tax_number: string;
-
-  // Dates
-  issue_date: string;
-  issue_date_formatted: string;
-  fulfillment_date: string | null;
-  fulfillment_date_formatted: string | null;
-  payment_due_date: string | null;
-  payment_due_date_formatted: string | null;
-  payment_date: string | null;
-  payment_date_formatted: string | null;
-
-  // Financial
-  currency_code: string;
-  invoice_net_amount: number;
-  invoice_net_amount_formatted: string;
-  invoice_vat_amount: number;
-  invoice_vat_amount_formatted: string;
-  invoice_gross_amount: number;
-  invoice_gross_amount_formatted: string;
-
-  // Business
-  invoice_operation: string | null;
-  payment_method: string | null;
-  original_invoice_number: string | null;
-  payment_status: {
-    status: string;
-    label: string;
-    icon: string;
-    class: string;
-  };
-  payment_status_date: string | null;
-  payment_status_date_formatted: string | null;
-  auto_marked_paid: boolean;
-  is_overdue: boolean;
-  is_paid: boolean;
-  invoice_category?: string | null;
-
-  // System
-  sync_status: string;
-  created_at: string;
-}
+// Use NAVInvoice from types/api.ts as the source of truth
+type Invoice = NAVInvoice;
 
 interface NAVInvoiceTableProps {
   invoices: Invoice[];

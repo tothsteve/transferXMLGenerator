@@ -111,6 +111,15 @@ const BankTransactionTable: React.FC<BankTransactionTableProps> = ({
   };
 
   /**
+   * Handle successful match action (approve/unmatch/rematch).
+   *
+   * Closes the expanded row so the user can re-expand to see updated state.
+   */
+  const handleActionSuccess = (): void => {
+    setExpandedRow(null);
+  };
+
+  /**
    * Memoized filtered and sorted transaction list.
    *
    * Uses utility functions to apply filtering and sorting operations.
@@ -187,6 +196,7 @@ const BankTransactionTable: React.FC<BankTransactionTableProps> = ({
                   transaction={transaction}
                   isExpanded={expandedRow === transaction.id}
                   onExpand={() => handleRowExpand(transaction.id)}
+                  onActionSuccess={handleActionSuccess}
                   {...(onMatchTransaction !== undefined && { onMatch: onMatchTransaction })}
                 />
               ))

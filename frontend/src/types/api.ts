@@ -173,8 +173,8 @@ export interface NAVInvoice {
   payment_due_date_formatted: string | null;
   payment_date: string | null;
   payment_date_formatted: string | null;
-  completion_date: string | null;
-  last_modified_date: string | null;
+  completion_date?: string | null | undefined;
+  last_modified_date?: string | null | undefined;
 
   // Financial
   currency_code: string;
@@ -188,7 +188,7 @@ export interface NAVInvoice {
   // Business
   invoice_operation: string | null;
   invoice_category: string | null;
-  invoice_appearance: string | null;
+  invoice_appearance?: string | null | undefined;
   payment_method: string | null;
   original_invoice_number: string | null;
   payment_status: {
@@ -208,16 +208,16 @@ export interface NAVInvoice {
   created_at: string;
 
   // NAV metadata (available in detail view)
-  nav_source: string | null;
-  original_request_version: string | null;
+  nav_source?: string | null | undefined;
+  original_request_version?: string | null | undefined;
 
   // Partners (available in detail view)
-  supplier_name: string | null;
-  customer_name: string | null;
-  supplier_tax_number: string | null;
-  customer_tax_number: string | null;
-  supplier_bank_account_number: string | null;
-  customer_bank_account_number: string | null;
+  supplier_name?: string | null | undefined;
+  customer_name?: string | null | undefined;
+  supplier_tax_number?: string | null | undefined;
+  customer_tax_number?: string | null | undefined;
+  supplier_bank_account_number?: string | null | undefined;
+  customer_bank_account_number?: string | null | undefined;
 }
 
 // ==================== Billingo Invoice Synchronization ====================
@@ -461,4 +461,161 @@ export interface ProductPrice {
   is_valid?: boolean | undefined;
   created_at: string;
   updated_at: string;
+}
+
+// ============================================================================
+// Bank Statement Import - Batch Invoice Matching
+// ============================================================================
+
+export interface BankTransactionInvoiceMatch {
+  id: number;
+  transaction: number;
+  invoice: number;
+  invoice_details?: {
+    id: number;
+    invoice_number: string;
+    supplier_name: string;
+    supplier_tax_number: string;
+    gross_amount: string;
+    payment_due_date: string | null;
+    payment_status: string;
+  };
+  match_confidence: string;
+  match_method: string;
+  matched_at: string;
+  matched_by: number | null;
+  match_notes: string;
+}
+
+export interface MatchedInvoiceDetail {
+  id: number;
+  invoice_number: string;
+  supplier_name: string;
+  supplier_tax_number: string;
+  gross_amount: string;
+  payment_due_date: string | null;
+  payment_status: string;
+  match_confidence: string;
+  match_method: string;
+  match_notes: string;
+}
+
+export interface BankTransaction {
+  id: number;
+  bank_statement: number;
+  statement_details?: {
+    id: number;
+    bank_name: string;
+    account_number: string;
+    period_from: string | null;
+    period_to: string | null;
+  };
+
+  // Transaction details
+  transaction_type: 'DEBIT' | 'CREDIT';
+  booking_date: string;
+  value_date: string;
+  amount: string;
+  currency: string;
+  description: string;
+  short_description?: string;
+  payment_id?: string | null;
+  transaction_id?: string | null;
+
+  // Payer/Beneficiary details
+  payer_name?: string | null;
+  payer_iban?: string | null;
+  payer_account_number?: string | null;
+  payer_bic?: string | null;
+  beneficiary_name?: string | null;
+  beneficiary_iban?: string | null;
+  beneficiary_account_number?: string | null;
+  beneficiary_bic?: string | null;
+
+  // Reference and additional info
+  reference?: string | null;
+  partner_id?: string | null;
+  transaction_type_code?: string | null;
+  fee_amount?: string | null;
+
+  // Card/Merchant details (for card transactions)
+  card_number?: string | null;
+  merchant_name?: string | null;
+  merchant_location?: string | null;
+
+  // Original amount (for foreign currency transactions)
+  original_amount?: string | null;
+  original_currency?: string | null;
+
+  // Single invoice match (DEPRECATED - use matched_invoices_details instead)
+  matched_invoice?: number | null;
+  matched_invoice_details?: {
+    id: number;
+    invoice_number: string;
+    supplier_name: string;
+    supplier_tax_number?: string;
+    customer_name?: string;
+    customer_tax_number?: string;
+    gross_amount: string;
+    payment_due_date: string | null;
+    payment_status: string;
+  } | null;
+
+  // Batch invoice matching (NEW)
+  matched_invoices_details: MatchedInvoiceDetail[];
+  is_batch_match: boolean;
+  total_matched_amount: string | null;
+
+  // Match metadata
+  match_confidence: string;
+  match_method: string;
+
+  // Transfer matching
+  matched_transfer?: number | null;
+  matched_transfer_batch?: number | null;
+
+  // Reimbursement matching
+  matched_reimbursement?: number | null;
+  matched_reimbursement_details?: {
+    id: number;
+    bank_statement: number;
+    transaction_type: string;
+    booking_date: string;
+    amount: string;
+    currency: string;
+    description: string;
+    partner_name: string;
+  } | null;
+
+  // Other cost linkage
+  has_other_cost: boolean;
+
+  // Timestamps
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BatchMatchInvoicesRequest {
+  invoice_ids: number[];
+}
+
+export interface BatchMatchInvoicesResponse {
+  message: string;
+  transaction_id: number;
+  batch_match: boolean;
+  invoice_count: number;
+  matched_invoices: Array<{
+    invoice_id: number;
+    invoice_number: string;
+    amount: string;
+  }>;
+  total_matched_amount: string;
+  confidence: string;
+  method: string;
+}
+
+export interface UnmatchResponse {
+  message: string;
+  was_batch_match: boolean;
+  invoices_unmatched: number;
 }

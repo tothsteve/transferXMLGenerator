@@ -382,11 +382,11 @@ COMMENT ON COLUMN bank_transfers_banktransaction.merchant_location IS 'Merchant 
 COMMENT ON COLUMN bank_transfers_banktransaction.original_amount IS 'Original amount in foreign currency (before conversion)';
 COMMENT ON COLUMN bank_transfers_banktransaction.original_currency IS 'Original currency code for FX transactions';
 COMMENT ON COLUMN bank_transfers_banktransaction.exchange_rate IS 'Exchange rate used for currency conversion (6 decimal precision)';
-COMMENT ON COLUMN bank_transfers_banktransaction.matched_invoice_id IS 'Foreign key to bank_transfers_invoice - NAV invoice matched to this transaction';
+COMMENT ON COLUMN bank_transfers_banktransaction.matched_invoice_id IS '(DEPRECATED) Foreign key to bank_transfers_invoice - Use matched_invoices ManyToMany instead - Single NAV invoice matched to this transaction';
 COMMENT ON COLUMN bank_transfers_banktransaction.matched_transfer_id IS 'Foreign key to bank_transfers_transfer - Transfer from executed batch matched to this transaction';
 COMMENT ON COLUMN bank_transfers_banktransaction.matched_reimbursement_id IS 'Foreign key to self - Offsetting transaction (e.g., POS purchase + personal reimbursement transfer)';
 COMMENT ON COLUMN bank_transfers_banktransaction.match_confidence IS 'Matching confidence score (0.00 to 1.00)';
-COMMENT ON COLUMN bank_transfers_banktransaction.match_method IS 'Method used for matching: REFERENCE_EXACT, AMOUNT_IBAN, FUZZY_NAME, TRANSFER_EXACT, REIMBURSEMENT_PAIR, MANUAL';
+COMMENT ON COLUMN bank_transfers_banktransaction.match_method IS 'Method used for matching: REFERENCE_EXACT, AMOUNT_IBAN, BATCH_INVOICES, FUZZY_NAME, AMOUNT_DATE_ONLY, TRANSFER_EXACT, REIMBURSEMENT_PAIR, MANUAL, MANUAL_BATCH';
 COMMENT ON COLUMN bank_transfers_banktransaction.match_notes IS 'Additional notes about matching process';
 COMMENT ON COLUMN bank_transfers_banktransaction.matched_at IS 'Timestamp when transaction was matched';
 COMMENT ON COLUMN bank_transfers_banktransaction.matched_by_id IS 'Foreign key to auth_user - User who performed matching (NULL for automatic)';
@@ -395,6 +395,17 @@ COMMENT ON COLUMN bank_transfers_banktransaction.extra_cost_category IS 'Categor
 COMMENT ON COLUMN bank_transfers_banktransaction.raw_data IS 'JSON object with raw transaction data from bank statement (sanitized for JSON storage)';
 COMMENT ON COLUMN bank_transfers_banktransaction.created_at IS 'Record creation timestamp';
 COMMENT ON COLUMN bank_transfers_banktransaction.updated_at IS 'Last modification timestamp';
+
+-- Bank Transaction Invoice Match (Batch Invoice Matching)
+COMMENT ON TABLE bank_transfers_banktransactioninvoicematch IS 'Intermediate table for ManyToMany relationship between BankTransaction and Invoice. Stores per-invoice match metadata (confidence, method, notes) for both single and batch invoice matching. Enables one payment to cover multiple invoices from the same supplier.';
+COMMENT ON COLUMN bank_transfers_banktransactioninvoicematch.id IS 'Primary key - unique match record identifier';
+COMMENT ON COLUMN bank_transfers_banktransactioninvoicematch.transaction_id IS 'Foreign key to bank_transfers_banktransaction - Bank transaction that was matched';
+COMMENT ON COLUMN bank_transfers_banktransactioninvoicematch.invoice_id IS 'Foreign key to bank_transfers_invoice - NAV invoice that was matched';
+COMMENT ON COLUMN bank_transfers_banktransactioninvoicematch.match_confidence IS 'Match confidence score (0.00 to 1.00) - Base 0.85 for batch + IBAN bonus (+0.10) + Name similarity bonus (+0.05)';
+COMMENT ON COLUMN bank_transfers_banktransactioninvoicematch.match_method IS 'Method used for matching: REFERENCE_EXACT, AMOUNT_IBAN, BATCH_INVOICES (automatic batch), FUZZY_NAME, AMOUNT_DATE_ONLY, MANUAL (single), MANUAL_BATCH (user-initiated batch)';
+COMMENT ON COLUMN bank_transfers_banktransactioninvoicematch.matched_at IS 'Timestamp when match was created';
+COMMENT ON COLUMN bank_transfers_banktransactioninvoicematch.matched_by_id IS 'Foreign key to auth_user - User who created manual match (NULL for automatic matching)';
+COMMENT ON COLUMN bank_transfers_banktransactioninvoicematch.match_notes IS 'Detailed match information for audit trail - includes batch payment details and invoice count';
 
 -- Other Cost Records
 COMMENT ON TABLE bank_transfers_othercost IS 'Additional cost records derived from bank transactions. Allows enhanced categorization, detailed notes, and flexible tagging beyond standard BankTransaction fields. Used for expense tracking, cost analysis, and financial reporting.';

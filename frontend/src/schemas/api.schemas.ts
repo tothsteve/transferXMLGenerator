@@ -152,8 +152,8 @@ export const NAVInvoiceSchema = z.object({
   payment_due_date_formatted: z.string().nullable(),
   payment_date: z.string().nullable(),
   payment_date_formatted: z.string().nullable(),
-  completion_date: z.string().nullable(),
-  last_modified_date: z.string().nullable(),
+  completion_date: z.string().nullish(),
+  last_modified_date: z.string().nullish(),
 
   // Financial - accept both string and number, coerce to number
   currency_code: z.string(),
@@ -167,7 +167,7 @@ export const NAVInvoiceSchema = z.object({
   // Business
   invoice_operation: z.string().nullable(),
   invoice_category: z.string().nullable(),
-  invoice_appearance: z.string().nullable(),
+  invoice_appearance: z.string().nullish(),
   payment_method: z.string().nullable(),
   original_invoice_number: z.string().nullable(),
   payment_status: PaymentStatusSchema,
@@ -182,16 +182,16 @@ export const NAVInvoiceSchema = z.object({
   created_at: z.string(),
 
   // NAV metadata (available in detail view)
-  nav_source: z.string().nullable(),
-  original_request_version: z.string().nullable(),
+  nav_source: z.string().nullish(),
+  original_request_version: z.string().nullish(),
 
   // Partners (available in detail view)
-  supplier_name: z.string().nullable(),
-  customer_name: z.string().nullable(),
-  supplier_tax_number: z.string().nullable(),
-  customer_tax_number: z.string().nullable(),
-  supplier_bank_account_number: z.string().nullable(),
-  customer_bank_account_number: z.string().nullable(),
+  supplier_name: z.string().nullish(),
+  customer_name: z.string().nullish(),
+  supplier_tax_number: z.string().nullish(),
+  customer_tax_number: z.string().nullish(),
+  supplier_bank_account_number: z.string().nullish(),
+  customer_bank_account_number: z.string().nullish(),
 });
 
 export type NAVInvoiceSchemaType = z.infer<typeof NAVInvoiceSchema>;
