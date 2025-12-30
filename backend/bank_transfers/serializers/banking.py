@@ -14,7 +14,7 @@ from decimal import Decimal
 from ..models import (
     BankAccount, Beneficiary, TransferTemplate, TemplateBeneficiary, Transfer, TransferBatch, Company
 )
-from ..hungarian_account_validator import validate_and_format_hungarian_account_number
+from ..validators import validate_hungarian_account_number
 from ..string_validation import validate_beneficiary_name, validate_remittance_info, normalize_whitespace, sanitize_export_string
 
 
@@ -27,16 +27,8 @@ class BankAccountSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at', 'updated_at', 'company', 'company_name']
 
     def validate_account_number(self, value):
-        """Validate and format Hungarian bank account number"""
-        if not value:
-            raise serializers.ValidationError("Számlaszám megadása kötelező")
-
-        validation = validate_and_format_hungarian_account_number(value)
-        if not validation.is_valid:
-            raise serializers.ValidationError(validation.error or "Érvénytelen számlaszám formátum")
-
-        # Return the formatted account number for consistent storage
-        return validation.formatted
+        """Validate and format Hungarian bank account number using shared validator"""
+        return validate_hungarian_account_number(value)
 
 class BeneficiarySerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.name', read_only=True)
@@ -51,16 +43,8 @@ class BeneficiarySerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at', 'updated_at', 'company', 'company_name']
 
     def validate_account_number(self, value):
-        """Validate and format Hungarian bank account number"""
-        if not value:
-            raise serializers.ValidationError("Számlaszám megadása kötelező")
-
-        validation = validate_and_format_hungarian_account_number(value)
-        if not validation.is_valid:
-            raise serializers.ValidationError(validation.error or "Érvénytelen számlaszám formátum")
-
-        # Return the formatted account number for consistent storage
-        return validation.formatted
+        """Validate and format Hungarian bank account number using shared validator"""
+        return validate_hungarian_account_number(value)
 
     def validate_name(self, value):
         """Sanitize beneficiary name for XML/CSV export"""
