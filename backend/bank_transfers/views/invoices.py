@@ -15,6 +15,7 @@ from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from django.db import models
 from drf_yasg.utils import swagger_auto_schema
@@ -28,6 +29,7 @@ from ..serializers import (
     TransferSerializer
 )
 from ..permissions import IsCompanyMember, RequireNavSync
+from ..filters import InvoiceFilterSet
 
 
 class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
@@ -38,8 +40,18 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
     retrieve: Egy konkrét NAV számla részletes adatai tételekkel együtt
 
     Jogosultság: NAV_SYNC
+
+    Filtering: Uses InvoiceFilterSet for declarative filtering (~150 lines of manual logic replaced)
     """
     permission_classes = [IsAuthenticated, IsCompanyMember, RequireNavSync]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_class = InvoiceFilterSet
+    ordering_fields = [
+        'issue_date', 'fulfillment_date', 'payment_due_date', 'payment_date',
+        'nav_invoice_number', 'invoice_gross_amount', 'invoice_net_amount',
+        'supplier_name', 'customer_name', 'created_at'
+    ]
+    ordering = ['-issue_date']
 
     def get_serializer_class(self):
         """Use different serializers for list vs detail view"""
@@ -48,123 +60,14 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         return InvoiceListSerializer
 
     def get_queryset(self):
-        """Company-scoped queryset with comprehensive filtering support"""
+        """Company-scoped queryset with prefetch optimization for detail view"""
         queryset = Invoice.objects.filter(company=self.request.company).select_related('company')
 
-        # For detail view (retrieve by ID), only prefetch line items - NO FILTERING
+        # For detail view (retrieve by ID), prefetch line items
         if self.action == 'retrieve':
             return queryset.prefetch_related('line_items')
 
-        # All filters below only apply to LIST view
-
-        # Filter by direction (INBOUND/OUTBOUND)
-        direction = self.request.query_params.get('direction', None)
-        if direction and direction in ['INBOUND', 'OUTBOUND']:
-            queryset = queryset.filter(invoice_direction=direction)
-
-        # Date range filtering for issue date
-        issue_date_from = self.request.query_params.get('issue_date_from', None)
-        issue_date_to = self.request.query_params.get('issue_date_to', None)
-        if issue_date_from:
-            queryset = queryset.filter(issue_date__gte=issue_date_from)
-        if issue_date_to:
-            queryset = queryset.filter(issue_date__lte=issue_date_to)
-
-        # Date range filtering for fulfillment date
-        fulfillment_date_from = self.request.query_params.get('fulfillment_date_from', None)
-        fulfillment_date_to = self.request.query_params.get('fulfillment_date_to', None)
-        if fulfillment_date_from:
-            queryset = queryset.filter(fulfillment_date__gte=fulfillment_date_from)
-        if fulfillment_date_to:
-            queryset = queryset.filter(fulfillment_date__lte=fulfillment_date_to)
-
-        # Date range filtering for payment due date
-        payment_due_from = self.request.query_params.get('payment_due_date_from', None)
-        payment_due_to = self.request.query_params.get('payment_due_date_to', None)
-        if payment_due_from:
-            queryset = queryset.filter(payment_due_date__gte=payment_due_from)
-        if payment_due_to:
-            queryset = queryset.filter(payment_due_date__lte=payment_due_to)
-
-        # Payment status filtering
-        payment_status = self.request.query_params.get('payment_status', None)
-        if payment_status:
-            if payment_status.upper() == 'PAID':
-                queryset = queryset.filter(payment_status='PAID')
-            elif payment_status.upper() == 'UNPAID':
-                queryset = queryset.filter(payment_status='UNPAID')
-            elif payment_status.upper() == 'PREPARED':
-                queryset = queryset.filter(payment_status='PREPARED')
-            # Legacy support for old format
-            elif payment_status == 'paid':
-                queryset = queryset.filter(payment_date__isnull=False)
-            elif payment_status == 'unpaid':
-                queryset = queryset.filter(payment_date__isnull=True)
-            elif payment_status == 'overdue':
-                from datetime import date
-                queryset = queryset.filter(payment_date__isnull=True, payment_due_date__lt=date.today())
-
-        # Amount range filtering
-        amount_from = self.request.query_params.get('amount_from', None)
-        amount_to = self.request.query_params.get('amount_to', None)
-        if amount_from:
-            queryset = queryset.filter(invoice_gross_amount__gte=amount_from)
-        if amount_to:
-            queryset = queryset.filter(invoice_gross_amount__lte=amount_to)
-
-        # Currency filter
-        currency = self.request.query_params.get('currency', None)
-        if currency:
-            queryset = queryset.filter(currency_code=currency)
-
-        # Invoice operation filter (CREATE, STORNO, MODIFY)
-        operation = self.request.query_params.get('operation', None)
-        if operation:
-            queryset = queryset.filter(invoice_operation=operation)
-
-        # Payment method filter
-        payment_method = self.request.query_params.get('payment_method', None)
-        if payment_method:
-            queryset = queryset.filter(payment_method=payment_method)
-
-        # Search by invoice number, names, tax numbers, original invoice number
-        search = self.request.query_params.get('search', None)
-        if search:
-            queryset = queryset.filter(
-                models.Q(nav_invoice_number__icontains=search) |
-                models.Q(supplier_name__icontains=search) |
-                models.Q(customer_name__icontains=search) |
-                models.Q(supplier_tax_number__icontains=search) |
-                models.Q(customer_tax_number__icontains=search) |
-                models.Q(original_invoice_number__icontains=search)
-            )
-
-        # STORNO filtering - hide both STORNO/MODIFY invoices and invoices that have been storno'd
-        hide_storno_invoices = self.request.query_params.get('hide_storno_invoices', 'true').lower() == 'true'
-        if hide_storno_invoices:
-            # Exclude STORNO and MODIFY invoices and invoices that have been storno'd
-            # This uses the ForeignKey relationship for better performance and accuracy
-            queryset = queryset.exclude(
-                models.Q(invoice_operation__in=['STORNO', 'MODIFY']) |  # Exclude STORNO and MODIFY invoices themselves
-                models.Q(storno_invoices__isnull=False)  # Exclude invoices that have been storno'd
-            )
-
-        # Ordering
-        ordering = self.request.query_params.get('ordering', '-issue_date')
-        if ordering:
-            # Validate ordering fields
-            allowed_fields = [
-                'issue_date', 'fulfillment_date', 'payment_due_date', 'payment_date',
-                'nav_invoice_number', 'invoice_gross_amount', 'invoice_net_amount',
-                'supplier_name', 'customer_name', 'created_at'
-            ]
-            # Remove - prefix for validation
-            field = ordering.lstrip('-')
-            if field in allowed_fields:
-                queryset = queryset.order_by(ordering)
-            else:
-                queryset = queryset.order_by('-issue_date')
-
+        # For list view, filtering is handled by InvoiceFilterSet
         return queryset
 
     @swagger_auto_schema(
