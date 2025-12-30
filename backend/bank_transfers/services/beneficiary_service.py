@@ -2,16 +2,29 @@
 Beneficiary service layer
 Handles business logic for beneficiary operations
 """
-from django.db.models import Q
-from ..models import Beneficiary
+from typing import Optional, Dict, Any, Tuple
+from django.db.models import Q, QuerySet
+from ..models import Beneficiary, Company
 
 
 class BeneficiaryService:
     """Service for beneficiary business logic"""
-    
+
     @staticmethod
-    def get_company_beneficiaries(company, filters=None):
-        """Get beneficiaries for a company with optional filters"""
+    def get_company_beneficiaries(
+        company: Company,
+        filters: Optional[Dict[str, Any]] = None
+    ) -> QuerySet[Beneficiary]:
+        """
+        Get beneficiaries for a company with optional filters.
+
+        Args:
+            company: Company instance to get beneficiaries for
+            filters: Optional dict of filter parameters (is_active, is_frequent, search, etc.)
+
+        Returns:
+            QuerySet of filtered Beneficiary instances
+        """
         queryset = Beneficiary.objects.filter(company=company)
         
         if filters:
@@ -69,30 +82,71 @@ class BeneficiaryService:
         return queryset
     
     @staticmethod
-    def get_frequent_beneficiaries(company):
-        """Get frequent and active beneficiaries for a company"""
+    def get_frequent_beneficiaries(company: Company) -> QuerySet[Beneficiary]:
+        """
+        Get frequent and active beneficiaries for a company.
+
+        Args:
+            company: Company instance to get beneficiaries for
+
+        Returns:
+            QuerySet of frequent and active Beneficiary instances
+        """
         return Beneficiary.objects.filter(
             company=company,
             is_frequent=True,
             is_active=True
         )
-    
+
     @staticmethod
-    def create_beneficiary(company, **beneficiary_data):
-        """Create a new beneficiary with proper validation"""
+    def create_beneficiary(company: Company, **beneficiary_data: Any) -> Beneficiary:
+        """
+        Create a new beneficiary with proper validation.
+
+        Args:
+            company: Company instance to create beneficiary for
+            **beneficiary_data: Additional beneficiary fields (name, account_number, etc.)
+
+        Returns:
+            Created Beneficiary instance
+        """
         beneficiary_data['company'] = company
         return Beneficiary.objects.create(**beneficiary_data)
-    
+
     @staticmethod
-    def toggle_frequent_status(beneficiary):
-        """Toggle the frequent status of a beneficiary"""
+    def toggle_frequent_status(beneficiary: Beneficiary) -> Beneficiary:
+        """
+        Toggle the frequent status of a beneficiary.
+
+        Args:
+            beneficiary: Beneficiary instance to toggle
+
+        Returns:
+            Updated Beneficiary instance
+        """
         beneficiary.is_frequent = not beneficiary.is_frequent
         beneficiary.save()
         return beneficiary
-    
+
     @staticmethod
-    def find_or_create_from_excel_data(company, name, account_number, **extra_data):
-        """Find existing beneficiary or create new one from Excel import data"""
+    def find_or_create_from_excel_data(
+        company: Company,
+        name: str,
+        account_number: str,
+        **extra_data: Any
+    ) -> Tuple[Beneficiary, bool]:
+        """
+        Find existing beneficiary or create new one from Excel import data.
+
+        Args:
+            company: Company instance to create beneficiary for
+            name: Beneficiary name
+            account_number: Bank account number
+            **extra_data: Additional beneficiary fields
+
+        Returns:
+            Tuple of (Beneficiary instance, created boolean)
+        """
         defaults = {
             'description': extra_data.get('description', ''),
             'is_active': True,
@@ -110,7 +164,10 @@ class BeneficiaryService:
         return beneficiary, created
 
     @staticmethod
-    def find_beneficiary_by_tax_number(company, supplier_tax_number):
+    def find_beneficiary_by_tax_number(
+        company: Company,
+        supplier_tax_number: str
+    ) -> Optional[Beneficiary]:
         """
         Find beneficiary by 8-digit tax number for transfer fallback.
 
