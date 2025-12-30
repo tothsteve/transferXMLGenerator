@@ -9,22 +9,26 @@ from rest_framework import viewsets, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
 
 from ..models import Beneficiary
 from ..serializers import BeneficiarySerializer
 from ..permissions import IsCompanyMember, RequireBeneficiaryManagement
 from ..services.beneficiary_service import BeneficiaryService
+from ..filters import BeneficiaryFilterSet
 
 
 class BeneficiaryViewSet(viewsets.ModelViewSet):
     """
     Kedvezményezettek kezelése
 
+    Filtering: Uses BeneficiaryFilterSet for declarative filtering (~35 lines of manual logic replaced)
+
     Támogatott szűrések:
     - is_active: true/false
     - is_frequent: true/false
-    - search: név, számlaszám, adószám és leírás alapján keresés
+    - search: multi-field search (név, számlaszám, adószám, leírás, közlemény)
     - vat_number: adószám alapján szűrés
     - has_vat_number: true/false - adószámmal rendelkező beneficiaries
     - has_account_number: true/false - számlaszámmal rendelkező beneficiaries
@@ -33,43 +37,21 @@ class BeneficiaryViewSet(viewsets.ModelViewSet):
     """
     serializer_class = BeneficiarySerializer
     permission_classes = [IsAuthenticated, IsCompanyMember, RequireBeneficiaryManagement]
-    filter_backends = [filters.OrderingFilter]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_class = BeneficiaryFilterSet
     ordering_fields = ['name', 'account_number', 'vat_number', 'description', 'remittance_information', 'is_active', 'is_frequent', 'created_at']
-    ordering = ['name']  # Default ordering
+    ordering = ['name']
 
     def get_queryset(self):
+        """
+        Company-scoped queryset.
+
+        Filtering is handled by BeneficiaryFilterSet.
+        """
         if not hasattr(self.request, 'company') or not self.request.company:
             return Beneficiary.objects.none()
 
-        # Build filters from query parameters
-        filters = {}
-
-        is_active = self.request.query_params.get('is_active', None)
-        if is_active is not None:
-            filters['is_active'] = is_active.lower() == 'true'
-
-        is_frequent = self.request.query_params.get('is_frequent', None)
-        if is_frequent is not None:
-            filters['is_frequent'] = is_frequent.lower() == 'true'
-
-        search = self.request.query_params.get('search', None)
-        if search:
-            filters['search'] = search
-
-        # VAT number specific filters
-        vat_number = self.request.query_params.get('vat_number', None)
-        if vat_number:
-            filters['vat_number'] = vat_number
-
-        has_vat_number = self.request.query_params.get('has_vat_number', None)
-        if has_vat_number is not None:
-            filters['has_vat_number'] = has_vat_number.lower() == 'true'
-
-        has_account_number = self.request.query_params.get('has_account_number', None)
-        if has_account_number is not None:
-            filters['has_account_number'] = has_account_number.lower() == 'true'
-
-        return BeneficiaryService.get_company_beneficiaries(self.request.company, filters)
+        return Beneficiary.objects.filter(company=self.request.company)
 
     def perform_create(self, serializer):
         """Assign company on creation"""

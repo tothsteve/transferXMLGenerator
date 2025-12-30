@@ -17,6 +17,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser
+from django_filters.rest_framework import DjangoFilterBackend
 from django.db import models
 from django.utils import timezone
 from drf_yasg.utils import swagger_auto_schema
@@ -36,6 +37,7 @@ from ..serializers import (
     OtherCostSerializer, SupportedBanksSerializer
 )
 from ..permissions import IsCompanyMember, RequireBankStatementImport
+from ..filters import BankTransactionFilterSet
 
 
 class BankStatementViewSet(viewsets.ModelViewSet):
@@ -176,62 +178,34 @@ class BankTransactionViewSet(viewsets.ReadOnlyModelViewSet):
     A tranzakciók automatikusan jönnek létre a kivonat feldolgozásakor.
     Csak lekérdezés és szűrés lehetséges.
 
+    Filtering: Uses BankTransactionFilterSet for declarative filtering (~35 lines of manual logic replaced)
+
     Permissions:
     - Requires BANK_STATEMENT_IMPORT feature to be enabled
     - All roles (ADMIN/FINANCIAL/ACCOUNTANT/USER): View only
     """
     serializer_class = BankTransactionSerializer
     permission_classes = [IsAuthenticated, IsCompanyMember, RequireBankStatementImport]
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_class = BankTransactionFilterSet
     search_fields = ['description', 'payer_name', 'beneficiary_name', 'reference', 'payment_id']
     ordering_fields = ['booking_date', 'value_date', 'amount']
     ordering = ['-booking_date']
 
     def get_queryset(self):
-        """Csak a cég tranzakciói"""
+        """
+        Company-scoped queryset with prefetch optimization.
+
+        Filtering is handled by BankTransactionFilterSet.
+        """
         company = getattr(self.request, 'company', None)
         if not company:
             return BankTransaction.objects.none()
 
-        queryset = BankTransaction.objects.filter(company=company).select_related(
+        return BankTransaction.objects.filter(company=company).select_related(
             'bank_statement',
             'matched_invoice'
         )
-
-        # Filter by statement
-        statement_id = self.request.query_params.get('statement_id')
-        if statement_id:
-            queryset = queryset.filter(bank_statement_id=statement_id)
-
-        # Filter by transaction type
-        transaction_type = self.request.query_params.get('transaction_type')
-        if transaction_type:
-            queryset = queryset.filter(transaction_type=transaction_type)
-
-        # Filter by matched status
-        matched = self.request.query_params.get('matched')
-        if matched == 'true':
-            queryset = queryset.filter(matched_invoice__isnull=False)
-        elif matched == 'false':
-            queryset = queryset.filter(matched_invoice__isnull=True)
-
-        # Filter by date range
-        from_date = self.request.query_params.get('from_date')
-        to_date = self.request.query_params.get('to_date')
-        if from_date:
-            queryset = queryset.filter(booking_date__gte=from_date)
-        if to_date:
-            queryset = queryset.filter(booking_date__lte=to_date)
-
-        # Filter by amount range
-        min_amount = self.request.query_params.get('min_amount')
-        max_amount = self.request.query_params.get('max_amount')
-        if min_amount:
-            queryset = queryset.filter(amount__gte=min_amount)
-        if max_amount:
-            queryset = queryset.filter(amount__lte=max_amount)
-
-        return queryset
 
     def _update_statement_match_count(self, transaction):
         """
