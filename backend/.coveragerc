@@ -1,0 +1,89 @@
+[run]
+# Coverage.py configuration for test coverage reporting
+
+# Source code to measure
+source = bank_transfers
+
+# Omit these files/patterns from coverage
+omit =
+    */migrations/*
+    */tests/*
+    */test_*.py
+    */__pycache__/*
+    */venv/*
+    */env/*
+    */manage.py
+    */wsgi.py
+    */asgi.py
+    */apps.py
+    */admin.py
+    */__init__.py
+    */conftest.py
+
+# Measure branch coverage (if/else branches)
+branch = True
+
+# Run tests in parallel (requires coverage[toml])
+parallel = False
+
+[report]
+# Reporting options
+
+# Precision for coverage percentage
+precision = 2
+
+# Show missing lines
+show_missing = True
+
+# Skip covered files in report
+skip_covered = False
+
+# Skip empty files
+skip_empty = True
+
+# Ignore errors from source files
+ignore_errors = False
+
+# Exclude lines from coverage with these patterns
+exclude_lines =
+    # Standard pragma
+    pragma: no cover
+
+    # Don't complain about missing debug-only code
+    def __repr__
+    def __str__
+
+    # Don't complain if tests don't hit defensive assertion code
+    raise AssertionError
+    raise NotImplementedError
+
+    # Don't complain if non-runnable code isn't run
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    if settings.DEBUG:
+
+    # Don't complain about abstract methods
+    @abstractmethod
+    @abc.abstractmethod
+
+    # Don't complain about pass statements
+    pass
+
+    # Don't complain about ellipsis in protocols
+    \.\.\.
+
+# Sort report by this key
+sort = Cover
+
+[html]
+# HTML report configuration
+directory = htmlcov
+title = Bank Transfers Test Coverage Report
+
+[xml]
+# XML report for CI/CD systems
+output = coverage.xml
+
+[json]
+# JSON report for programmatic access
+output = coverage.json
