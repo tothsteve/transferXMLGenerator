@@ -14,6 +14,12 @@ from django.db import transaction
 from django.utils import timezone
 
 from ..models import ExchangeRate, ExchangeRateSyncLog
+from ..schemas.exchange_rate import (
+    CurrencyConversionInput,
+    CurrencyConversionOutput,
+    ExchangeRateSyncInput,
+    ExchangeRateSyncOutput,
+)
 from .mnb_client import MNBClient, MNBClientError
 
 logger = logging.getLogger(__name__)
@@ -373,6 +379,47 @@ class ExchangeRateSyncService:
             return None
 
         return amount * rate
+
+    def convert_currency(self, input_data: CurrencyConversionInput) -> CurrencyConversionOutput:
+        """
+        Convert currency with type-safe Pydantic input/output.
+
+        Args:
+            input_data: CurrencyConversionInput with amount, currencies, and optional date
+
+        Returns:
+            CurrencyConversionOutput with conversion results
+
+        Raises:
+            ValueError: If exchange rate is not available
+        """
+        # Use today's date if not specified
+        rate_date = input_data.rate_date or date.today()
+
+        # Get exchange rate
+        rate = self.get_rate_for_date(
+            rate_date,
+            input_data.from_currency,
+            fallback_to_latest=True
+        )
+
+        if rate is None:
+            raise ValueError(
+                f"Exchange rate not available for {input_data.from_currency} on {rate_date}"
+            )
+
+        # Calculate converted amount
+        converted_amount = input_data.amount * rate
+
+        # Build output
+        return CurrencyConversionOutput(
+            original_amount=input_data.amount,
+            original_currency=input_data.from_currency,
+            converted_amount=converted_amount,
+            converted_currency=input_data.to_currency,
+            exchange_rate=rate,
+            rate_date=rate_date
+        )
 
     @staticmethod
     def get_latest_rates(currencies: Optional[List[str]] = None) -> Dict[str, Tuple[Decimal, date]]:
