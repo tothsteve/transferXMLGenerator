@@ -2,6 +2,7 @@ Django==4.2.7
 djangorestframework==3.14.0
 django-cors-headers==4.4.0
 django-filter==23.5
+pydantic==2.10.4
 cryptography==45.0.6
 requests==2.32.4
 python-decouple==3.8
