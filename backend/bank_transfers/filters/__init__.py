@@ -8,9 +8,11 @@ Each FilterSet provides type-safe, testable filtering for ViewSets.
 from .invoice_filters import InvoiceFilterSet
 from .bank_transaction_filters import BankTransactionFilterSet
 from .beneficiary_filters import BeneficiaryFilterSet
+from .billingo_filters import BillingoInvoiceFilterSet
 
 __all__ = [
     'InvoiceFilterSet',
     'BankTransactionFilterSet',
     'BeneficiaryFilterSet',
+    'BillingoInvoiceFilterSet',
 ]
