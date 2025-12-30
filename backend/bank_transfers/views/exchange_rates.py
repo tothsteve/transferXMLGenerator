@@ -27,6 +27,7 @@ from ..serializers import (
 )
 from ..permissions import IsCompanyMember, IsCompanyAdmin
 from ..services.exchange_rate_sync_service import ExchangeRateSyncService
+from ..schemas.exchange_rate import CurrencyConversionInput, CurrencyConversionOutput
 
 
 class ExchangeRateViewSet(viewsets.ReadOnlyModelViewSet):
@@ -161,35 +162,49 @@ class ExchangeRateViewSet(viewsets.ReadOnlyModelViewSet):
     )
     @action(detail=False, methods=['post'])
     def convert(self, request):
-        """Deviza átváltás HUF-ra adott árfolyamon"""
+        """
+        Deviza átváltás HUF-ra adott árfolyamon.
+
+        Uses Pydantic for type-safe service layer integration.
+        """
         serializer = CurrencyConversionSerializer(data=request.data)
 
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        amount = serializer.validated_data['amount']
-        currency = serializer.validated_data['currency']
-        conversion_date = serializer.validated_data.get('conversion_date') or date.today()
-
-        # Get exchange rate
-        rate = ExchangeRateSyncService.get_rate_for_date(conversion_date, currency)
-
-        if not rate:
+        # Create Pydantic input from validated data
+        try:
+            conversion_input = CurrencyConversionInput(
+                amount=serializer.validated_data['amount'],
+                from_currency=serializer.validated_data['currency'],
+                to_currency='HUF',
+                rate_date=serializer.validated_data.get('conversion_date')
+            )
+        except Exception as e:
             return Response(
-                {'error': f'Nincs elérhető {currency} árfolyam {conversion_date} dátumra'},
-                status=status.HTTP_404_NOT_FOUND
+                {'error': f'Validation error: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Convert to HUF
-        huf_amount = ExchangeRateSyncService.convert_to_huf(amount, currency, conversion_date)
+        # Use Pydantic-based service method
+        try:
+            service = ExchangeRateSyncService()
+            result: CurrencyConversionOutput = service.convert_currency(conversion_input)
 
-        return Response({
-            'amount': str(amount),
-            'currency': currency,
-            'conversion_date': conversion_date.strftime('%Y-%m-%d'),
-            'rate': str(rate),
-            'huf_amount': str(huf_amount)
-        })
+            # Return response in original format for backward compatibility
+            return Response({
+                'amount': str(result.original_amount),
+                'currency': result.original_currency,
+                'conversion_date': result.rate_date.strftime('%Y-%m-%d'),
+                'rate': str(result.exchange_rate),
+                'huf_amount': str(result.converted_amount)
+            })
+
+        except ValueError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
     @swagger_auto_schema(
         operation_description="MNB árfolyamok szinkronizálása (mai napra) - Csak ADMIN",
