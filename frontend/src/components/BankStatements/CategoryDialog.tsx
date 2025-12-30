@@ -167,6 +167,7 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
   const [description, setDescription] = useState('');
   const [notes, setNotes] = useState('');
   const [tags, setTags] = useState('');
+  const [isLocalSubmitting, setIsLocalSubmitting] = useState(false);
 
   // Reset form when dialog opens
   const handleOpen = () => {
@@ -175,6 +176,7 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
       setDescription(transaction.description || '');
       setNotes('');
       setTags('');
+      setIsLocalSubmitting(false);
     }
   };
 
@@ -182,18 +184,29 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
   const handleSubmit = async () => {
     if (!transaction) return;
 
-    await onSubmit({
-      category,
-      description,
-      notes,
-      tags,
-    });
+    // Prevent duplicate submissions - local guard
+    if (isLocalSubmitting || isSubmitting) {
+      return;
+    }
 
-    // Reset form after successful submission
-    setCategory('OTHER');
-    setDescription('');
-    setNotes('');
-    setTags('');
+    setIsLocalSubmitting(true);
+
+    try {
+      await onSubmit({
+        category,
+        description,
+        notes,
+        tags,
+      });
+
+      // Reset form after successful submission
+      setCategory('OTHER');
+      setDescription('');
+      setNotes('');
+      setTags('');
+    } finally {
+      setIsLocalSubmitting(false);
+    }
   };
 
   const merchantName = transaction ? getMerchantName(transaction) : '';
@@ -294,16 +307,16 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={onClose} disabled={isSubmitting}>
+        <Button onClick={onClose} disabled={isLocalSubmitting || isSubmitting}>
           Mégse
         </Button>
         <Button
           onClick={handleSubmit}
           variant="contained"
-          disabled={isSubmitting || !category}
+          disabled={isLocalSubmitting || isSubmitting || !category}
           startIcon={<CategoryIcon />}
         >
-          {isSubmitting ? 'Mentés...' : 'Kategorizálás'}
+          {(isLocalSubmitting || isSubmitting) ? 'Mentés...' : 'Kategorizálás'}
         </Button>
       </DialogActions>
     </Dialog>
