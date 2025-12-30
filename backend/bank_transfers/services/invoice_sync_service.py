@@ -26,11 +26,17 @@ from django.db import transaction
 from django.core.exceptions import ValidationError
 
 from ..models import (
-    Company, NavConfiguration, Invoice, InvoiceLineItem, 
+    Company, NavConfiguration, Invoice, InvoiceLineItem,
     InvoiceSyncLog
 )
 from .nav_client import NavApiClient
 from .credential_manager import CredentialManager
+from ..schemas.invoice import (
+    InvoiceSyncInput,
+    InvoiceSyncOutput,
+    PaymentStatusUpdateInput,
+    PaymentStatusUpdateOutput,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -151,14 +157,17 @@ class InvoiceSyncService:
             
         except Exception as e:
             # Log error and update sync status
-            error_message = str(e)
+            import traceback
+            error_message = str(e) if str(e) else f"{type(e).__name__}: {repr(e)}"
+            error_traceback = traceback.format_exc()
             logger.error(f"NAV szinkronizáció hiba: {company.name} - {error_message}")
-            
+            logger.error(f"Traceback:\n{error_traceback}")
+
             sync_log.sync_end_time = django_timezone.now()
             sync_log.sync_status = 'ERROR'
             sync_log.last_error_message = error_message
             sync_log.save()
-            
+
             return {
                 'success': False,
                 'sync_log_id': sync_log.id,
@@ -167,7 +176,81 @@ class InvoiceSyncService:
                 'invoices_updated': 0,
                 'errors': [error_message]
             }
-    
+
+    def sync_invoices(self, input_data: InvoiceSyncInput) -> InvoiceSyncOutput:
+        """
+        Type-safe invoice synchronization with Pydantic input/output.
+
+        This is the recommended method for new code. It provides:
+        - Type-safe input validation through Pydantic
+        - Consistent output format
+        - Better error handling
+        - Self-documenting through schema
+
+        Args:
+            input_data: InvoiceSyncInput with sync parameters
+
+        Returns:
+            InvoiceSyncOutput with sync statistics and results
+
+        Example:
+            >>> sync_input = InvoiceSyncInput(
+            ...     company_id=1,
+            ...     date_from=datetime(2025, 12, 1),
+            ...     date_to=datetime(2025, 12, 30),
+            ...     direction=InvoiceDirection.OUTBOUND
+            ... )
+            >>> result = service.sync_invoices(sync_input)
+            >>> print(f"Synced {result.invoices_created} new invoices")
+        """
+        try:
+            # Get company instance
+            company = Company.objects.get(id=input_data.company_id)
+        except Company.DoesNotExist:
+            return InvoiceSyncOutput(
+                success=False,
+                errors=[f"Company with ID {input_data.company_id} does not exist"]
+            )
+
+        # Call the existing sync method (maintains backward compatibility)
+        result = self.sync_company_invoices(
+            company=company,
+            date_from=input_data.date_from,
+            date_to=input_data.date_to,
+            direction=input_data.direction.value,
+            environment=input_data.environment,
+            prefer_production=input_data.prefer_production
+        )
+
+        # Get NAV config to determine environment used
+        nav_config = self._get_nav_configuration(
+            company,
+            input_data.environment,
+            input_data.prefer_production
+        )
+        environment_used = nav_config.api_environment if nav_config else None
+
+        # Format date range for output
+        date_range = None
+        if input_data.date_from and input_data.date_to:
+            date_range = f"{input_data.date_from.strftime('%Y-%m-%d')} to {input_data.date_to.strftime('%Y-%m-%d')}"
+
+        # Convert to Pydantic output
+        return InvoiceSyncOutput(
+            success=result['success'],
+            invoices_processed=result.get('invoices_processed', 0),
+            invoices_created=result.get('invoices_created', 0),
+            invoices_updated=result.get('invoices_updated', 0),
+            invoices_skipped=0,  # Not tracked in current implementation
+            errors=result.get('errors', []),
+            warnings=[],  # Not tracked in current implementation
+            sync_log_id=result.get('sync_log_id'),
+            synced_at=datetime.now(),
+            environment_used=environment_used,
+            date_range=date_range,
+            direction=input_data.direction.value
+        )
+
     def _get_nav_configuration(self, company: Company) -> Optional[NavConfiguration]:
         """Get active NAV configuration for company."""
         return NavConfiguration.objects.filter(

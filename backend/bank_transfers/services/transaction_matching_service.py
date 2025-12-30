@@ -19,6 +19,12 @@ from django.utils import timezone
 from rapidfuzz import fuzz
 
 from ..models import BankStatement, BankTransaction, Invoice
+from ..schemas.bank_statement import (
+    TransactionMatchInput,
+    TransactionMatchOutput,
+    MatchedInvoiceInfo,
+    MatchMethod,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -205,6 +211,157 @@ class TransactionMatchingService:
         # No match found
         logger.debug(f"No match found for transaction {transaction.id}")
         return {'matched': False}
+
+    def match_transaction_to_invoices(
+        self,
+        input_data: TransactionMatchInput,
+        user=None
+    ) -> TransactionMatchOutput:
+        """
+        Type-safe manual transaction-to-invoice matching with Pydantic I/O.
+
+        This method provides type-safe manual matching of bank transactions to NAV invoices,
+        supporting both single and batch invoice matching.
+
+        Args:
+            input_data: TransactionMatchInput with transaction and invoice IDs
+            user: User instance performing the match (optional)
+
+        Returns:
+            TransactionMatchOutput with match results and confidence
+
+        Raises:
+            ValueError: If transaction or invoices don't exist or belong to wrong company
+
+        Example:
+            >>> match_input = TransactionMatchInput(
+            ...     transaction_id=456,
+            ...     invoice_ids=[123, 789],
+            ...     match_notes="Batch payment for 2 invoices"
+            ... )
+            >>> result = service.match_transaction_to_invoices(match_input, user=request.user)
+            >>> print(f"Matched with {result.match_confidence} confidence")
+        """
+        from ..models import BankTransactionInvoiceMatch
+        from django.utils import timezone
+
+        # Get transaction
+        try:
+            transaction = BankTransaction.objects.get(
+                id=input_data.transaction_id,
+                bank_statement__company=self.company
+            )
+        except BankTransaction.DoesNotExist:
+            return TransactionMatchOutput(
+                success=False,
+                transaction_id=input_data.transaction_id,
+                total_matched_amount=Decimal('0'),
+                transaction_amount=Decimal('0'),
+                match_confidence=Decimal('0'),
+                match_method=MatchMethod.MANUAL,
+                errors=[f"Transaction {input_data.transaction_id} not found or belongs to different company"]
+            )
+
+        # Get invoices
+        invoices = Invoice.objects.filter(
+            id__in=input_data.invoice_ids,
+            company=self.company
+        )
+
+        if not invoices.exists():
+            return TransactionMatchOutput(
+                success=False,
+                transaction_id=input_data.transaction_id,
+                total_matched_amount=Decimal('0'),
+                transaction_amount=transaction.amount,
+                match_confidence=Decimal('0'),
+                match_method=MatchMethod.MANUAL,
+                errors=["No invoices found with provided IDs for this company"]
+            )
+
+        if invoices.count() != len(input_data.invoice_ids):
+            return TransactionMatchOutput(
+                success=False,
+                transaction_id=input_data.transaction_id,
+                total_matched_amount=Decimal('0'),
+                transaction_amount=transaction.amount,
+                match_confidence=Decimal('0'),
+                match_method=MatchMethod.MANUAL,
+                errors=["Some invoice IDs not found or belong to different company"]
+            )
+
+        # Calculate total matched amount
+        total_matched_amount = sum(inv.invoice_gross_amount for inv in invoices)
+
+        # Determine if this is a batch match
+        is_batch_match = len(invoices) > 1
+
+        # Set match method
+        match_method = MatchMethod.MANUAL_BATCH if is_batch_match else MatchMethod.MANUAL
+
+        # Build match notes
+        match_notes = input_data.match_notes or ""
+        if is_batch_match:
+            match_notes = f"Manual batch match to {len(invoices)} invoices. " + match_notes
+
+        # Create matches with full confidence for manual matches
+        matched_invoice_infos = []
+        for invoice in invoices:
+            # Create or update match record
+            match_record, created = BankTransactionInvoiceMatch.objects.update_or_create(
+                transaction=transaction,
+                invoice=invoice,
+                defaults={
+                    'match_confidence': Decimal('1.00'),  # Full confidence for manual
+                    'match_method': 'MANUAL_BATCH' if is_batch_match else 'MANUAL',
+                    'matched_at': timezone.now(),
+                    'matched_by': user,
+                    'match_notes': match_notes,
+                    'is_approved': True,
+                    'approved_at': timezone.now(),
+                    'approved_by': user,
+                }
+            )
+
+            matched_invoice_infos.append(MatchedInvoiceInfo(
+                invoice_id=invoice.id,
+                invoice_number=invoice.nav_invoice_number or f"Invoice #{invoice.id}",
+                amount=invoice.invoice_gross_amount,
+                supplier_name=invoice.supplier_name
+            ))
+
+            # Auto-mark invoice as PAID for manual matches
+            if invoice.payment_status == 'UNPAID':
+                invoice.mark_as_paid(
+                    payment_date=transaction.booking_date,
+                    auto_marked=False  # Manual match
+                )
+
+        # Update transaction with match metadata
+        transaction.match_confidence = Decimal('1.00')
+        transaction.match_method = 'MANUAL_BATCH' if is_batch_match else 'MANUAL'
+        transaction.matched_at = timezone.now()
+        transaction.matched_by = user
+        transaction.match_notes = match_notes
+        transaction.save()
+
+        logger.info(
+            f"Manual {'batch ' if is_batch_match else ''}match: Transaction {transaction.id} "
+            f"matched to {len(invoices)} invoice(s) - Total: {total_matched_amount}"
+        )
+
+        return TransactionMatchOutput(
+            success=True,
+            transaction_id=transaction.id,
+            is_batch_match=is_batch_match,
+            matched_invoices=matched_invoice_infos,
+            total_matched_amount=total_matched_amount,
+            transaction_amount=transaction.amount,
+            match_confidence=Decimal('1.00'),
+            match_method=match_method,
+            match_notes=match_notes,
+            errors=[]
+        )
 
     def _try_transfer_matching(self, transaction: BankTransaction, user=None) -> Dict[str, Any]:
         """

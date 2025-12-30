@@ -20,6 +20,11 @@ from django.core.files.uploadedfile import UploadedFile
 
 from ..models import BankStatement, BankTransaction, Company
 from ..bank_adapters import BankAdapterFactory, BankStatementParseError
+from ..schemas.bank_statement import (
+    BankStatementUploadInput,
+    BankStatementParseOutput,
+    BankCode,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +140,93 @@ class BankStatementParserService:
             raise BankStatementParseError(f"Parsing failed: {e}") from e
 
         return statement
+
+    def parse_statement_with_output(
+        self,
+        uploaded_file: UploadedFile
+    ) -> BankStatementParseOutput:
+        """
+        Type-safe bank statement parsing with Pydantic output.
+
+        This method provides type-safe parsing with comprehensive output statistics.
+
+        Args:
+            uploaded_file: Django UploadedFile instance
+
+        Returns:
+            BankStatementParseOutput with parsing results and statistics
+
+        Example:
+            >>> result = service.parse_statement_with_output(uploaded_file)
+            >>> print(f"Parsed {result.total_transactions} transactions")
+            >>> print(f"Auto-matched {result.auto_matched} transactions")
+        """
+        errors = []
+        warnings = []
+
+        try:
+            # Call existing parse_and_save method
+            statement = self.parse_and_save(uploaded_file)
+
+            # Build success output
+            return BankStatementParseOutput(
+                success=True,
+                bank_code=BankCode(statement.bank_code),
+                statement_id=statement.id,
+                account_number=statement.account_number,
+                statement_period_from=statement.statement_period_from,
+                statement_period_to=statement.statement_period_to,
+                opening_balance=statement.opening_balance,
+                closing_balance=statement.closing_balance,
+                total_transactions=statement.total_transactions,
+                transactions_created=statement.total_transactions,
+                duplicates_skipped=0,  # Could be enhanced to track this
+                auto_matched=statement.matched_count or 0,
+                errors=[],
+                warnings=[]
+            )
+
+        except ValueError as e:
+            # Duplicate file or validation error
+            error_msg = str(e)
+            logger.warning(f"Validation error during parsing: {error_msg}")
+            return BankStatementParseOutput(
+                success=False,
+                total_transactions=0,
+                transactions_created=0,
+                duplicates_skipped=0,
+                auto_matched=0,
+                errors=[error_msg],
+                warnings=[]
+            )
+
+        except BankStatementParseError as e:
+            # Bank detection or parsing error
+            error_msg = str(e)
+            logger.error(f"Parsing error: {error_msg}")
+            return BankStatementParseOutput(
+                success=False,
+                total_transactions=0,
+                transactions_created=0,
+                duplicates_skipped=0,
+                auto_matched=0,
+                errors=[error_msg],
+                warnings=[]
+            )
+
+        except Exception as e:
+            # Unexpected error
+            error_msg = f"Unexpected error: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return BankStatementParseOutput(
+                success=False,
+                total_transactions=0,
+                transactions_created=0,
+                duplicates_skipped=0,
+                auto_matched=0,
+                errors=[error_msg],
+                warnings=[]
+            )
 
     def _parse_statement(self, statement: BankStatement, adapter, pdf_bytes: bytes):
         """
