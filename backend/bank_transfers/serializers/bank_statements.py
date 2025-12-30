@@ -383,6 +383,17 @@ class OtherCostSerializer(serializers.ModelSerializer):
 
         return value
 
+    def validate_bank_transaction(self, value):
+        """Validate that bank_transaction doesn't already have an OtherCost"""
+        if value and hasattr(value, 'other_cost_detail') and value.other_cost_detail:
+            # Check if this is an update (self.instance exists)
+            if not self.instance or self.instance.id != value.other_cost_detail.id:
+                raise serializers.ValidationError(
+                    f"Ez a tranzakció már rendelkezik egyéb költség kategorizálással. "
+                    f"Kérem szerkessze a meglévő költséget az újat létrehozása helyett."
+                )
+        return value
+
 
 class SupportedBanksSerializer(serializers.Serializer):
     """
