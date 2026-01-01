@@ -70,52 +70,52 @@ class BillingoInvoiceFilterSet(django_filters.FilterSet):
 
     def filter_invoice_number(self, queryset, name, value):
         """Filter invoice number with operator support"""
-        operator = self.request.query_params.get('invoice_number_operator', 'contains')
+        operator = self.data.get('invoice_number_operator', 'contains')
         return self._apply_string_filter(queryset, 'invoice_number', value, operator)
 
     def filter_partner_name(self, queryset, name, value):
         """Filter partner name with operator support"""
-        operator = self.request.query_params.get('partner_name_operator', 'contains')
+        operator = self.data.get('partner_name_operator', 'contains')
         return self._apply_string_filter(queryset, 'partner_name', value, operator)
 
     def filter_partner_tax_number(self, queryset, name, value):
         """Filter partner tax number with operator support"""
-        operator = self.request.query_params.get('partner_tax_number_operator', 'contains')
+        operator = self.data.get('partner_tax_number_operator', 'contains')
         return self._apply_string_filter(queryset, 'partner_tax_number', value, operator)
 
     def filter_type(self, queryset, name, value):
         """Filter invoice type with operator support"""
-        operator = self.request.query_params.get('type_operator', 'contains')
+        operator = self.data.get('type_operator', 'contains')
         return self._apply_string_filter(queryset, 'type', value, operator)
 
     def filter_payment_status(self, queryset, name, value):
         """Filter payment status with operator support"""
-        operator = self.request.query_params.get('payment_status_operator', 'equals')
+        operator = self.data.get('payment_status_operator', 'equals')
         return self._apply_string_filter(queryset, 'payment_status', value, operator)
 
     def filter_cancelled(self, queryset, name, value):
         """Filter cancelled status with operator support"""
-        operator = self.request.query_params.get('cancelled_operator', 'is')
+        operator = self.data.get('cancelled_operator', 'is')
         return self._apply_boolean_filter(queryset, 'cancelled', value, operator)
 
     def filter_invoice_date(self, queryset, name, value):
         """Filter invoice date with operator support"""
-        operator = self.request.query_params.get('invoice_date_operator', 'is')
+        operator = self.data.get('invoice_date_operator', 'is')
         return self._apply_date_filter(queryset, 'invoice_date', value, operator)
 
     def filter_due_date(self, queryset, name, value):
         """Filter due date with operator support"""
-        operator = self.request.query_params.get('due_date_operator', 'is')
+        operator = self.data.get('due_date_operator', 'is')
         return self._apply_date_filter(queryset, 'due_date', value, operator)
 
     def filter_gross_total(self, queryset, name, value):
         """Filter gross total with operator support"""
-        operator = self.request.query_params.get('gross_total_operator', '=')
+        operator = self.data.get('gross_total_operator', '=')
         return self._apply_numeric_filter(queryset, 'gross_total', value, operator)
 
     def filter_net_total(self, queryset, name, value):
         """Filter net total with operator support"""
-        operator = self.request.query_params.get('net_total_operator', '=')
+        operator = self.data.get('net_total_operator', '=')
         return self._apply_numeric_filter(queryset, 'net_total', value, operator)
 
     # Filter helper methods

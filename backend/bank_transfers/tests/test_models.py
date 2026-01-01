@@ -14,10 +14,11 @@ from decimal import Decimal
 from datetime import date, timedelta
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
+from django.utils import timezone
 
 from bank_transfers.models import (
     Company, Beneficiary, BankAccount, Transfer, TransferBatch,
-    NAVInvoice, TrustedPartner, ExchangeRate, BankStatement,
+    Invoice, TrustedPartner, ExchangeRate, BankStatement,
     BankTransaction, CompanyBillingoSettings
 )
 
@@ -36,16 +37,13 @@ class TestCompanyModel:
         """Test creating a company with all valid fields."""
         company = Company.objects.create(
             name='Test Company Ltd.',
-            tax_id='12345678-1-42',
-            registration_number='01-09-123456',
-            address='1234 Budapest, Test Street 1.',
-            is_active=True
+            tax_id='12345678-1-42'
         )
 
         assert company.id is not None
         assert company.name == 'Test Company Ltd.'
         assert company.tax_id == '12345678-1-42'
-        assert company.is_active is True
+        assert company.is_active is True  # Default from TimestampedActiveModel
 
     def test_company_str_method(self):
         """Test Company __str__ method."""
@@ -89,15 +87,14 @@ class TestBeneficiaryModel:
             company=company,
             name='Test Supplier Ltd.',
             account_number='12345678-12345678-12345678',
-            vat_number='87654321-2-42',
-            default_amount=Decimal('100000.00'),
-            is_active=True
+            tax_number='87654321',
+            description='Test supplier'
         )
 
         assert beneficiary.id is not None
         assert beneficiary.company == company
         assert beneficiary.name == 'Test Supplier Ltd.'
-        assert beneficiary.default_amount == Decimal('100000.00')
+        assert beneficiary.tax_number == '87654321'
 
     def test_beneficiary_str_method(self, company):
         """Test Beneficiary __str__ method."""
@@ -107,7 +104,9 @@ class TestBeneficiaryModel:
             account_number='12345678-12345678-12345678'
         )
 
-        assert str(beneficiary) == 'Supplier XYZ'
+        # __str__ format is: "name (identifier)" where identifier is account_number or vat_number or tax_number
+        assert 'Supplier XYZ' in str(beneficiary)
+        assert '12345678-12345678-12345678' in str(beneficiary)
 
     def test_beneficiary_company_required(self):
         """Test that company is required."""
@@ -132,27 +131,27 @@ class TestBankAccountModel:
         """Test creating a bank account."""
         account = BankAccount.objects.create(
             company=company,
+            name='Main Account',
             account_number='12345678-90123456-12345678',
-            account_iban='HU42123456789012345612345678',
             bank_name='Test Bank',
-            bank_bic='TESTHUHU',
-            currency='HUF',
             is_default=True
         )
 
         assert account.id is not None
-        assert account.currency == 'HUF'
+        assert account.name == 'Main Account'
         assert account.is_default is True
 
     def test_bank_account_str_method(self, company):
         """Test BankAccount __str__ method."""
         account = BankAccount.objects.create(
             company=company,
+            name='GRÁNIT Account',
             account_number='12345678-90123456',
             bank_name='GRÁNIT Bank'
         )
 
-        assert 'GRÁNIT Bank' in str(account)
+        # __str__ format is: "name (account_number)"
+        assert 'GRÁNIT Account' in str(account)
         assert '12345678-90123456' in str(account)
 
 
@@ -163,25 +162,28 @@ class TestBankAccountModel:
 @pytest.mark.unit
 @pytest.mark.model
 @pytest.mark.django_db
-class TestNAVInvoiceModel:
+class TestInvoiceModel:
     """Test cases for NAV Invoice model."""
 
     def test_create_nav_invoice(self, company):
         """Test creating a NAV invoice."""
-        invoice = NAVInvoice.objects.create(
+        invoice = Invoice.objects.create(
             company=company,
             nav_invoice_number='TEST-2025-001',
+            invoice_direction='INBOUND',
             supplier_name='Supplier Ltd.',
             supplier_tax_number='12345678-1-42',
             customer_name='Customer Ltd.',
             customer_tax_number='87654321-2-42',
-            invoice_issue_date=date.today(),
-            invoice_delivery_date=date.today(),
+            issue_date=date.today(),
+            fulfillment_date=date.today(),
             payment_due_date=date.today() + timedelta(days=30),
             invoice_gross_amount=Decimal('121000.00'),
             invoice_vat_amount=Decimal('21000.00'),
             invoice_net_amount=Decimal('100000.00'),
-            currency='HUF',
+            currency_code='HUF',
+            original_request_version='3.0',
+            last_modified_date=timezone.now(),
             payment_status='UNPAID',
             invoice_category='NORMAL',
             invoice_operation='CREATE'
@@ -193,26 +195,38 @@ class TestNAVInvoiceModel:
 
     def test_nav_invoice_payment_status_choices(self, company):
         """Test NAV invoice payment status field."""
-        invoice = NAVInvoice.objects.create(
+        invoice = Invoice.objects.create(
             company=company,
             nav_invoice_number='TEST-2025-002',
+            invoice_direction='INBOUND',
             supplier_name='Supplier Ltd.',
             supplier_tax_number='12345678-1-42',
-            invoice_issue_date=date.today(),
+            issue_date=date.today(),
             invoice_gross_amount=Decimal('100000.00'),
+            invoice_net_amount=Decimal('80000.00'),
+            invoice_vat_amount=Decimal('20000.00'),
+            currency_code='HUF',
+            original_request_version='3.0',
+            last_modified_date=timezone.now(),
             payment_status='PAID'  # Valid choice
         )
 
         assert invoice.payment_status == 'PAID'
 
     def test_nav_invoice_str_method(self, company):
-        """Test NAVInvoice __str__ method."""
-        invoice = NAVInvoice.objects.create(
+        """Test Invoice __str__ method."""
+        invoice = Invoice.objects.create(
             company=company,
             nav_invoice_number='INV-2025-123',
+            invoice_direction='INBOUND',
             supplier_name='Supplier XYZ',
-            invoice_issue_date=date.today(),
-            invoice_gross_amount=Decimal('50000.00')
+            issue_date=date.today(),
+            invoice_gross_amount=Decimal('50000.00'),
+            invoice_net_amount=Decimal('40000.00'),
+            invoice_vat_amount=Decimal('10000.00'),
+            currency_code='HUF',
+            original_request_version='3.0',
+            last_modified_date=timezone.now()
         )
 
         assert 'INV-2025-123' in str(invoice)
@@ -228,11 +242,10 @@ class TestNAVInvoiceModel:
 class TestTransferModel:
     """Test cases for Transfer model."""
 
-    def test_create_transfer(self, company, bank_account, beneficiary):
+    def test_create_transfer(self, bank_account, beneficiary):
         """Test creating a transfer."""
         transfer = Transfer.objects.create(
-            company=company,
-            bank_account=bank_account,
+            originator_account=bank_account,
             beneficiary=beneficiary,
             amount=Decimal('50000.00'),
             currency='HUF',
@@ -245,14 +258,14 @@ class TestTransferModel:
         assert transfer.amount == Decimal('50000.00')
         assert transfer.is_processed is False
 
-    def test_transfer_currency_default(self, company, bank_account, beneficiary):
+    def test_transfer_currency_default(self, bank_account, beneficiary):
         """Test transfer currency defaults to HUF."""
         transfer = Transfer.objects.create(
-            company=company,
-            bank_account=bank_account,
+            originator_account=bank_account,
             beneficiary=beneficiary,
             amount=Decimal('10000.00'),
-            execution_date=date.today()
+            execution_date=date.today(),
+            remittance_info='Default currency test'
         )
 
         assert transfer.currency == 'HUF'
@@ -295,17 +308,22 @@ class TestBankStatementModel:
         """Test BankStatement __str__ method."""
         statement = BankStatement.objects.create(
             company=company,
+            bank_code='TEST',
             bank_name='Test Bank',
             account_number='12345678',
             statement_period_from=date(2025, 1, 1),
             statement_period_to=date(2025, 1, 31),
+            opening_balance=Decimal('1000000.00'),
+            closing_balance=Decimal('1500000.00'),
             file_name='test.pdf',
+            file_path='/test/path/test.pdf',
             file_size=100,
             file_hash='hash123',
             uploaded_by=user
         )
 
-        assert 'Test Bank' in str(statement)
+        # __str__ format is: "bank_code account_number (period_from - period_to)"
+        assert 'Test Bank' in str(statement) or 'TEST' in str(statement)
         assert '12345678' in str(statement)
 
 
@@ -322,25 +340,23 @@ class TestExchangeRateModel:
     def test_create_exchange_rate(self):
         """Test creating an exchange rate."""
         rate = ExchangeRate.objects.create(
-            currency_code='USD',
-            currency_name='US Dollar',
-            units=1,
-            rate_to_huf=Decimal('360.50'),
+            currency='USD',
+            unit=1,
+            rate=Decimal('360.50'),
             rate_date=date.today(),
             source='MNB'
         )
 
         assert rate.id is not None
-        assert rate.currency_code == 'USD'
-        assert rate.rate_to_huf == Decimal('360.50')
+        assert rate.currency == 'USD'
+        assert rate.rate == Decimal('360.50')
 
     def test_exchange_rate_str_method(self):
         """Test ExchangeRate __str__ method."""
         rate = ExchangeRate.objects.create(
-            currency_code='EUR',
-            currency_name='Euro',
-            units=1,
-            rate_to_huf=Decimal('395.25'),
+            currency='EUR',
+            unit=1,
+            rate=Decimal('395.25'),
             rate_date=date.today(),
             source='MNB'
         )
@@ -349,20 +365,20 @@ class TestExchangeRateModel:
         assert '395.25' in str(rate)
 
     def test_exchange_rate_uniqueness(self):
-        """Test that currency_code + rate_date must be unique."""
+        """Test that currency + rate_date must be unique."""
         ExchangeRate.objects.create(
-            currency_code='USD',
-            units=1,
-            rate_to_huf=Decimal('360.00'),
+            currency='USD',
+            unit=1,
+            rate=Decimal('360.00'),
             rate_date=date.today(),
             source='MNB'
         )
 
         with pytest.raises(IntegrityError):
             ExchangeRate.objects.create(
-                currency_code='USD',
-                units=1,
-                rate_to_huf=Decimal('365.00'),  # Different rate
+                currency='USD',
+                unit=1,
+                rate=Decimal('365.00'),  # Different rate
                 rate_date=date.today(),  # Same date
                 source='MNB'
             )

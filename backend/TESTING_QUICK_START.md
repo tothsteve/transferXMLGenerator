@@ -4,6 +4,53 @@
 
 ---
 
+## ⚠️ CRITICAL RULE: Always Read Models First
+
+**NEVER GUESS MODEL FIELDS!** Before writing ANY test:
+
+1. **Read the actual model file** in `bank_transfers/models/`
+2. **Check ALL field names** - don't assume field names
+3. **Check required vs optional fields** - read the model definition
+4. **Check field types** - CharField, DecimalField, ForeignKey, etc.
+
+### Why This Matters
+
+When the test infrastructure was initially created, tests were written based on **guessed field names** instead of reading actual models. This caused:
+- ❌ 11 test failures due to wrong field names (`default_amount`, `account_iban`, `currency_code` vs `currency`, etc.)
+- ❌ Hours of debugging and fixing self-created problems
+- ❌ Tests that didn't match reality
+
+### Example of Wrong Approach (DON'T DO THIS):
+
+```python
+# ❌ WRONG: Guessing field names without reading the model
+def test_create_beneficiary(self, company):
+    beneficiary = Beneficiary.objects.create(
+        company=company,
+        name='Test',
+        default_amount=Decimal('100000.00'),  # ← This field doesn't exist!
+        vat_number='87654321-2-42',           # ← Wrong format!
+    )
+```
+
+### Example of Correct Approach (DO THIS):
+
+```python
+# ✅ CORRECT: First read bank_transfers/models/banking.py
+# Found: Beneficiary has fields: name, account_number, vat_number, tax_number, description, is_frequent
+def test_create_beneficiary(self, company):
+    beneficiary = Beneficiary.objects.create(
+        company=company,
+        name='Test',
+        tax_number='12345678',      # ← Actual field (8 digits)
+        description='Test supplier'  # ← Actual field
+    )
+```
+
+**Always verify fields by reading the model code! No guessing!**
+
+---
+
 ## 🚀 Quick Start (2 minutes)
 
 ### Install Dependencies

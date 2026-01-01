@@ -19,7 +19,7 @@ from bank_transfers.filters import (
     InvoiceFilterSet,
     BeneficiaryFilterSet
 )
-from bank_transfers.models import BillingoInvoice, BankTransaction, NAVInvoice, Beneficiary
+from bank_transfers.models import BillingoInvoice, BankTransaction, Invoice, Beneficiary
 
 
 # ============================================================================
@@ -292,28 +292,44 @@ class TestInvoiceFilterSet:
 
     def test_filter_invoice_by_payment_status(self, company):
         """Test filtering invoices by payment status."""
-        NAVInvoice.objects.create(
+        from django.utils import timezone
+
+        Invoice.objects.create(
             company=company,
             nav_invoice_number='INV-001',
+            invoice_direction='INBOUND',
             supplier_name='Supplier A',
-            invoice_issue_date=date.today(),
+            issue_date=date.today(),
             invoice_gross_amount=Decimal('100000'),
+            invoice_net_amount=Decimal('80000'),
+            invoice_vat_amount=Decimal('20000'),
+            currency_code='HUF',
+            original_request_version='3.0',
+            last_modified_date=timezone.now(),
             payment_status='PAID'
         )
-        NAVInvoice.objects.create(
+        Invoice.objects.create(
             company=company,
             nav_invoice_number='INV-002',
+            invoice_direction='INBOUND',
             supplier_name='Supplier B',
-            invoice_issue_date=date.today(),
+            issue_date=date.today(),
             invoice_gross_amount=Decimal('200000'),
+            invoice_net_amount=Decimal('160000'),
+            invoice_vat_amount=Decimal('40000'),
+            currency_code='HUF',
+            original_request_version='3.0',
+            last_modified_date=timezone.now(),
             payment_status='UNPAID'
         )
 
         factory = RequestFactory()
         request = factory.get('/', {'payment_status': 'UNPAID'})
 
-        queryset = NAVInvoice.objects.filter(company=company)
+        queryset = Invoice.objects.filter(company=company)
         filterset = InvoiceFilterSet(request.GET, queryset=queryset, request=request)
 
         # Actual test depends on FilterSet implementation
         assert filterset.is_valid()
+        assert filterset.qs.count() == 1
+        assert filterset.qs.first().payment_status == 'UNPAID'

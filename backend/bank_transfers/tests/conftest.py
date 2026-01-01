@@ -7,13 +7,13 @@ Fixtures are available to all tests automatically via pytest's fixture discovery
 
 import pytest
 from decimal import Decimal
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from bank_transfers.models import (
     Company, CompanyUser, BankAccount, Beneficiary, TransferTemplate,
-    Transfer, TransferBatch, NAVInvoice, TrustedPartner, ExchangeRate,
+    Transfer, TransferBatch, Invoice, TrustedPartner, ExchangeRate,
     BankStatement, BankTransaction, CompanyBillingoSettings
 )
 
@@ -59,10 +59,7 @@ def company(db):
     """Create a test company."""
     return Company.objects.create(
         name='Test Company Ltd.',
-        tax_id='12345678-1-42',
-        registration_number='01-09-123456',
-        address='1234 Budapest, Test Street 1.',
-        is_active=True
+        tax_id='12345678-1-42'
     )
 
 
@@ -75,6 +72,40 @@ def company_user(db, company, user):
         role='ADMIN',
         is_active=True
     )
+
+
+@pytest.fixture
+def enable_all_features(db, company):
+    """Enable all features for testing."""
+    from bank_transfers.models import FeatureTemplate, CompanyFeature
+
+    # Get or create all feature templates
+    feature_codes = [
+        'NAV_SYNC',
+        'BILLINGO_SYNC',
+        'BANK_STATEMENT_IMPORT',
+        'BENEFICIARY_MANAGEMENT',
+        'TRANSFER_MANAGEMENT',
+        'BATCH_MANAGEMENT',
+    ]
+
+    for feature_code in feature_codes:
+        # Create feature template if doesn't exist
+        feature_template, _ = FeatureTemplate.objects.get_or_create(
+            feature_code=feature_code,
+            defaults={
+                'feature_name': feature_code.replace('_', ' ').title(),
+                'description': f'Test feature: {feature_code}',
+                'is_system_critical': False,
+            }
+        )
+
+        # Enable feature for company
+        CompanyFeature.objects.get_or_create(
+            company=company,
+            feature_template=feature_template,
+            defaults={'is_enabled': True}
+        )
 
 
 @pytest.fixture
@@ -102,13 +133,10 @@ def bank_account(db, company):
     """Create a test bank account."""
     return BankAccount.objects.create(
         company=company,
+        name='Test Bank Account',
         account_number='12345678-90123456-12345678',
-        account_iban='HU42123456789012345612345678',
         bank_name='Test Bank',
-        bank_bic='TESTHUHU',
-        currency='HUF',
-        is_default=True,
-        is_active=True
+        is_default=True
     )
 
 
@@ -123,9 +151,8 @@ def beneficiary(db, company):
         company=company,
         name='Test Beneficiary Ltd.',
         account_number='98765432-10987654-32109876',
-        vat_number='87654321-2-42',
-        default_amount=Decimal('100000.00'),
-        is_active=True
+        tax_number='87654321',  # First 8 digits of tax number
+        description='Test supplier for unit tests'
     )
 
 
@@ -139,9 +166,8 @@ def multiple_beneficiaries(db, company):
                 company=company,
                 name=f'Beneficiary {i+1}',
                 account_number=f'1234567{i}-1234567{i}-1234567{i}',
-                vat_number=f'1234567{i}-1-42',
-                default_amount=Decimal(f'{(i+1)*10000}.00'),
-                is_active=True
+                tax_number=f'1234567{i}',
+                description=f'Test beneficiary #{i+1}'
             )
         )
     return beneficiaries
@@ -175,11 +201,10 @@ def transfer_batch(db, company, bank_account):
 
 
 @pytest.fixture
-def transfer(db, company, bank_account, beneficiary):
+def transfer(db, bank_account, beneficiary):
     """Create a single transfer."""
     return Transfer.objects.create(
-        company=company,
-        bank_account=bank_account,
+        originator_account=bank_account,
         beneficiary=beneficiary,
         amount=Decimal('50000.00'),
         currency='HUF',
@@ -196,20 +221,23 @@ def transfer(db, company, bank_account, beneficiary):
 @pytest.fixture
 def nav_invoice(db, company):
     """Create a NAV invoice."""
-    return NAVInvoice.objects.create(
+    return Invoice.objects.create(
         company=company,
         nav_invoice_number='TESZT-2025-001',
+        invoice_direction='INBOUND',
         supplier_name='Test Supplier Ltd.',
         supplier_tax_number='12345678-1-42',
         customer_name='Test Company Ltd.',
         customer_tax_number='87654321-2-42',
-        invoice_issue_date=date.today(),
-        invoice_delivery_date=date.today(),
+        issue_date=date.today(),
+        fulfillment_date=date.today(),
         payment_due_date=date.today() + timedelta(days=30),
         invoice_gross_amount=Decimal('121000.00'),
         invoice_vat_amount=Decimal('21000.00'),
         invoice_net_amount=Decimal('100000.00'),
-        currency='HUF',
+        currency_code='HUF',
+        original_request_version='3.0',
+        last_modified_date=timezone.now(),
         payment_status='UNPAID',
         invoice_category='NORMAL',
         invoice_operation='CREATE'
@@ -294,10 +322,9 @@ def bank_transaction(db, bank_statement):
 def exchange_rate_usd(db):
     """Create a USD exchange rate."""
     return ExchangeRate.objects.create(
-        currency_code='USD',
-        currency_name='US Dollar',
-        units=1,
-        rate_to_huf=Decimal('360.50'),
+        currency='USD',
+        unit=1,
+        rate=Decimal('360.50'),
         rate_date=date.today(),
         source='MNB'
     )
@@ -307,10 +334,9 @@ def exchange_rate_usd(db):
 def exchange_rate_eur(db):
     """Create a EUR exchange rate."""
     return ExchangeRate.objects.create(
-        currency_code='EUR',
-        currency_name='Euro',
-        units=1,
-        rate_to_huf=Decimal('395.25'),
+        currency='EUR',
+        unit=1,
+        rate=Decimal('395.25'),
         rate_date=date.today(),
         source='MNB'
     )
@@ -328,8 +354,8 @@ def api_client():
 
 
 @pytest.fixture
-def authenticated_client(api_client, user, company, company_user):
-    """Create an authenticated API client with company context."""
+def authenticated_client(api_client, user, company, company_user, enable_all_features):
+    """Create an authenticated API client with company context and all features enabled."""
     from rest_framework_simplejwt.tokens import RefreshToken
 
     # Generate JWT token

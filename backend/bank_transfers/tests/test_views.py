@@ -14,6 +14,7 @@ from decimal import Decimal
 from datetime import date, timedelta
 from rest_framework import status
 from rest_framework.test import APIClient
+from django.utils import timezone
 
 
 # ============================================================================
@@ -45,15 +46,15 @@ class TestBeneficiaryAPI:
         data = {
             'name': 'New Beneficiary Ltd.',
             'account_number': '12345678-12345678-12345678',
-            'vat_number': '12345678-1-42',
-            'default_amount': '50000.00'
+            'tax_number': '12345678',
+            'description': 'New supplier via API'
         }
 
         response = authenticated_client.post('/api/beneficiaries/', data, format='json')
 
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data['name'] == 'New Beneficiary Ltd.'
-        assert Decimal(response.data['default_amount']) == Decimal('50000.00')
+        assert response.data['tax_number'] == '12345678'
 
     def test_create_beneficiary_invalid_data(self, authenticated_client):
         """Test creating beneficiary with invalid data fails."""
@@ -99,7 +100,11 @@ class TestBillingoSettingsAPI:
     """Test cases for Billingo settings API endpoints."""
 
     def test_test_credentials_endpoint_exists(self, authenticated_client):
-        """Test that test_credentials endpoint is accessible."""
+        """Test that test_credentials endpoint is accessible.
+
+        Tests the ability to test Billingo API credentials before saving them.
+        ADMIN and FINANCIAL roles can test credentials.
+        """
         data = {'api_key': 'test-key-12345'}
 
         response = authenticated_client.post(
@@ -135,7 +140,7 @@ class TestNAVInvoiceAPI:
 
     def test_list_nav_invoices(self, authenticated_client, nav_invoice):
         """Test listing NAV invoices."""
-        response = authenticated_client.get('/api/invoices/')
+        response = authenticated_client.get('/api/nav/invoices/')
 
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data['results']) >= 1
@@ -143,31 +148,48 @@ class TestNAVInvoiceAPI:
     def test_filter_invoices_by_payment_status(self, authenticated_client, company):
         """Test filtering invoices by payment status."""
         # Create invoices with different statuses
-        from bank_transfers.models import NAVInvoice
+        from bank_transfers.models import Invoice
 
-        NAVInvoice.objects.create(
+        Invoice.objects.create(
             company=company,
             nav_invoice_number='PAID-001',
+            invoice_direction='INBOUND',
             supplier_name='Supplier A',
-            invoice_issue_date=date.today(),
+            issue_date=date.today(),
             invoice_gross_amount=Decimal('100000'),
+            invoice_net_amount=Decimal('80000'),
+            invoice_vat_amount=Decimal('20000'),
+            currency_code='HUF',
+            original_request_version='3.0',
+            last_modified_date=timezone.now(),
             payment_status='PAID'
         )
-        NAVInvoice.objects.create(
+        Invoice.objects.create(
             company=company,
             nav_invoice_number='UNPAID-001',
+            invoice_direction='INBOUND',
             supplier_name='Supplier B',
-            invoice_issue_date=date.today(),
+            issue_date=date.today(),
             invoice_gross_amount=Decimal('200000'),
+            invoice_net_amount=Decimal('160000'),
+            invoice_vat_amount=Decimal('40000'),
+            currency_code='HUF',
+            original_request_version='3.0',
+            last_modified_date=timezone.now(),
             payment_status='UNPAID'
         )
 
-        response = authenticated_client.get('/api/invoices/?payment_status=UNPAID')
+        response = authenticated_client.get('/api/nav/invoices/?payment_status=UNPAID')
 
         assert response.status_code == status.HTTP_200_OK
         # All returned invoices should have UNPAID status
+        # payment_status is serialized as an object with status, label, icon, class
         for invoice in response.data['results']:
-            assert invoice['payment_status'] == 'UNPAID'
+            # Check if it's a dict (serialized) or string (raw)
+            if isinstance(invoice['payment_status'], dict):
+                assert invoice['payment_status']['status'] == 'UNPAID'
+            else:
+                assert invoice['payment_status'] == 'UNPAID'
 
 
 # ============================================================================
@@ -243,6 +265,9 @@ class TestHealthCheck:
         response = api_client.get('/api/health/')
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.data['status'] == 'healthy'
-        assert 'timestamp' in response.data
-        assert response.data['service'] == 'transferXMLGenerator-backend'
+        # Health check returns Django JsonResponse, not DRF Response
+        import json
+        data = json.loads(response.content)
+        assert data['status'] == 'healthy'
+        assert 'timestamp' in data
+        assert data['service'] == 'transferXMLGenerator-backend'
