@@ -15,6 +15,7 @@ from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 import logging
@@ -32,6 +33,7 @@ from ..serializers import (
     BillingoSpendingDetailSerializer
 )
 from ..permissions import IsCompanyMember, IsCompanyAdmin, RequireBillingoSync
+from ..filters import BillingoInvoiceFilterSet
 
 
 class CompanyBillingoSettingsViewSet(viewsets.ModelViewSet):
@@ -161,6 +163,68 @@ class CompanyBillingoSettingsViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @swagger_auto_schema(
+        operation_description="Billingo API kulcs tesztelése",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['api_key'],
+            properties={
+                'api_key': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description='Billingo API kulcs teszteléshez'
+                ),
+            }
+        ),
+        responses={
+            200: openapi.Response(
+                description="API kulcs érvényes",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'valid': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'organization_name': openapi.Schema(type=openapi.TYPE_STRING),
+                        'organization_tax_number': openapi.Schema(type=openapi.TYPE_STRING),
+                    }
+                )
+            ),
+            400: 'Érvénytelen kérés',
+        }
+    )
+    @action(detail=False, methods=['post'])
+    def test_credentials(self, request):
+        """
+        Test Billingo API credentials.
+
+        POST /api/billingo-settings/test_credentials/
+        Body: { "api_key": "your-api-key-here" }
+
+        Returns:
+            200: { "valid": true, "organization_name": "...", "organization_tax_number": "..." }
+            200: { "valid": false, "error": "..." }
+        """
+        from ..services.billingo_sync_service import BillingoSyncService
+
+        api_key = request.data.get('api_key')
+
+        if not api_key:
+            return Response(
+                {'error': 'API kulcs megadása kötelező'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Test credentials using service
+        try:
+            service = BillingoSyncService()
+            result = service.validate_and_test_credentials(api_key)
+            return Response(result, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Credential validation error: {str(e)}", exc_info=True)
+            return Response(
+                {'valid': False, 'error': f'Váratlan hiba: {str(e)}'},
+                status=status.HTTP_200_OK  # Return 200 with valid:false instead of 500
+            )
+
 
 class BillingoInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -169,216 +233,33 @@ class BillingoInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
     Szinkronizált számlák lekérdezése Billingo-ból.
     Csak olvasható - a számlák az API szinkronizálással frissülnek.
 
-    Szűrések:
-    - invoice_number: számlaszám alapján keresés
-    - partner_tax_number: partner adószáma alapján
+    Szűrések (django-filter FilterSet):
+    - invoice_number: számlaszám alapján keresés (operator support)
+    - partner_name: partner név alapján (operator support)
+    - partner_tax_number: partner adószáma alapján (operator support)
     - payment_status: fizetési státusz (paid, unpaid, overdue stb.)
     - cancelled: true/false - sztornózott számlák
-    - from_date: számla dátuma >= (YYYY-MM-DD)
-    - to_date: számla dátuma <= (YYYY-MM-DD)
+    - invoice_date: számla dátuma (operator support)
+    - due_date: esedékesség dátuma (operator support)
+    - gross_total: bruttó összeg (operator support)
+    - net_total: nettó összeg (operator support)
+
+    Operator support: contains, equals, startsWith, endsWith, isEmpty, isNotEmpty, =, !=, <, <=, >, >=, etc.
     """
     permission_classes = [IsAuthenticated, IsCompanyMember, RequireBillingoSync]
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_class = BillingoInvoiceFilterSet
     search_fields = ['invoice_number', 'partner_name', 'partner_tax_number']
     ordering_fields = ['invoice_number', 'partner_name', 'invoice_date', 'due_date', 'gross_total', 'net_total', 'payment_status']
     ordering = ['-invoice_date']
 
-    def _apply_string_filter(self, queryset, field_name, value, operator='contains'):
-        """Apply operator-based filter for string fields"""
-        if value:
-            if operator == 'contains':
-                return queryset.filter(**{f'{field_name}__icontains': value})
-            elif operator == 'notContains':
-                return queryset.exclude(**{f'{field_name}__icontains': value})
-            elif operator == 'equals':
-                return queryset.filter(**{f'{field_name}__iexact': value})
-            elif operator == 'notEqual':
-                return queryset.exclude(**{f'{field_name}__iexact': value})
-            elif operator == 'startsWith':
-                return queryset.filter(**{f'{field_name}__istartswith': value})
-            elif operator == 'endsWith':
-                return queryset.filter(**{f'{field_name}__iendswith': value})
-        elif operator == 'isEmpty':
-            return queryset.filter(**{f'{field_name}__isnull': True}) | queryset.filter(**{field_name: ''})
-        elif operator == 'isNotEmpty':
-            return queryset.exclude(**{f'{field_name}__isnull': True}).exclude(**{field_name: ''})
-        return queryset
-
-    def _apply_boolean_filter(self, queryset, field_name, value, operator='is'):
-        """Apply operator-based filter for boolean fields"""
-        if value is not None:
-            bool_value = value.lower() == 'true' if isinstance(value, str) else bool(value)
-            if operator == 'is':
-                return queryset.filter(**{field_name: bool_value})
-        return queryset
-
-    def _apply_date_filter(self, queryset, field_name, value, operator='is'):
-        """Apply operator-based filter for date fields"""
-        if value:
-            if operator == 'is':
-                return queryset.filter(**{field_name: value})
-            elif operator == 'not':
-                return queryset.exclude(**{field_name: value})
-            elif operator == 'after':
-                return queryset.filter(**{f'{field_name}__gt': value})
-            elif operator == 'onOrAfter':
-                return queryset.filter(**{f'{field_name}__gte': value})
-            elif operator == 'before':
-                return queryset.filter(**{f'{field_name}__lt': value})
-            elif operator == 'onOrBefore':
-                return queryset.filter(**{f'{field_name}__lte': value})
-        elif operator == 'isEmpty':
-            return queryset.filter(**{f'{field_name}__isnull': True})
-        elif operator == 'isNotEmpty':
-            return queryset.exclude(**{f'{field_name}__isnull': True})
-        return queryset
-
-    def _apply_numeric_filter(self, queryset, field_name, value, operator='='):
-        """Apply operator-based filter for numeric fields"""
-        if value:
-            if operator == '=':
-                return queryset.filter(**{field_name: value})
-            elif operator == '!=':
-                return queryset.exclude(**{field_name: value})
-            elif operator == '>':
-                return queryset.filter(**{f'{field_name}__gt': value})
-            elif operator == '>=':
-                return queryset.filter(**{f'{field_name}__gte': value})
-            elif operator == '<':
-                return queryset.filter(**{f'{field_name}__lt': value})
-            elif operator == '<=':
-                return queryset.filter(**{f'{field_name}__lte': value})
-        elif operator == 'isEmpty':
-            return queryset.filter(**{f'{field_name}__isnull': True})
-        elif operator == 'isNotEmpty':
-            return queryset.exclude(**{f'{field_name}__isnull': True})
-        return queryset
-
     def get_queryset(self):
-        """Csak a cég számlái"""
+        """Company-scoped queryset with prefetch optimization"""
         company = getattr(self.request, 'company', None)
         if not company:
             return BillingoInvoice.objects.none()
 
-        queryset = BillingoInvoice.objects.filter(company=company).prefetch_related('items')
-
-        # String filters with operator support
-        queryset = self._apply_string_filter(
-            queryset, 'invoice_number',
-            self.request.query_params.get('invoice_number'),
-            self.request.query_params.get('invoice_number_operator', 'contains')
-        )
-
-        queryset = self._apply_string_filter(
-            queryset, 'partner_name',
-            self.request.query_params.get('partner_name'),
-            self.request.query_params.get('partner_name_operator', 'contains')
-        )
-
-        queryset = self._apply_string_filter(
-            queryset, 'type',
-            self.request.query_params.get('type'),
-            self.request.query_params.get('type_operator', 'contains')
-        )
-
-        queryset = self._apply_string_filter(
-            queryset, 'payment_status',
-            self.request.query_params.get('payment_status'),
-            self.request.query_params.get('payment_status_operator', 'equals')
-        )
-
-        # Boolean filter with operator support
-        queryset = self._apply_boolean_filter(
-            queryset, 'cancelled',
-            self.request.query_params.get('cancelled'),
-            self.request.query_params.get('cancelled_operator', 'is')
-        )
-
-        # Date filters with operator support
-        queryset = self._apply_date_filter(
-            queryset, 'invoice_date',
-            self.request.query_params.get('invoice_date'),
-            self.request.query_params.get('invoice_date_operator', 'is')
-        )
-
-        queryset = self._apply_date_filter(
-            queryset, 'due_date',
-            self.request.query_params.get('due_date'),
-            self.request.query_params.get('due_date_operator', 'is')
-        )
-
-        # Numeric filters with operator support
-        queryset = self._apply_numeric_filter(
-            queryset, 'gross_total',
-            self.request.query_params.get('gross_total'),
-            self.request.query_params.get('gross_total_operator', '=')
-        )
-
-        queryset = self._apply_numeric_filter(
-            queryset, 'net_total',
-            self.request.query_params.get('net_total'),
-            self.request.query_params.get('net_total_operator', '=')
-        )
-
-        # Legacy filters for backward compatibility (will be removed later)
-        # These handle old query params like from_date, to_date, etc.
-        from_date = self.request.query_params.get('from_date')
-        to_date = self.request.query_params.get('to_date')
-        if from_date:
-            queryset = queryset.filter(invoice_date__gte=from_date)
-        if to_date:
-            queryset = queryset.filter(invoice_date__lte=to_date)
-
-        due_date_from = self.request.query_params.get('due_date_from')
-        due_date_to = self.request.query_params.get('due_date_to')
-        if due_date_from:
-            queryset = queryset.filter(due_date__gte=due_date_from)
-        if due_date_to:
-            queryset = queryset.filter(due_date__lte=due_date_to)
-
-        gross_total_min = self.request.query_params.get('gross_total_min')
-        gross_total_max = self.request.query_params.get('gross_total_max')
-        if gross_total_min:
-            queryset = queryset.filter(gross_total__gte=gross_total_min)
-        if gross_total_max:
-            queryset = queryset.filter(gross_total__lte=gross_total_max)
-
-        net_total_min = self.request.query_params.get('net_total_min')
-        net_total_max = self.request.query_params.get('net_total_max')
-        if net_total_min:
-            queryset = queryset.filter(net_total__gte=net_total_min)
-        if net_total_max:
-            queryset = queryset.filter(net_total__lte=net_total_max)
-
-        partner_tax_number = self.request.query_params.get('partner_tax_number')
-        if partner_tax_number:
-            queryset = queryset.filter(partner_tax_number=partner_tax_number)
-
-        # Filter for invoices with related documents (corrections, storno, etc.)
-        # Only apply this filter to list view, not to retrieve (detail) view
-        # If hide_related_invoices=true (default), exclude both parent and child invoices
-        if self.action == 'list':
-            hide_related = self.request.query_params.get('hide_related_invoices', 'true').lower() == 'true'
-            if hide_related:
-                from ..models import BillingoRelatedDocument
-
-                # Get invoice IDs that have related documents (parent invoices)
-                invoices_with_related = BillingoRelatedDocument.objects.filter(
-                    invoice__company=company
-                ).values_list('invoice_id', flat=True).distinct()
-
-                # Get invoice IDs that are referenced in related_documents (child invoices)
-                related_invoice_ids = BillingoRelatedDocument.objects.filter(
-                    invoice__company=company
-                ).values_list('related_invoice_id', flat=True).distinct()
-
-                # Combine both exclusions - hide invoices that are either parent or child
-                all_related_ids = set(invoices_with_related) | set(related_invoice_ids)
-
-                if all_related_ids:
-                    queryset = queryset.exclude(id__in=all_related_ids)
-
-        return queryset
+        return BillingoInvoice.objects.filter(company=company).prefetch_related('items')
 
     def get_serializer_class(self):
         """Use list serializer for list view, detail for retrieve"""

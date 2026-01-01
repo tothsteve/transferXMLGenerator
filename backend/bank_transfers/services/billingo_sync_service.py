@@ -100,6 +100,97 @@ class BillingoSyncService:
 
         return results
 
+    def validate_and_test_credentials(self, api_key: str) -> Dict[str, any]:
+        """
+        Validate Billingo API credentials by making a test API call.
+
+        Args:
+            api_key: Decrypted Billingo API key to test
+
+        Returns:
+            dict: Validation result with structure:
+                {
+                    'valid': bool,
+                    'organization_name': str (if valid),
+                    'organization_tax_number': str (if valid),
+                    'error': str (if invalid)
+                }
+
+        Raises:
+            BillingoAPIError: If API call fails (invalid credentials, network error, etc.)
+        """
+        url = f"{self.BASE_URL}/documents"
+        headers = {
+            'X-API-KEY': api_key,
+            'Accept': 'application/json'
+        }
+        params = {
+            'page': 1,
+            'per_page': 1  # Fetch minimal data just to test credentials
+        }
+
+        try:
+            response = requests.get(url, headers=headers, params=params, timeout=10)
+
+            if response.status_code == 401:
+                return {
+                    'valid': False,
+                    'error': 'Érvénytelen API kulcs'
+                }
+
+            if response.status_code == 403:
+                return {
+                    'valid': False,
+                    'error': 'Hozzáférés megtagadva - ellenőrizze az API kulcs jogosultságait'
+                }
+
+            if response.status_code != 200:
+                return {
+                    'valid': False,
+                    'error': f'API hiba: HTTP {response.status_code}'
+                }
+
+            # Credentials are valid
+            data = response.json()
+
+            # Try to extract organization info from first invoice if available
+            organization_name = None
+            organization_tax_number = None
+
+            if data.get('data') and len(data['data']) > 0:
+                first_invoice = data['data'][0]
+                org = first_invoice.get('organization', {})
+                organization_name = org.get('name')
+                organization_tax_number = org.get('tax_number')
+
+            return {
+                'valid': True,
+                'organization_name': organization_name,
+                'organization_tax_number': organization_tax_number,
+            }
+
+        except requests.exceptions.Timeout:
+            return {
+                'valid': False,
+                'error': 'Időtúllépés - Billingo API nem elérhető'
+            }
+        except requests.exceptions.ConnectionError:
+            return {
+                'valid': False,
+                'error': 'Kapcsolódási hiba - ellenőrizze az internet kapcsolatot'
+            }
+        except requests.exceptions.RequestException as e:
+            return {
+                'valid': False,
+                'error': f'API kérés hiba: {str(e)}'
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error during credential validation: {str(e)}", exc_info=True)
+            return {
+                'valid': False,
+                'error': f'Váratlan hiba: {str(e)}'
+            }
+
     def sync_company(
         self,
         company: Company,

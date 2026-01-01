@@ -454,9 +454,9 @@ class RequireBillingoSync(FeatureBasedPermission):
     Requires BILLINGO_SYNC feature to be enabled for the company.
 
     Access levels by role:
-    - ADMIN: Full access (manage settings, trigger sync, view invoices)
-    - FINANCIAL: View only (cannot manage settings or trigger sync)
-    - ACCOUNTANT: View only (cannot manage settings or trigger sync)
+    - ADMIN: Full access (manage settings, trigger sync, test credentials, view invoices)
+    - FINANCIAL: View and test credentials (cannot manage settings or trigger sync)
+    - ACCOUNTANT: View only (cannot manage settings, trigger sync, or test credentials)
     - USER: No access
     """
 
@@ -491,6 +491,10 @@ class RequireBillingoSync(FeatureBasedPermission):
         # Settings management and sync trigger - ADMIN only
         if view.action in ['create', 'update', 'partial_update', 'destroy', 'trigger_sync']:
             return user_role == 'ADMIN'
+
+        # Test credentials - ADMIN and FINANCIAL can test API keys before saving
+        if view.action == 'test_credentials':
+            return user_role in ['ADMIN', 'FINANCIAL']
 
         # View operations - ADMIN, FINANCIAL, ACCOUNTANT
         if request.method in permissions.SAFE_METHODS:
