@@ -5,7 +5,7 @@ from decouple import config
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Development settings
-SECRET_KEY = config('SECRET_KEY', default='your-secret-key-here')
+SECRET_KEY = config('SECRET_KEY', default='your-secret-key-here-change-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
 ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
@@ -107,14 +107,16 @@ REDOC_SETTINGS = {
     'LAZY_RENDERING': False,
 }
 
-# PostgreSQL Database Configuration (for local development)
-# Switch back to SQL Server by uncommenting the SQL Server block below
+# Database Configuration
+# Choose ONE of the following configurations:
+
+# Option 1: PostgreSQL (recommended for local development matching production)
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'administration',
         'USER': 'postgres',
-        'PASSWORD': config('DB_PASSWORD', default='Almafa+123'),
+        'PASSWORD': config('DB_PASSWORD', default='your-db-password-here'),
         'HOST': 'localhost',
         'PORT': '5432',
         # Connection pooling - reuse connections for 600 seconds (10 minutes)
@@ -124,13 +126,13 @@ DATABASES = {
     }
 }
 
-# SQL Server Database Configuration (commented out)
+# Option 2: SQL Server (uncomment to use SQL Server instead)
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'mssql',
 #         'NAME': 'administration',
 #         'USER': 'sa',
-#         'PASSWORD': config('DB_PASSWORD', default='Almafa+123'),
+#         'PASSWORD': config('DB_PASSWORD', default='your-db-password-here'),
 #         'HOST': 'localhost',
 #         'PORT': '1435',
 #         'OPTIONS': {

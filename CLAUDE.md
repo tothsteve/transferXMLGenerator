@@ -152,6 +152,25 @@ Comprehensive bank statement import documentation (1200+ lines):
 - Never add "Co-Authored-By: Claude <noreply@anthropic.com>" to commits
 - Keep commit messages clean and professional without AI tool attribution
 
+## Local Development Setup
+
+### Backend Local Settings
+
+**CRITICAL:** `settings_local.py` is git-ignored and must be created manually.
+
+1. Copy the example file:
+   ```bash
+   cd backend/transferXMLGenerator
+   cp settings_local.py.example settings_local.py
+   ```
+
+2. Configure your database credentials in `settings_local.py`:
+   - Set `DB_PASSWORD` in your environment or `.env` file
+   - Choose PostgreSQL (recommended) or SQL Server
+   - Set `SECRET_KEY` for Django
+
+3. Never commit `settings_local.py` to git (it's in `.gitignore`)
+
 ## Development Commands
 
 ### Backend
