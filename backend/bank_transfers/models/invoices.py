@@ -116,7 +116,7 @@ class NavConfiguration(models.Model):
         return f"NAV konfiguráció - {self.company.name}"
     
     def save(self, *args, **kwargs):
-        from .services.credential_manager import CredentialManager
+        from ..services.credential_manager import CredentialManager
         credential_manager = CredentialManager()
         
         # Check if this is a new instance or if credential fields have changed
@@ -157,23 +157,23 @@ class NavConfiguration(models.Model):
         """Get decrypted technical user password"""
         if not self.technical_user_password:
             return ""
-        from .services.credential_manager import CredentialManager
+        from ..services.credential_manager import CredentialManager
         credential_manager = CredentialManager()
         return credential_manager.decrypt_credential(self.technical_user_password)
-    
+
     def get_decrypted_signing_key(self):
         """Get decrypted signing key"""
         if not self.signing_key:
             return ""
-        from .services.credential_manager import CredentialManager
+        from ..services.credential_manager import CredentialManager
         credential_manager = CredentialManager()
         return credential_manager.decrypt_credential(self.signing_key)
-    
+
     def get_decrypted_exchange_key(self):
         """Get decrypted exchange key"""
         if not self.exchange_key:
             return ""
-        from .services.credential_manager import CredentialManager
+        from ..services.credential_manager import CredentialManager
         credential_manager = CredentialManager()
         return credential_manager.decrypt_credential(self.exchange_key)
     
