@@ -1,6 +1,6 @@
 # Bank Statement Import - Field Mapping Documentation
 
-**Last Updated**: 2025-10-22
+**Last Updated**: 2026-01-01
 **System**: transferXMLGenerator - Multi-Bank Statement Import System
 
 ---
@@ -15,6 +15,7 @@
    - [Revolut Bank (CSV)](#revolut-bank-csv)
    - [MagNet Bank (XML)](#magnet-bank-xml)
    - [K&H Bank (PDF)](#kh-bank-pdf)
+   - [Raiffeisen Bank (PDF)](#raiffeisen-bank-pdf)
 5. [Import Process](#import-process)
 6. [Transaction Matching](#transaction-matching)
 7. [Troubleshooting](#troubleshooting)
@@ -208,13 +209,53 @@ Represents a single transaction from a bank statement.
 - **Detection**: Looks for "K&H Bank Zrt." and "BANKSZÁMLAKIVONAT" in PDF text
 - **Status**: ✅ Production-ready
 
+### 5. Raiffeisen Bank Zrt.
+
+- **Bank Code**: `RAIFFEISEN`
+- **BIC**: `UBRTHUHB`
+- **Format**: PDF
+- **Detection**: Checks for "RAIFFEISEN" and "UBRTHUHB" in PDF text with statement header "BANKSZ"
+- **PDF Library**: PyPDF2 (preserves word spacing for all-caps names)
+- **Character Encoding**: Custom CHAR_FIXES dictionary for Hungarian characters
+- **Special Features**:
+  - Multi-line company name handling with intelligent joining
+  - CamelCase spacing (e.g., "ITCardigan" → "IT Cardigan")
+  - Card merchant name extraction from line after "Referencia:"
+  - Merchant name populated in `reference` field for UI display consistency
+- **Status**: ✅ Production-ready
+
 ---
 
 ## Field Mapping
 
+### Summary: PDF Parsers by Bank
+
+Different banks require different PDF parsing libraries based on their PDF structure and encoding:
+
+| Bank | Format | PDF Library | Why This Library? |
+|------|--------|-------------|-------------------|
+| **GRÁNIT Bank** | PDF | **pdfplumber** | Standard PDF format, works well for GRÁNIT's structure |
+| **Revolut Bank** | CSV | N/A (CSV parser) | CSV format, no PDF parsing needed |
+| **MagNet Bank** | XML | N/A (XML parser) | NetBankXML format, no PDF parsing needed |
+| **K&H Bank** | PDF | **pdfplumber** | Standard PDF format, reliable text extraction |
+| **Raiffeisen Bank** | PDF | **PyPDF2** | Preserves word spacing in all-caps names (pdfplumber doesn't) |
+
+**Why different libraries?**
+
+- **pdfplumber**: Works well for most Hungarian bank PDFs (GRÁNIT, K&H)
+- **PyPDF2**: Required for Raiffeisen because:
+  - Preserves word boundaries in uppercase company names ("DANUBIUS EXPERT ZRT." not "DANUBIUSEXPERTZRT.")
+  - Better handling of Raiffeisen's specific PDF encoding
+  - Maintains spacing in multi-word all-caps text
+
+This is **NOT inconsistency** - it's adaptive engineering. Each bank's PDF format has different characteristics, and we use the best tool for each job.
+
+---
+
 ### GRÁNIT Bank (PDF)
 
 **Parser**: `GranitBankAdapter` (`bank_adapters/granit_adapter.py`)
+**PDF Library**: pdfplumber
 **Strategy**: Multi-line block parsing with regex extraction
 
 #### Statement Metadata
@@ -600,6 +641,7 @@ Complete XML element is stored in `raw_data` field for debugging and future enha
 ### K&H Bank (PDF)
 
 **Parser**: `KHBankAdapter` (`bank_adapters/kh_adapter.py`)
+**PDF Library**: pdfplumber
 **Format**: PDF (BANKSZÁMLAKIVONAT)
 **Strategy**: Multi-line block parsing with regex extraction
 
@@ -754,6 +796,305 @@ Parser uses regex with `re.DOTALL` to capture multi-line names and concatenates 
 **Raw Data**:
 
 Complete transaction block lines stored in `raw_data` field for debugging.
+
+---
+
+### Raiffeisen Bank (PDF)
+
+**Parser**: `RaiffeisenBankAdapter` (`bank_adapters/raiffeisen_adapter.py`)
+**PDF Library**: PyPDF2 (preserves word spacing, unlike pdfplumber)
+**Strategy**: Transaction block parsing with PyPDF2 text extraction and character encoding cleanup
+
+#### Key Technical Differences
+
+**Why PyPDF2 instead of pdfplumber?**
+
+Raiffeisen PDF statements require PyPDF2 because:
+1. **Word spacing preservation**: "DANUBIUS EXPERT ZRT." extracted correctly (not "DANUBIUSEXPERTZRT.")
+2. **All-caps company names**: PyPDF2 preserves word boundaries in uppercase text
+3. **Clean text extraction**: Better handling of Raiffeisen's specific PDF encoding
+
+**Character Encoding Issues**:
+
+Raiffeisen PDFs use special encoding that mangles Hungarian characters. The adapter uses a `CHAR_FIXES` dictionary:
+
+| Corrupted | Correct | Example |
+|-----------|---------|---------|
+| `£` | `á` | K**£**rtyatranzakci**©** → K**á**rtyatranzakci**ó** |
+| `©` | `é` | K**©**zlem**©**ny → K**é**zlem**é**ny |
+| `é` | `ö` | Sch**é**nherz → Sch**ö**nherz |
+| `ë` | `ó` | **ë**sszeg → **ó**sszeg |
+| `›` | `ő` | **›**sszes → **ő**sszes |
+| `¶` | `Á` | **¶**tutalás → **Á**tutalás |
+| `½` | `É` | **½**rt**©**k → **É**rt**é**k |
+| `ï` | `ü` | **ï**zenet → **ü**zenet |
+| `û` | `ű` | kí**û**tő → kí**ű**tő |
+
+**Multi-line Company Name Handling**:
+
+Raiffeisen company names often span multiple lines with intelligent joining:
+
+```
+Example: "Danubius Expert Consulting Z\nrt."
+
+Logic:
+- If next line starts with lowercase → Join WITHOUT space
+  "Z" + "rt." → "Zrt." ✅ (not "Z rt.")
+- If next line starts with uppercase → Join WITH space
+  "Danubius" + "Expert" → "Danubius Expert" ✅
+```
+
+**CamelCase Spacing**:
+
+```
+Input: "ITCardiganKft."
+
+Step 1: Handle acronyms - "ITCardigan" → "IT Cardigan"
+  Pattern: ([A-Z]+)([A-Z][a-z]) → \1 \2
+
+Step 2: Handle camelCase - "Cardigan" (already handled)
+  Pattern: ([a-z])([A-Z]) → \1 \2
+
+Output: "IT Cardigan Kft." ✅
+```
+
+#### Statement Metadata
+
+| PDF Source | Field | Extraction Pattern |
+|------------|-------|-------------------|
+| Header | `bank_name` | "Raiffeisen Bank Zrt." (constant) |
+| Constant | `bank_code` | "RAIFFEISEN" |
+| Header | `bank_bic` | "UBRTHUHB" |
+| "Számlaszám:" | `account_number` | Regex: `Számlaszám:\s*([\d-]+)` |
+| "IBAN:" | `account_iban` | Regex: `IBAN:\s*(HU\d{2}[\d\s]+)` |
+| "A kivonat időszaka:" | `period_from`, `period_to` | Regex: `(\d{4}\.\d{2}\.\d{2})\. - (\d{4}\.\d{2}\.\d{2})\.` |
+| "A kivonat sorszáma:" | `statement_number` | Regex: `A kivonat sorszáma:\s*(\S+)` |
+| "Nyitó egyenleg" | `opening_balance` | Regex: `Nyitó egyenleg\s+([\d\s.,]+)\s+HUF` |
+| "Záró egyenleg" | `closing_balance` | Regex: `Záró egyenleg\s+([\d\s.,]+)\s+HUF` |
+
+**Date Format**: "2025.12.31." (with trailing dot)
+
+**Amount Format**: European with dots as thousand separators (e.g., "1.080.000,00")
+
+#### Transaction Fields
+
+**Transaction Block Pattern**:
+
+Raiffeisen transactions start with a 10-digit ID and continue until next ID:
+
+```
+5411545603 2025.12.31. Kamat 8,31
+2025.12.31.
+
+5411545547 2025.12.31. Elektronikus forint átutalás -1.080.000,00
+2025.12.22. Referencia: AFK25L0001950742
+Kedvezményezett neve: Danubius Expert Consulting Zrt.
+Kedvezményezett számlaszáma:
+HU70167400152063900000000000
+Közlemény: 20241231
+Előjegyzett díj: 390,00 HUF Forgalmi jutalék
+```
+
+**First Line Pattern**: `transaction_id booking_date transaction_type amount`
+
+| PDF Source | Field | Notes |
+|------------|-------|-------|
+| 10-digit ID | `transaction_id` | E.g., "5411545603" |
+| After ID | `booking_date` | Format: "2025.12.31." (with dot) |
+| Second line | `value_date` | Same format as booking date |
+| Transaction type text | `transaction_type_code` | Full Raiffeisen description |
+| Last column on first line | `amount` | European format, signed |
+| Constant | `currency` | "HUF" |
+
+**Additional Transaction Details**:
+
+| PDF Pattern | Field | Character Cleanup |
+|-------------|-------|-------------------|
+| `Referencia: AFK...` | `payment_id` | ✅ Yes (applied to all extracted text) |
+| `Közlemény: ...` | `reference` | ✅ Yes - **CRITICAL for invoice matching** |
+| `Átutaló neve: ...` | `payer_name` (incoming) | ✅ Yes + CamelCase spacing + multi-line |
+| `Átutaló számlaszáma: HU...` | `payer_iban`, `payer_account_number` | ✅ Yes |
+| `Kedvezményezett neve: ...` | `beneficiary_name` (outgoing) | ✅ Yes + CamelCase spacing + multi-line |
+| `Kedvezményezett számlaszáma: HU...` | `beneficiary_iban`, `beneficiary_account_number` | ✅ Yes |
+| `Előjegyzett díj: ...` | `fee_amount` | ✅ Yes |
+
+#### Card Transaction Handling
+
+**Detection**: Card transactions have a masked card number pattern `\d{6}X+\d{4}`
+
+**Merchant Name Extraction**:
+
+```
+Example:
+Referencia:
+BARIONP BARION.COM/GUE BUDAPEST  ← This line is the merchant name
+Országkód: HU
+```
+
+**Card Transaction Fields**:
+
+| PDF Pattern | Field | UI Display |
+|-------------|-------|------------|
+| `402115XXXXXX1446` | `card_number` | Masked card number |
+| Line after "Referencia:" | `merchant_name` | Full merchant string |
+| Line after "Referencia:" | `payer_name` | Same as merchant_name |
+| **Line after "Referencia:"** | **`reference`** | **CRITICAL: Used for UI display** |
+| `Országkód: HU` | `merchant_location` | Country code |
+
+**Why merchant name goes in `reference` field?**
+
+For UI display consistency with GRÁNIT Bank, which shows merchant names in the `reference` field for card transactions. This ensures the transaction table displays merchant information uniformly across all banks.
+
+#### Transaction Type Detection
+
+Raiffeisen uses detailed Hungarian transaction type descriptions:
+
+| Pattern in Type Text | `transaction_type` | Direction | Notes |
+|----------------------|-------------------|-----------|-------|
+| "Kártyatranzakció" | `POS_PURCHASE` | Debit | Card purchase |
+| "Kamat" + amount > 0 | `INTEREST_CREDIT` | Credit | Interest earned |
+| "Kamat" + amount < 0 | `INTEREST_DEBIT` | Debit | Interest charged |
+| "átutalás" + amount > 0 | `TRANSFER_CREDIT` | Credit | Incoming transfer |
+| "átutalás" + amount < 0 | `TRANSFER_DEBIT` | Debit | Outgoing transfer |
+| Default | `OTHER` | - | Unknown type |
+
+**Directional Type Mapping**:
+
+Unlike other adapters, Raiffeisen must add direction suffix to transaction types:
+
+```python
+if base_type == 'TRANSFER':
+    return 'TRANSFER_CREDIT' if amount > 0 else 'TRANSFER_DEBIT'
+elif base_type == 'INTEREST':
+    return 'INTEREST_CREDIT' if amount > 0 else 'INTEREST_DEBIT'
+```
+
+This is required for BankTransaction model validation.
+
+#### Transaction Type Examples
+
+- `Elektronikus forint átutalás` - Electronic HUF transfer
+- `Kártyatranzakció` - Card transaction
+- `Kamat` - Interest
+- `Azonnali átutalás` - Instant transfer
+- `Készpénzfelvétel` - Cash withdrawal
+
+#### Balance Validation
+
+The adapter validates that transactions balance correctly:
+
+```
+opening_balance + sum(all transaction amounts) = closing_balance
+
+Example from test statement:
+Opening: 0.00
+Total credits: +4,788,408.31
+Total debits: -2,418,670.00
+Net change: +2,369,738.31
+Closing: 2,369,738.31 ✅ Matches!
+```
+
+#### Special Cases and Workarounds
+
+**1. Multi-line Beneficiary Names**
+
+Problem: Company names span multiple lines in PDF
+```
+Kedvezményezett neve: Danubius Expert Consulting Z
+rt.
+```
+
+Solution: Join lines intelligently based on capitalization:
+```python
+if line.startswith_lowercase():
+    join_without_space()  # "Zrt." not "Z rt."
+else:
+    join_with_space()     # "Expert Consulting"
+```
+
+**2. CamelCase Company Names**
+
+Problem: PDF extraction merges words
+```
+ITCardiganKft.
+```
+
+Solution: Insert spaces using regex patterns:
+```python
+# Step 1: IT + Cardigan → "IT Cardigan"
+re.sub(r'([A-Z]+)([A-Z][a-z])', r'\1 \2', name)
+
+# Step 2: Cardigan + Kft → "Cardigan Kft."
+re.sub(r'([a-z])([A-Z])', r'\1 \2', name)
+```
+
+**3. All-Uppercase Names**
+
+Problem: pdfplumber loses word spacing in all-caps text
+```
+"DANUBIUSEXPERTZRT."  ❌ Wrong
+```
+
+Solution: Use PyPDF2 instead
+```
+"DANUBIUS EXPERT ZRT."  ✅ Correct
+```
+
+**4. Hungarian Character Corruption**
+
+Problem: PDF encoding mangles Hungarian characters
+```
+"K£rtyatranzakci©"  ❌ Wrong (£=á corruption, ©=é corruption)
+```
+
+Solution: CHAR_FIXES dictionary cleanup
+```
+"Kártyatranzakció"  ✅ Correct
+```
+
+**5. Card Transaction Merchant Display**
+
+Problem: UI shows empty reference for card transactions
+
+Solution: Populate `reference` field with merchant name:
+```python
+if card_transaction:
+    details['kozlemeny'] = merchant_name  # Used for reference field
+```
+
+This ensures UI displays merchant name consistently across all banks.
+
+#### Test Coverage
+
+The adapter has comprehensive test coverage (16 tests):
+
+**Detection Tests (3)**:
+- Valid Raiffeisen PDF detection ✅
+- Invalid PDF rejection ✅
+- Other bank PDF rejection ✅
+
+**Parsing Tests (7)**:
+- Metadata extraction (account, IBAN, period, balances) ✅
+- Transaction count verification ✅
+- Transfer transaction parsing ✅
+- Card transaction parsing (with merchant extraction) ✅
+- Interest transaction parsing ✅
+- Transaction type enum validation ✅
+- Balance calculation validation ✅
+
+**Character Encoding Tests (2)**:
+- Hungarian character cleanup ✅
+- Normal text preservation ✅
+
+**Name Formatting Tests (2)**:
+- CamelCase spacing ("ITCardigan" → "IT Cardigan") ✅
+- Multi-line company name joining ✅
+
+**PyPDF2 Integration Tests (2)**:
+- PyPDF2 library usage verification ✅
+- All-caps name spacing validation ✅
+
+Run tests: `pytest bank_transfers/tests/test_raiffeisen_adapter.py -v`
 
 ---
 

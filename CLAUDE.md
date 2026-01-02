@@ -176,6 +176,22 @@ python manage.py createsuperuser
 python manage.py import_base_tables --company-id=<ID> --csv-type=suppliers --csv-path=<PATH>
 python manage.py import_base_tables --company-id=<ID> --csv-type=customers --csv-path=<PATH>
 python manage.py import_base_tables --company-id=<ID> --csv-type=prices --csv-path=<PATH>
+
+# ⚠️ IMPORTANT: Running Tests
+# ALWAYS activate the virtual environment first from the backend directory
+source venv/bin/activate
+
+# Run all tests
+pytest
+
+# Run specific test file
+pytest bank_transfers/tests/test_transaction_matching_service.py -v
+
+# Run tests with coverage report
+pytest --cov=bank_transfers --cov-report=term --cov-report=html
+
+# View HTML coverage report
+open htmlcov/index.html
 ```
 
 ### Frontend

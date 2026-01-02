@@ -7,12 +7,13 @@ WITH matched AS (
         bi.id AS invoice_id,
         bi.invoice_number,
         bi.invoice_date,
+        bi.fulfillment_date,
         bi.online_szamla_status,
         bi.cancelled,
         bi."type",
         bii.id AS item_id,
         bii.name,
-        bii.net_amount,
+        bii.net_amount*bi.conversion_rate net_amount,
         p.product_value,
         p.product_description,
         p.purchase_price_huf,
@@ -30,18 +31,17 @@ WITH matched AS (
     LEFT JOIN bank_transfers_productprice p 
         ON bii.name LIKE p.product_value || '%' and bi.fulfillment_date between p.valid_from and coalesce(p.valid_to , '9999-12-31')
         where type != 'draft' 
-          and not exists (select 1 from bank_transfers_billingorelateddocument br 
-          								 WHERE br.invoice_id = bi.id 
-       												OR br.related_invoice_id = bi.id)
 )
 select
     invoice_id,
     invoice_number,
     invoice_date,
+    fulfillment_date,
     online_szamla_status,
     cancelled,
     "type",
     item_id,
+    net_amount,
     name,
     product_value,
     product_description,
@@ -111,7 +111,7 @@ select bt.id, 'other' category, null paid_at, bt.booking_date fulfillment_date,
   from bank_transfers_banktransaction bt 
         inner join bank_transfers_bankstatement bs on  bs.id = bt.bank_statement_id  and bs.company_id  = 3
         left outer join v_supplier_with_cat_and_type s on bt.booking_date between s.valid_from and s.valid_to and bt.beneficiary_name = s.partner_name 
-where bt.beneficiary_name in ('Kövesi Dániel', 'Fekete Dávid','Turcsán János Gábor') or bt.beneficiary_name like '%NAV%'
+where bt.beneficiary_name in ('Kövesi Dániel', 'Fekete Dávid', 'Turcsán János Gábor') or bt.beneficiary_name like '%NAV%'
 ; 
 
 

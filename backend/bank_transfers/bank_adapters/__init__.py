@@ -16,6 +16,7 @@ from .granit_adapter import GranitBankAdapter
 from .revolut_adapter import RevolutAdapter
 from .magnet_adapter import MagnetBankAdapter
 from .kh_adapter import KHBankAdapter
+from .raiffeisen_adapter import RaiffeisenBankAdapter
 
 __all__ = [
     'BankStatementAdapter',
@@ -27,4 +28,5 @@ __all__ = [
     'RevolutAdapter',
     'MagnetBankAdapter',
     'KHBankAdapter',
+    'RaiffeisenBankAdapter',
 ]

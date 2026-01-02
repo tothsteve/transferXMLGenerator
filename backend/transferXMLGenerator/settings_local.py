@@ -107,24 +107,39 @@ REDOC_SETTINGS = {
     'LAZY_RENDERING': False,
 }
 
-# SQL Server Database Configuration (for local development)
+# PostgreSQL Database Configuration (for local development)
+# Switch back to SQL Server by uncommenting the SQL Server block below
 DATABASES = {
     'default': {
-        'ENGINE': 'mssql',
+        'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'administration',
-        'USER': 'sa',
+        'USER': 'postgres',
         'PASSWORD': config('DB_PASSWORD', default='Almafa+123'),
         'HOST': 'localhost',
-        'PORT': '1435',
-        'OPTIONS': {
-            'driver': 'ODBC Driver 17 for SQL Server',
-        },
+        'PORT': '5432',
         # Connection pooling - reuse connections for 600 seconds (10 minutes)
         'CONN_MAX_AGE': 600,
         # Health checks - validate connection before reuse
         'CONN_HEALTH_CHECKS': True,
     }
 }
+
+# SQL Server Database Configuration (commented out)
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'mssql',
+#         'NAME': 'administration',
+#         'USER': 'sa',
+#         'PASSWORD': config('DB_PASSWORD', default='Almafa+123'),
+#         'HOST': 'localhost',
+#         'PORT': '1435',
+#         'OPTIONS': {
+#             'driver': 'ODBC Driver 17 for SQL Server',
+#         },
+#         'CONN_MAX_AGE': 600,
+#         'CONN_HEALTH_CHECKS': True,
+#     }
+# }
 
 # Static files
 STATIC_URL = '/static/'

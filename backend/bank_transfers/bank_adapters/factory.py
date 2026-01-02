@@ -13,6 +13,7 @@ from .granit_adapter import GranitBankAdapter
 from .revolut_adapter import RevolutAdapter
 from .magnet_adapter import MagnetBankAdapter
 from .kh_adapter import KHBankAdapter
+from .raiffeisen_adapter import RaiffeisenBankAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ class BankAdapterFactory:
         RevolutAdapter,
         MagnetBankAdapter,
         KHBankAdapter,
+        RaiffeisenBankAdapter,
         # Future adapters:
         # OTPBankAdapter,
         # CIBBankAdapter,

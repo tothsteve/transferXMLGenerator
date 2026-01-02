@@ -27,7 +27,9 @@
       "Bash(npm run lint:*)",
       "Bash(awk:*)",
       "Bash(npx eslint:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(wc:*)",
+      "Bash(tree:*)"
     ],
     "deny": []
   }

@@ -10,7 +10,8 @@
       "Bash(npx tsc:*)",
       "Read(//Users/tothi/Workspace/ITCardigan/TransferGenerator/**)",
       "Bash(pkill:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(venv/bin/python:*)"
     ],
     "deny": [],
     "ask": []
