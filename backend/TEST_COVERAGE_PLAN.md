@@ -4,7 +4,7 @@
 **Target Coverage**: 80%
 **Gap**: 45.21%
 
-**Last Updated**: 2026-01-02
+**Last Updated**: 2026-01-03
 
 ## Current Status
 
@@ -37,7 +37,7 @@
 
 | File | Current | Target | Gap | Lines Missed | Priority |
 |------|---------|--------|-----|--------------|----------|
-| `services/transaction_matching_service.py` | 5.90% | 80% | 74.1% | 408/447 | **CRITICAL** |
+| `services/transaction_matching_service.py` | 59.30% ⬆️ | 80% | 20.7% | 172/447 | **IN PROGRESS** |
 | `services/invoice_sync_service.py` | 6.86% | 80% | 73.14% | 422/464 | **CRITICAL** |
 | `services/nav_client.py` | 7.55% | 80% | 72.45% | 378/418 | **CRITICAL** |
 | `services/bank_statement_parser_service.py` | 15.24% | 80% | 64.76% | 117/142 | **HIGH** |
@@ -122,16 +122,19 @@ All management commands have 0% coverage. These can be tested manually or with i
 ### Phase 1: Critical Services (Week 1)
 **Goal**: Raise critical services from 5-15% to 80%+
 
-- [ ] **Day 1-2**: Transaction Matching Service
-  - [ ] Test exact amount matching
-  - [ ] Test fuzzy amount matching (±1%)
-  - [ ] Test date range matching
-  - [ ] Test reference number matching
-  - [ ] Test beneficiary account matching
-  - [ ] Test invoice number matching
-  - [ ] Test combined multi-field matching
-  - [ ] Test confidence level calculation
-  - [ ] Test duplicate match prevention
+- [x] **Day 1-2**: Transaction Matching Service ✅ **59.30% coverage** (+53.40%)
+  - [x] Test exact amount matching
+  - [x] Test fuzzy amount matching (±1%)
+  - [x] Test date range matching
+  - [x] Test reference number matching (invoice number & tax number)
+  - [x] Test beneficiary account matching (IBAN)
+  - [x] Test batch invoice matching
+  - [x] Test confidence level calculation
+  - [x] Test auto-payment threshold (≥0.90)
+  - [x] Test duplicate match prevention
+  - [x] Test system transaction exclusions (fees, interest)
+  - [x] Test edge cases (no candidates, currency mismatch)
+  - **Result**: 22 test cases, 100% passing
 
 - [ ] **Day 3-4**: Invoice Sync Service
   - [ ] Test NAV API client integration
@@ -257,10 +260,14 @@ pytest bank_transfers/tests/test_transaction_matching_service.py -v
 - ✅ Model tests (26 tests)
 - ✅ Filter tests (8 tests)
 - ✅ View tests (20 tests)
+- ✅ **Transaction Matching Service tests** (22 tests, 100% passing)
+  - **Coverage**: 5.90% → 59.30% (+53.40%)
+  - All 7 matching strategies tested
+  - Auto-payment threshold validation
+  - Edge cases and duplicate prevention
 
 ### In Progress
-- 🔄 Transaction Matching Service tests
-- 🔄 Invoice Sync Service tests
+- 🔄 Invoice Sync Service tests (NEXT)
 - 🔄 NAV Client tests
 
 ### Pending
@@ -293,6 +300,10 @@ pytest bank_transfers/tests/test_transaction_matching_service.py -v
 - **Goal**: Raise Services category from 12.19% → 50%
 - **Focus**: Transaction Matching, Invoice Sync, NAV Client
 - **Deliverable**: ~100 new test cases, 3 new test files
+- **Progress**:
+  - ✅ Transaction Matching: 5.90% → 59.30% (+53.40%) - 22 tests
+  - ⏳ Invoice Sync: 6.86% (pending)
+  - ⏳ NAV Client: 7.55% (pending)
 
 ### Week 2
 - **Goal**: Raise Services category from 50% → 70%
